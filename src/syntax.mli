@@ -212,7 +212,7 @@ and exp = Pow of binary_exp
         | Compr of comprehension
         | Array of exp list
         | MArray of (exp list) list
-        | ExplicitPartialFunction of exp
+        | ExplicitClosure of exp
         | Empty | Der | Initial
 
 and idx = { variable : string ; range : exp option }
