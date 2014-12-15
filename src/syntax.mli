@@ -125,7 +125,7 @@ and statement_desc = Assignment of assignment
                    | ForStmt of for_statement
                    | WhileStmt of while_statement
 
-and assignment = { target : exp ; source : exp } (* TODO: change lhs from exp to dedicated lhs type *)
+and assignment = { target : exp ; source : exp }
 
 and 'a else_condition = { guard : exp ; elsethen : 'a list }
                    
