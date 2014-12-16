@@ -95,7 +95,8 @@ expr:
   | left = expr DOTDIV right = expr
        { DDiv ( {left ; right} ) } 
 
-
+  | object_ = expr DOT field = IDENT
+       { Proj { object_ ; field } }
 
 
 
