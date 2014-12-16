@@ -29,6 +29,7 @@
 open Lexing
 open Generated_parser
 open Sedlexing
+open Batteries
        
 type cursor = Location.t
 
@@ -209,8 +210,8 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | "==" -> EQEQ
     | '[' ->  LBRACKET 
     | ']' ->  RBRACKET
-    | '\'' -> s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; quoted_content ()
-    | '"' ->  s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; string_content ()
+    | '\'' -> s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; quoted_content Text.empty
+    | '"' ->  s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; string_content Text.empty
     | Opt('-'), number, '.', Opt( number ), Opt ( 'e', Opt('+' | '-'), number ) ->  ( FLOAT ( float_of_string (Sedlexing.Utf8.lexeme buf) ) )
     | '.' ->  ( DOT )
     | Opt('-'), number ->  ( INT ( int_of_string (current () ) ))
@@ -232,21 +233,21 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | any -> terminate_comment ()
     | _ -> failwith "no match on 'any'. This cannot happen"
 
-  and string_content () =
+  and string_content current =
     match %sedlex buf with
-      "\\\"" -> string_content ()
-    | "\r\n" | '\n' | '\r' ->  s_cursor.str_line <- (s_cursor.str_line + 1) ; s_cursor.str_bol <- Sedlexing.lexeme_end buf ; string_content () 
-    | '"' -> s_cursor.str_end <- Sedlexing.lexeme_end buf ; STRING ( Sedlexing.Utf8.sub_lexeme buf s_cursor.str_start s_cursor.str_end )
+      '\\','\"' -> string_content (Text.append_char (UChar.of_char '"') current)
+    | "\r\n" | '\n' | '\r' ->  s_cursor.str_line <- (s_cursor.str_line + 1) ; s_cursor.str_bol <- Sedlexing.lexeme_end buf ; string_content (Text.append_char (UChar.of_char '\n') current) 
+    | '"' -> s_cursor.str_end <- (Sedlexing.lexeme_end buf) - 1  ; STRING ( Text.to_string current )
     | eof -> EOF
-    | any -> string_content ()
+    | any -> string_content (Text.append_char (UChar.of_int (Sedlexing.lexeme_char buf 0)) current)
     | _ -> failwith "no match on 'any'. This cannot happen"
                             
-  and quoted_content () =
+  and quoted_content current =
     match %sedlex buf with
-      "\\\"" -> string_content ()
-    | "\r\n" | '\n' | '\r' ->  s_cursor.str_line <- (s_cursor.str_line + 1) ; s_cursor.str_bol <- Sedlexing.lexeme_end buf ; quoted_content () 
-    | '\'' -> s_cursor.str_end <- Sedlexing.lexeme_end buf ; QIDENT ( Sedlexing.Utf8.sub_lexeme buf s_cursor.str_start s_cursor.str_end )
+      "\\\"" -> quoted_content (Text.append_char (UChar.of_char '"') current)
+    | "\r\n" | '\n' | '\r' ->  s_cursor.str_line <- (s_cursor.str_line + 1) ; s_cursor.str_bol <- Sedlexing.lexeme_end buf ; quoted_content (Text.append_char (UChar.of_char '\n') current)  
+    | '\'' -> s_cursor.str_end <- Sedlexing.lexeme_end buf ; QIDENT ( Text.to_string current )
     | eof -> EOF
-    | any -> quoted_content ()
+    | any -> quoted_content (Text.append_char (UChar.of_int (Sedlexing.lexeme_char buf 0)) current)
     | _ -> failwith "no match on 'any'. This cannot happen"                                                                 
   in lift (token ())
