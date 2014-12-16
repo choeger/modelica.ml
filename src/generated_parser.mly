@@ -73,6 +73,8 @@ expr:
         { Int (i) }
   | f = FLOAT
         { Real (f) }
+  | s = STRING
+        { String(s) }
   | x = IDENT 
         { Ide(x) }
   | x = QIDENT 
