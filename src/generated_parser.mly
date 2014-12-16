@@ -26,11 +26,12 @@
  *
  *)
 
-%token GT LT NEQ GEQ LEQ EQ EQEQ LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE SEMICOLON COMMA DOT
+%token GT LT NEQ GEQ LEQ EQ EQEQ LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE SEMICOLON COMMA DOT COLON
 
 %token <int> INT
 %token <float> FLOAT
 %token <string> IDENT
+%token <string> QIDENT                                 
 %token <string> STRING
 %token DOTPOWER POWER PLUS MINUS TIMES DIV DOTPLUS DOTMINUS DOTTIMES DOTDIV 
 %token EOF
@@ -74,6 +75,8 @@ expr:
         { Real (f) }
   | x = IDENT 
         { Ide(x) }
+  | x = QIDENT 
+        { Ide(x) }
   | LPAREN e = expr RPAREN
         { e }
 
@@ -96,6 +99,8 @@ expr:
        { DDiv ( {left ; right} ) } 
 
   | object_ = expr DOT field = IDENT
+       { Proj { object_ ; field } }
+  | object_ = expr DOT field = QIDENT
        { Proj { object_ ; field } }
 
 

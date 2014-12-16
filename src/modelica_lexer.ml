@@ -151,15 +151,15 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
   
   let lift token =
     let loc_start = match token with
-        STRING(_) -> { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ; 
-		       pos_cnum = s_cursor.str_start ; pos_fname = src }
+        STRING(_) | QIDENT(_) -> { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ; 
+		                   pos_cnum = s_cursor.str_start ; pos_fname = src }
       | _ -> { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ; 
 	       pos_cnum = lexeme_start buf ; pos_fname = src }
     in
     let loc_end = match token with
-        (* the only token that can span multiple lines is the string *)
-        STRING(s) -> { pos_lnum = s_cursor.str_line ; pos_bol = s_cursor.str_bol ; 
-		       pos_cnum = s_cursor.str_end ; pos_fname = src }
+        (* the only tokens that can span multiple lines are strings and quoted identifiers *)
+        STRING(_) | QIDENT(_) -> { pos_lnum = s_cursor.str_line ; pos_bol = s_cursor.str_bol ; 
+		                   pos_cnum = s_cursor.str_end ; pos_fname = src }
       | _ -> { loc_start with pos_cnum = lexeme_start buf + lexeme_length buf }
     in     
     let tok = { token ; cursor = { loc_start ; loc_end ; loc_ghost = false } } 
@@ -185,6 +185,7 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | Plus ( white_space ) -> token ()
     | eof ->  ( EOF )
 
+    | ':' -> COLON
     | ',' -> COMMA
     | ';' -> SEMICOLON
     | '(' ->  LPAREN 
@@ -208,12 +209,13 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | "==" -> EQEQ
     | '[' ->  LBRACKET 
     | ']' ->  RBRACKET
-    | '\'', Plus ( id_continue ), '\'' -> IDENT (Sedlexing.Utf8.lexeme buf)
+    | '\'' -> s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; quoted_content ()
     | '"' ->  s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; string_content ()
     | Opt('-'), number, '.', Opt( number ), Opt ( 'e', Opt('+' | '-'), number ) ->  ( FLOAT ( float_of_string (Sedlexing.Utf8.lexeme buf) ) )
     | '.' ->  ( DOT )
     | Opt('-'), number ->  ( INT ( int_of_string (current () ) ))
 
+    | "//", Star ( Compl ('\n' | '\r') ) -> token ()
     | "/*" -> terminate_comment ()
 
     | (id_start | '_'), Star ( id_continue ) -> ident_or_kw () 
@@ -239,5 +241,12 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | any -> string_content ()
     | _ -> failwith "no match on 'any'. This cannot happen"
                             
-                                                                 
+  and quoted_content () =
+    match %sedlex buf with
+      "\\\"" -> string_content ()
+    | "\r\n" | '\n' | '\r' ->  s_cursor.str_line <- (s_cursor.str_line + 1) ; s_cursor.str_bol <- Sedlexing.lexeme_end buf ; quoted_content () 
+    | '\'' -> s_cursor.str_end <- Sedlexing.lexeme_end buf ; QIDENT ( Sedlexing.Utf8.sub_lexeme buf s_cursor.str_start s_cursor.str_end )
+    | eof -> EOF
+    | any -> quoted_content ()
+    | _ -> failwith "no match on 'any'. This cannot happen"                                                                 
   in lift (token ())
