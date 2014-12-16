@@ -208,6 +208,7 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | "==" -> EQEQ
     | '[' ->  LBRACKET 
     | ']' ->  RBRACKET
+    | '\'', Plus ( id_continue ), '\'' -> IDENT (Sedlexing.Utf8.lexeme buf)
     | '"' ->  s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; string_content ()
     | Opt('-'), number, '.', Opt( number ), Opt ( 'e', Opt('+' | '-'), number ) ->  ( FLOAT ( float_of_string (Sedlexing.Utf8.lexeme buf) ) )
     | '.' ->  ( DOT )
@@ -215,7 +216,7 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
 
     | "/*" -> terminate_comment ()
 
-    | (id_start | '_'), Star ( id_continue | '\'' ) -> ident_or_kw () 
+    | (id_start | '_'), Star ( id_continue ) -> ident_or_kw () 
     | any -> failwith (Printf.sprintf "Unexpected character '%s'" (Sedlexing.Utf8.lexeme buf))
     | _ -> failwith "no match on 'any'. This cannot happen"
 					  
