@@ -209,11 +209,12 @@ and exp = Pow of binary_exp
         | Bool of bool
         | Int of int
         | Real of float
+        | String of string
         | Compr of comprehension
         | Array of exp list
         | MArray of (exp list) list
         | ExplicitClosure of exp
-        | Empty | Der | Initial
+        | End | Colon | Empty | Der | Initial
 
 and idx = { variable : string ; range : exp option }
 
