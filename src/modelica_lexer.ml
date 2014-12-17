@@ -173,8 +173,69 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     m_cursor.m_line <- (m_cursor.m_line + 1) ;
     m_cursor.m_bol <- Sedlexing.lexeme_end buf ;
   in
-  
+
+  (* to regenerate using zsh: for N $KEYWORD_TOKEN; do echo "    | \"$N:l\" -> $N"; done | sort *)
   let ident_or_kw () = match (Sedlexing.Utf8.lexeme buf) with
+    | "algorithm" -> ALGORITHM
+    | "and" -> AND
+    | "annotation" -> ANNOTATION
+    | "assert" -> ASSERT
+    | "block" -> BLOCK
+    | "break" -> BREAK
+    | "class" -> CLASS
+    | "connect" -> CONNECT
+    | "connector" -> CONNECTOR
+    | "constant" -> CONSTANT
+    | "constrainedby" -> CONSTRAINEDBY
+    | "der" -> DER
+    | "discrete" -> DISCRETE
+    | "each" -> EACH
+    | "else" -> ELSE
+    | "elseif" -> ELSEIF
+    | "elsewhen" -> ELSEWHEN
+    | "encapsulated" -> ENCAPSULATED
+    | "end" -> END
+    | "enumeration" -> ENUMERATION
+    | "equation" -> EQUATION
+    | "expandable" -> EXPANDABLE
+    | "extends" -> EXTENDS
+    | "external" -> EXTERNAL
+    | "false" -> FALSE
+    | "final" -> FINAL
+    | "flow" -> FLOW
+    | "for" -> FOR
+    | "function" -> FUNCTION
+    | "if" -> IF
+    | "import" -> IMPORT
+    | "impure" -> IMPURE
+    | "in" -> IN
+    | "initial" -> INITIAL
+    | "inner" -> INNER
+    | "input" -> INPUT
+    | "loop" -> LOOP
+    | "model" -> MODEL
+    | "not" -> NOT
+    | "operator" -> OPERATOR
+    | "or" -> OR
+    | "outer" -> OUTER
+    | "output" -> OUTPUT
+    | "package" -> PACKAGE
+    | "parameter" -> PARAMETER
+    | "partial" -> PARTIAL
+    | "protected" -> PROTECTED
+    | "public" -> PUBLIC
+    | "pure" -> PURE
+    | "record" -> RECORD
+    | "redeclare" -> REDECLARE
+    | "replaceable" -> REPLACEABLE
+    | "return" -> RETURN
+    | "stream" -> STREAM
+    | "then" -> THEN
+    | "true" -> TRUE
+    | "type" -> TYPE
+    | "when" -> WHEN
+    | "while" -> WHILE
+    | "within" -> WITHIN
     |  _ as x -> IDENT (x)
   in
 
@@ -210,7 +271,7 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | "==" -> EQEQ
     | '[' ->  LBRACKET 
     | ']' ->  RBRACKET
-    | '\'' -> s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; quoted_content Text.empty
+    | '\'' -> s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; quoted_content (Text.of_char '\'')
     | '"' ->  s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; string_content Text.empty
     | Opt('-'), number, '.', Opt( number ), Opt ( 'e', Opt('+' | '-'), number ) ->  ( FLOAT ( float_of_string (Sedlexing.Utf8.lexeme buf) ) )
     | '.' ->  ( DOT )
@@ -244,9 +305,9 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
                             
   and quoted_content current =
     match %sedlex buf with
-      "\\\"" -> quoted_content (Text.append_char (UChar.of_char '"') current)
+      "\\\'" -> quoted_content (Text.append_char (UChar.of_char '\'') current)
     | "\r\n" | '\n' | '\r' ->  s_cursor.str_line <- (s_cursor.str_line + 1) ; s_cursor.str_bol <- Sedlexing.lexeme_end buf ; quoted_content (Text.append_char (UChar.of_char '\n') current)  
-    | '\'' -> s_cursor.str_end <- Sedlexing.lexeme_end buf ; QIDENT ( Text.to_string current )
+    | '\'' -> s_cursor.str_end <- Sedlexing.lexeme_end buf ; QIDENT ( Text.to_string (Text.append_char (UChar.of_char '\'') current) )
     | eof -> EOF
     | any -> quoted_content (Text.append_char (UChar.of_int (Sedlexing.lexeme_char buf 0)) current)
     | _ -> failwith "no match on 'any'. This cannot happen"                                                                 
