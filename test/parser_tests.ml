@@ -78,7 +78,7 @@ let test_cases = [
 
   expr "\"foo \n bar\"" (String "foo \n bar") ;
 
-  expr "\"\\\"\"" (String "\\\"") ;
+  expr "\"\\\"\"" (String "\"") ;
 
   (let x = (String.repeat "ABC" 1000) in
    expr ("\"" ^ x ^ "\"") (String x) );
