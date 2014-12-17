@@ -48,8 +48,8 @@ let expr input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::
        expr_test input (fun e -> assert_equal ~msg:"equality of parsed expression" ~printer:expr2str expected e ) ) ;
-    (* ("re-parsing" >::
-       expr_test input (fun e -> expr_test (expr2str ~max:100 e) (fun e -> assert_equal ~msg:"equality of re-parsed expression" ~printer:expr2str (prep_expr expected) (prep_expr e)) ())) ; *)
+     ("re-parsing" >::
+       expr_test input (fun e -> expr_test (expr2str ~max:100 e) (fun e -> assert_equal ~msg:"equality of re-parsed expression" ~printer:expr2str expected e) ())) ; 
   ]
       
 let test_cases = [ 
