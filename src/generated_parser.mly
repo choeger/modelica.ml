@@ -96,7 +96,10 @@ expr:
        { Mul ( {left ; right} ) } 
   | left = expr DIV right = expr
        { Div ( {left ; right} ) } 
+  | left = expr POWER right = expr
+       { Pow ( {left ; right} ) } 
 
+       
   | left = expr DOTPLUS right = expr
        { DPlus ( {left ; right} ) } 
   | left = expr DOTMINUS right = expr
@@ -105,6 +108,8 @@ expr:
        { DMul ( {left ; right} ) } 
   | left = expr DOTDIV right = expr
        { DDiv ( {left ; right} ) } 
+  | left = expr DOTPOWER right = expr
+       { DPow ( {left ; right} ) } 
 
   | object_ = expr DOT field = IDENT
        { Proj { object_ ; field } }
