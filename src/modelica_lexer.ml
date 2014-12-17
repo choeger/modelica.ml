@@ -299,6 +299,15 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
   and string_content current =
     match %sedlex buf with
       '\\','\"' -> string_content (Text.append_char (UChar.of_char '"') current)
+    | "\\?" -> string_content (Text.append_char (UChar.of_char '?') current)
+    | "\\a" -> string_content (Text.append_char (UChar.of_char '\x07') current)
+    | "\\b" -> string_content (Text.append_char (UChar.of_char '\x08') current)
+    | "\\f" -> string_content (Text.append_char (UChar.of_char '\x0C') current)
+    | "\\n" -> string_content (Text.append_char (UChar.of_char '\n') current)
+    | "\\r" -> string_content (Text.append_char (UChar.of_char '\r') current)
+    | "\\t" -> string_content (Text.append_char (UChar.of_char '\t') current)
+    | "\\v" -> string_content (Text.append_char (UChar.of_char '\x0B') current)                              
+    | "\\\\" -> string_content (Text.append_char (UChar.of_char '\\') current)                                                                              
     | "\r\n" | '\n' | '\r' ->  s_cursor.str_line <- (s_cursor.str_line + 1) ; s_cursor.str_bol <- Sedlexing.lexeme_end buf ; string_content (Text.append_char (UChar.of_char '\n') current) 
     | '"' -> s_cursor.str_end <- (Sedlexing.lexeme_end buf) - 1  ; STRING ( Text.to_string current )
     | eof -> EOF
