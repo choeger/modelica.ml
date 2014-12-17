@@ -99,7 +99,7 @@ and pp_expr fmt = function
   | ArrayAccess { lhs ; indices } -> fprintf fmt "@[%a[%a]@]" pp_expr lhs (pp_list ~sep:", " pp_expr) indices 
   | ExplicitClosure e -> fprintf fmt "@[function %a@]" pp_expr e
   | Tuple es -> fprintf fmt "@[(%a)@]" (pp_list ~sep:", " pp_expr) es
-  | Empty -> ()
+  | Empty -> fprintf fmt "@[()@]"
 
 and pp_named_arg fmt (name,expr) =
   fprintf fmt "@[%s = %a@]" name pp_expr expr
