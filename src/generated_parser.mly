@@ -81,8 +81,8 @@ expr:
         { Ide(x) }
   | x = QIDENT 
         { Ide(x) }
-  | LPAREN e = expr RPAREN
-        { e }
+  | LPAREN e = option (expr) RPAREN
+        { match e with Some e -> e | None -> Empty }
   | END { End }
   | DER { Der }
   | INITIAL { Initial }
