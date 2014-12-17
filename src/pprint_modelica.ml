@@ -49,7 +49,8 @@ let rec pp_enum ?(sep="") pp_element fmt enum = match (Enum.get enum) with
 and pp_expr fmt = function
     Ide(x) -> fprintf fmt "@[%s@]" x
   | RootIde(x) -> fprintf fmt "@[.%s@]" x
-  | If {condition; then_; else_if; else_} -> fprintf fmt "@[if@ %a@ then@ %a@ else@ %a @]" pp_expr condition pp_expr then_ pp_expr else_
+  | If {condition; then_; else_if; else_} -> fprintf fmt "@[if@ %a@ then@ %a@ %a@ else@ %a @]"
+                                                     pp_expr condition pp_expr then_ (pp_list (pp_elseif pp_expr "elseif")) else_if pp_expr else_
   | Int(i) -> fprintf fmt "@[%d@]" i
   | Real(f) -> fprintf fmt "@[%f@]" f
   | Bool(b) -> fprintf fmt "@[%b@]" b
@@ -101,6 +102,9 @@ and pp_expr fmt = function
   | Tuple es -> fprintf fmt "@[(%a)@]" (pp_list ~sep:", " pp_expr) es
   | Empty -> fprintf fmt "@[()@]"
 
+and pp_elseif pp kw fmt {guard; elsethen} =
+              fprintf fmt "@[%s@ %a@ then@ %a@]" kw pp_expr guard pp elsethen
+              
 and pp_named_arg fmt (name,expr) =
   fprintf fmt "@[%s = %a@]" name pp_expr expr
 
