@@ -48,7 +48,7 @@ let rec pp_enum ?(sep="") pp_element fmt enum = match (Enum.get enum) with
 
 and pp_expr fmt = function
     Ide(x) -> fprintf fmt "@[%s@]" x
-  | RootIde(x) -> fprintf fmt "[@.%s@]" x
+  | RootIde(x) -> fprintf fmt "@[.%s@]" x
   | If {condition; then_; else_if; else_} -> fprintf fmt "@[if@ %a@ then@ %a@ else@ %a @]" pp_expr condition pp_expr then_ pp_expr else_
   | Int(i) -> fprintf fmt "@[%d@]" i
   | Real(f) -> fprintf fmt "@[%f@]" f
