@@ -88,6 +88,8 @@ expr:
         { e }
   | LPAREN hd=optional_expr COMMA tl=separated_nonempty_list(COMMA, optional_expr) RPAREN
         { Tuple (hd::tl) }
+  | LBRACE es=separated_list(COMMA, expr) RBRACE
+        { Array es }                            
   | END { End }
   | DER { Der }
   | INITIAL { Initial }
