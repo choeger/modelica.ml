@@ -27,6 +27,7 @@
  *)
 
 open Batteries
+open Utils
 open Format
 open Syntax
 
@@ -47,6 +48,7 @@ let rec pp_enum ?(sep="") pp_element fmt enum = match (Enum.get enum) with
 
 and pp_expr fmt = function
     Ide(x) -> fprintf fmt "@[%s@]" x
+  | RootIde(x) -> fprintf fmt "[@.%s@]" x
   | If {condition; then_; else_if; else_} -> fprintf fmt "@[if@ %a@ then@ %a@ else@ %a @]" pp_expr condition pp_expr then_ pp_expr else_
   | Int(i) -> fprintf fmt "@[%d@]" i
   | Real(f) -> fprintf fmt "@[%f@]" f
@@ -55,10 +57,56 @@ and pp_expr fmt = function
   | Proj {field; object_} -> fprintf fmt "@[%a.%s@]" pp_expr object_ field
   | Der -> fprintf fmt "@[der@]"
   | End -> fprintf fmt "@[end@]"
+  | Colon -> fprintf fmt "@[:@]"
   | Initial -> fprintf fmt "@[initial@]"
-                  
 
-                                                     
+  | Pow { left; right } -> fprintf fmt "@[(%a)^(%a)@]" pp_expr left pp_expr right                  
+  | DPow { left; right } -> fprintf fmt "@[(%a).^(%a)@]" pp_expr left pp_expr right                  
+  | Plus { left; right } -> fprintf fmt "@[(%a)+(%a)@]" pp_expr left pp_expr right                  
+  | DPlus { left; right } -> fprintf fmt "@[(%a).+(%a)@]" pp_expr left pp_expr right                  
+  | Minus { left; right } -> fprintf fmt "@[(%a)-(%a)@]" pp_expr left pp_expr right                  
+  | DMinus { left; right } -> fprintf fmt "@[(%a).-(%a)@]" pp_expr left pp_expr right                  
+  | Mul { left; right } -> fprintf fmt "@[(%a)*(%a)@]" pp_expr left pp_expr right                  
+  | DMul { left; right } -> fprintf fmt "@[(%a).*(%a)@]" pp_expr left pp_expr right                  
+  | Div { left; right } -> fprintf fmt "@[(%a)/(%a)@]" pp_expr left pp_expr right                  
+  | DDiv { left; right } -> fprintf fmt "@[(%a)./(%a)@]" pp_expr left pp_expr right                  
+
+  | Leq { left; right } -> fprintf fmt "@[(%a)<=(%a)@]" pp_expr left pp_expr right                  
+  | Lt { left; right } -> fprintf fmt "@[(%a)<(%a)@]" pp_expr left pp_expr right                  
+  | Geq { left; right } -> fprintf fmt "@[(%a)>=(%a)@]" pp_expr left pp_expr right                  
+  | Gt { left; right } -> fprintf fmt "@[(%a)>(%a)@]" pp_expr left pp_expr right                  
+  | Eq { left; right } -> fprintf fmt "@[(%a)==(%a)@]" pp_expr left pp_expr right                  
+  | Neq { left; right } -> fprintf fmt "@[(%a)<>(%a)@]" pp_expr left pp_expr right                  
+
+  | And { left; right } -> fprintf fmt "@[(%a) and (%a)@]" pp_expr left pp_expr right                  
+  | Or { left; right } -> fprintf fmt "@[(%a) or (%a)@]" pp_expr left pp_expr right                  
+
+  | UPlus e -> fprintf fmt "@[+(%a)@]" pp_expr e
+  | UDPlus e -> fprintf fmt "@[.+(%a)@]" pp_expr e
+  | UMinus e -> fprintf fmt "@[-(%a)@]" pp_expr e
+  | UDMinus e -> fprintf fmt "@[.+(%a)@]" pp_expr e
+  | Not e -> fprintf fmt "@[not (%a)@]" pp_expr e
+
+  | App { fun_ ; args=[] ; named_args } -> fprintf fmt "@[%a(%a)@]" pp_expr fun_ (pp_enum ~sep:", " pp_named_arg) (StrMap.enum named_args)
+  | App { fun_ ; args ; named_args } when named_args = StrMap.empty -> fprintf fmt "@[%a(%a)@]" pp_expr fun_ (pp_list ~sep:", " pp_expr) args
+  | App { fun_ ; args; named_args } -> fprintf fmt "@[%a(%a, %a)@]" pp_expr fun_ (pp_list ~sep:", " pp_expr) args (pp_enum ~sep:", " pp_named_arg) (StrMap.enum named_args)
+
+  | Range { start; end_; step = None } -> fprintf fmt "@[(%a):(%a)@]" pp_expr start pp_expr end_
+  | Range { start; end_; step = Some(s)  } -> fprintf fmt "@[(%a):(%a):(%a)@]" pp_expr start pp_expr s pp_expr end_
+  | Compr { exp ; idxs } -> fprintf fmt "@[(%a) for %a@]" pp_expr exp (pp_list ~sep:", " pp_foridx) idxs
+  | Array es -> fprintf fmt "@[{%a}@]" (pp_list ~sep:", " pp_expr) es
+  | MArray els -> fprintf fmt "@[[%a]@]" (pp_list ~sep:"; " (pp_list ~sep:", " pp_expr)) els
+  | ArrayAccess { lhs ; indices } -> fprintf fmt "@[%a[%a]@]" pp_expr lhs (pp_list ~sep:", " pp_expr) indices 
+  | ExplicitClosure e -> fprintf fmt "@[function %a@]" pp_expr e
+  | Empty -> ()
+
+and pp_named_arg fmt (name,expr) =
+  fprintf fmt "@[%s = %a@]" name pp_expr expr
+
+and pp_foridx fmt = function
+    { variable ; range=Some(e) } -> fprintf fmt "@[%s in %a@]" variable pp_expr e
+  | { variable ; range=None } -> fprintf fmt "@[%s@]" variable
+                                         
 let expr2str ?max:(n=8) e = 
   pp_set_max_boxes str_formatter n ;
   (pp_expr str_formatter e) ;
