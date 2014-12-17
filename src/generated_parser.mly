@@ -75,6 +75,8 @@ expr:
         { Real (f) }
   | s = STRING
         { String(s) }
+  | DOT x = IDENT
+        { RootIde x}
   | x = IDENT 
         { Ide(x) }
   | x = QIDENT 
