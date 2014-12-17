@@ -92,11 +92,18 @@ expr:
         { Array es }
   | lhs = expr LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
         { ArrayAccess { lhs; indices } }
+  | LBRACKET els = separated_nonempty_list(SEMICOLON, separated_nonempty_list(COMMA, expr)) RBRACKET
+        { MArray els }
+  | FUNCTION e = expr
+        { ExplicitClosure e }           
   | END { End }
   | DER { Der }
   | INITIAL { Initial }
   | COLON { Colon }
-        
+
+  | exp = expr FOR idxs = separated_nonempty_list(COMMA, index)
+        { Compr { exp ; idxs } }
+          
   | left = expr PLUS right = expr
        { Plus ( {left ; right} ) } 
   | left = expr MINUS right = expr
@@ -128,10 +135,12 @@ expr:
 
   | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
        { If { condition ; then_ ; else_if ; else_ } }
-
     
 else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
-                        
+
+index_range : IN e = expr { e }
+                                                 
+index : variable = IDENT range = option(index_range) { { variable ; range } }
                         
 
                         
