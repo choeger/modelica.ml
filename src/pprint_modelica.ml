@@ -51,7 +51,7 @@ and pp_expr fmt = function
   | Int(i) -> fprintf fmt "@[%d@]" i
   | Real(f) -> fprintf fmt "@[%f@]" f
   | Bool(b) -> fprintf fmt "@[%b@]" b
-  | String(s) -> fprintf fmt "\"@[%s@]\"" (String.escaped s)
+  | String(s) -> fprintf fmt "@[\"%s\"@]" (String.escaped s)
   | Proj {field; object_} -> fprintf fmt "@[%a.%s@]" pp_expr object_ field
   | Der -> fprintf fmt "@[der@]"
   | End -> fprintf fmt "@[end@]"
