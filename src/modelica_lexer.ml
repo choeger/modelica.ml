@@ -255,6 +255,8 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | '{' -> LBRACE
     | '}' -> RBRACE
     | '=' ->  EQ
+    | '^' -> POWER
+    | ".^" -> DOTPOWER
     | '+' ->  PLUS
     | '*' ->  TIMES
     | '/' ->  DIV
