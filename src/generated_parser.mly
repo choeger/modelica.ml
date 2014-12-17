@@ -81,7 +81,11 @@ expr:
         { Ide(x) }
   | LPAREN e = expr RPAREN
         { e }
-
+  | END { End }
+  | DER { Der }
+  | INITIAL { Initial }
+  | COLON { Colon }
+        
   | left = expr PLUS right = expr
        { Plus ( {left ; right} ) } 
   | left = expr MINUS right = expr
