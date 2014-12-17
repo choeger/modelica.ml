@@ -66,6 +66,9 @@
 
 modelica_expr: e = expr EOF { e }
 
+optional_expr : e = expr { e }
+              | { Empty}                                                  
+                        
 expr:
   | TRUE { Bool(true) }
   | FALSE { Bool(false) }
@@ -81,8 +84,10 @@ expr:
         { Ide(x) }
   | x = QIDENT 
         { Ide(x) }
-  | LPAREN e = option (expr) RPAREN
-        { match e with Some e -> e | None -> Empty }
+  | LPAREN e = optional_expr RPAREN
+        { e }
+  | LPAREN hd=optional_expr COMMA tl=separated_nonempty_list(COMMA, optional_expr) RPAREN
+        { Tuple (hd::tl) }
   | END { End }
   | DER { Der }
   | INITIAL { Initial }
@@ -117,7 +122,11 @@ expr:
        { Proj { object_ ; field } }
 
 
+  | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
+       { If { condition ; then_ ; else_if ; else_ } }
 
+    
+else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
                         
                         
 
