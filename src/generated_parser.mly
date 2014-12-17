@@ -89,7 +89,9 @@ expr:
   | LPAREN hd=optional_expr COMMA tl=separated_nonempty_list(COMMA, optional_expr) RPAREN
         { Tuple (hd::tl) }
   | LBRACE es=separated_list(COMMA, expr) RBRACE
-        { Array es }                            
+        { Array es }
+  | lhs = expr LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
+        { ArrayAccess { lhs; indices } }
   | END { End }
   | DER { Der }
   | INITIAL { Initial }
