@@ -27,6 +27,7 @@
  *)
 
 open OUnit
+open Utils
 open Batteries
 open Modelica_parser
 open Syntax
@@ -102,119 +103,52 @@ let test_cases = [
   expr "a.'b'.c"  (Proj { object_ = Proj { object_ = (Ide "a"); field = "'b'"} ; field = "c" } ) ;
   expr "a/* comment */.b.c"  (Proj { object_ = Proj { object_ = (Ide "a"); field = "b"} ; field = "c" }) ;
   
+  expr ".x" (RootIde "x") ;
+  expr ".x.y" (Proj {object_ = (RootIde "x"); field = "y"}) ;
+
+  (* functions *)
+  expr "f()" (App {fun_= (Ide "f"); args=[]; named_args=StrMap.empty });
+  expr "f()()" (App {fun_= App { fun_=Ide "f"; args=[]; named_args=StrMap.empty }; args=[]; named_args=StrMap.empty});
+  expr "f(1.0)" (App {fun_=Ide "f"; args=[Real 1.]; named_args=StrMap.empty }) ;
+  expr "f(x=1.0)" (App {fun_= (Ide "f"); args=[]; named_args=StrMap.add "x" (Real 1.0) StrMap.empty });
+  expr "f(1.0, x=1.0)" (App {fun_= (Ide "f"); args=[Real 1.]; named_args=StrMap.add "x" (Real 1.0) StrMap.empty });
+  expr "function x" (ExplicitClosure (Ide "x"));
+
+  (* precedences *)
+  expr "1 + 2 * 3" (Plus { left = Int 1 ; right = Mul { left = Int 2 ; right = Int 3 } });
+  expr "2 * 3 + 1" (Plus { left = Mul { left = Int 2 ; right = Int 3 } ; right = Int 1 });
+  expr "(1 + 2) * 3" (Mul { left = Plus { left = Int 1 ; right = Int 2 } ; right = Int 3 });
+  expr "3 * (1 + 2)" (Mul { right = Plus { left = Int 1 ; right = Int 2 } ; left = Int 3 });
+  expr "3 * 2 ^ 4" (Mul { left = Int 3 ; right = Pow { left = Int 2 ; right = Int 4 } });
+  expr "2 ^ 4 * 3" (Mul { right = Int 3 ; left = Pow { left = Int 2 ; right = Int 4 } });
+  expr "-2 * 3" (UMinus (Mul { left = Int 2 ; right = Int 3 }) ) ;
+  expr "-2 - 3" (Minus { left = UMinus (Int 2) ; right = Int 3 }) ;
+
+
+  (* tuples and stuff *)
+  expr "(1)" (Int 1) ;
+  expr "()" (Empty) ;
+  expr "(,)" (Tuple [Empty; Empty]);
+
+  (* arrays *)
+  expr "x[1]" (ArrayAccess { lhs = Ide "x" ; indices = [Int 1] }) ;
+  expr "x[1].y" (Proj { object_ = ArrayAccess { lhs = Ide "x" ; indices = [Int 1] } ; field = "y" });
+  expr "{true}" (Array [Bool true]);
+  expr "[4,2;0,0]" (MArray [[Int 4; Int 2];[Int 0; Int 0]]);
+    
+  (* if/then *)
+  expr "if true then false else true" (If { condition = Bool true; then_ = Bool false; else_if = []; else_ = Bool true });
+  expr "if true then false elseif false then true else true" (If { condition = Bool true; then_ = Bool false;
+                                                                   else_if = [{guard=Bool false; elsethen=Bool true}];
+                                                                   else_ = Bool true });
+
+       
+  (* comprehension *)
+  expr "x for x in foo" (Compr {exp = Ide "x"; idxs = [{variable="x"; range=Some (Ide "foo")}]});
+  expr "x for x" (Compr {exp = Ide "x"; idxs = [{variable="x"; range=None}]});
+  
 (*
-    it("Should parse root-identifier") {
-      ".x" parsed_with exp should create (Root(Ide "x"))
-    }
-
-    it("Should parse root-identifiers in projections") {
-      ".x.y" parsed_with exp should create (Proj(RootIde("x"), "y"))
-    }
-
-    it("Should parse an empty application") {
-      "f()" parsed_with exp should create (
-        App(Ide("f")))
-    }
-
-    it("Should parse two empty applications") {
-      "f()()" parsed_with exp should create (
-        App(App(Ide("f"))))
-    }
-
-    it("Should parse a simple application") {
-      "f(1.0)" parsed_with exp should create (
-        App(Ide("f"), List(RealLit(1.0))))
-    }
-
-    it("Should parse a named-arg") {
-      "x=1.0" parsed_with namedArgs should create (Map("x" -> RealLit(1.0)))
-    }
-
-    it("Should parse a named-arg application") {
-      "f(x=1.0)" parsed_with exp should create (
-        App(Ide("f"), Nil, Map("x" -> RealLit(1.0)) ) )
-    }
-
-    it("Should parse a mixed application") {
-      "f(1.0, x=1.0)" parsed_with exp should create (
-        App(Ide("f"), List(RealLit(1.0)), Map("x" -> RealLit(1.0))))
-    }
     
-    it("Should bind multiplication over addition") {
-      "1 + 2 * 3" parsed_with exp should create(Plus(IntLit(1), Mul(IntLit(2), IntLit(3))))
-      "2 * 3 + 1" parsed_with exp should create(Plus(Mul(IntLit(2), IntLit(3)),IntLit(1)))
-    }
-    
-    it("Should respect parentheses") {
-      "(1 + 2) * 3" parsed_with exp should create(Mul(Plus(IntLit(1), IntLit(2)), IntLit(3)))
-      "3 * (1 + 2)" parsed_with exp should create(Mul(IntLit(3), Plus(IntLit(1), IntLit(2))))
-    }
-
-    it("Should bind exponentiation over addition") {
-      "1 + 2 * 3 ^ 4" parsed_with exp should create(Plus(IntLit(1), Mul(IntLit(2), Pow(IntLit(3), IntLit(4)))))
-      "3 ^ 4 * 2 + 1" parsed_with exp should create(Plus(Mul(Pow(IntLit(3), IntLit(4)), IntLit(2)), IntLit(1)))
-    }
-
-    it("Should bind negation less strongly than multiplication") {
-      "-2 * 3" parsed_with exp should create(UMinus(Mul(IntLit(2), IntLit(3))))
-    }
-
-    it("Should parse negations alongside subtraction") {
-      "-2 - 3" parsed_with exp should create(Minus(UMinus(IntLit(2)), IntLit(3)))
-    }
-
-    it("Should not create 1-tuples") {
-      "(1)" parsed_with exp should create (IntLit(1))
-    }
-
-    it("Should create empty tuples (for pattern-expressions)") {
-      "()" parsed_with exp should create (Empty)
-    }
-
-    it("Should create tuples containing empty-vars (for pattern-expressions)") {
-      "(,)" parsed_with exp should create (Tup(List(Empty,Empty)))
-    }
-
-    it("Should parse array-access") {
-      "x[1]" parsed_with exp should create (ArrAcc(Ide("x"),List(IntLit(1))))
-    }
-
-    it("Should parse nested array-access") {
-      "x[1].y" parsed_with exp should create (Proj(ArrAcc(Ide("x"),List(IntLit(1))),"y"))
-    }
-
-    it("Should parse if-expressions ") {
-      "if true then false else true" parsed_with exp should create (If(BoolLit(true), BoolLit(false), BoolLit(true)))
-    }
-
-    it("Should parse else-if-expressions ") {
-      "if true then false elseif false then true else true" parsed_with exp should create (If(BoolLit(true), BoolLit(false), BoolLit(true), List((BoolLit(false),BoolLit(true))) ))
-    }
-
-    it("Should parse array constructions ") {
-      "{true}" parsed_with exp should create (Array(List(BoolLit(true))))
-    }
-
-    it("Should parse list comprehensions") {
-      "{x for x in foo}" parsed_with exp should create (Array(List(Compr(Ide("x"), List(Idx("x", Some(Ide("foo"))))))))
-    }
-
-    it("Should parse slightly complicated list comprehensions") {
-      "{1, 2, x for x in foo}" parsed_with exp should create (Array(List(IntLit(1), IntLit(2), Compr(Ide("x"), List(Idx("x", Some(Ide("foo"))))))))
-    }
-
-    it("Should parse list comprehension in function application") {
-      "f(x for x)" parsed_with exp should create (App(Ide("f"), List(Compr(Ide("x"), List(Idx("x"))))))
-    }
-    
-    it("Should parse the explicit partial function expression") {
-      "function x" parsed_with exp should create(ExplicitPartialFunction(Ide("x")))
-    }
-
-    it("Should parse matrix constructions ") {
-      "[4,2;0,0]" parsed_with exp should create (MArray(List(List(IntLit(4), IntLit(2)), List(IntLit(0), IntLit(0))) ))
-    }
-
     it("Should parse return statements") {
       "return;" parsed_with statement should create (Return())
     }

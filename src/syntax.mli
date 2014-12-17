@@ -127,7 +127,7 @@ and statement_desc = Assignment of assignment
 
 and assignment = { target : exp ; source : exp }
 
-and 'a else_condition = { guard : exp ; elsethen : 'a list }
+and 'a else_condition = { guard : exp ; elsethen : 'a }
                    
 and 'a condition_struct = { condition : exp ; then_ : 'a ; else_if : 'a else_condition list ; else_ : 'a }
                    
@@ -215,7 +215,8 @@ and exp = Pow of binary_exp
         | MArray of (exp list) list
         | ExplicitClosure of exp
         | End | Colon | Empty | Der | Initial
-
+        | Tuple of exp list
+                       
 and idx = { variable : string ; range : exp option }
 
 and path = string list
