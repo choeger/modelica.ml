@@ -28,3 +28,5 @@
 open Batteries
        
 module StrMap = Map.Make(String)
+
+module List = List

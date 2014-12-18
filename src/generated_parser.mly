@@ -57,6 +57,7 @@
 
 %{
    open Syntax
+   open Utils
 %}
 
 
@@ -103,7 +104,10 @@ expr:
 
   | exp = expr FOR idxs = separated_nonempty_list(COMMA, index)
         { Compr { exp ; idxs } }
-          
+
+  | fun_ = expr LPAREN arguments = function_args RPAREN
+        { let (args, named_args) = arguments in App { fun_ ; args; named_args } }
+                                                   
   | left = expr PLUS right = expr
        { Plus ( {left ; right} ) } 
   | left = expr MINUS right = expr
@@ -141,7 +145,15 @@ else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
 index_range : IN e = expr { e }
                                                  
 index : variable = IDENT range = option(index_range) { { variable ; range } }
-                        
+
+function_args : e = expr COMMA fs = function_args { let (args, named_args) = fs in (e::args, named_args) }
+              | e = expr { ([e], StrMap.empty) }
+              | m = named_function_args { ([], m) }
+                                 
+named_argument : x=IDENT EQ e=expr { (x,e) }
+
+named_function_args : args=separated_nonempty_list (COMMA, named_argument) { StrMap.of_enum (List.enum args) }
+                    | { StrMap.empty }                                                            
 
                         
                                                
