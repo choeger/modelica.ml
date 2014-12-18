@@ -189,8 +189,8 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                | RETURN { Return }
                | IF condition=expr THEN then_ = list(statement) else_if = list(elseif_statement) else_ = else_statements END IF
                     { IfStmt { condition; then_ ; else_if; else_ } }
-               | WHEN condition=expr THEN then_ = list(statement) else_if = list(elsewhen_statement) else_ = else_statements END WHEN
-                    { WhenStmt { condition; then_ ; else_if; else_ } }                                                                                                                         
+               | WHEN condition=expr THEN then_ = list(statement) else_if = list(elsewhen_statement) END WHEN
+                    { WhenStmt { condition; then_ ; else_if; else_ = []} }                                                                                                                         
                | FOR idx = list(index) LOOP body=list(statement) END FOR { ForStmt { idx; body } }
                | WHILE while_=expr LOOP do_ = list(statement) END WHILE { WhileStmt { while_; do_ } }
                | target=lexpr COLONEQ source=expr { Assignment { target; source } }                       

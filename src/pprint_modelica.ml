@@ -49,11 +49,12 @@ let rec pp_enum ?(sep="") pp_element fmt enum = match (Enum.get enum) with
 let rec pp_elseif pp_expr pp_then kw fmt {guard; elsethen} =
   fprintf fmt "@[ else%s@ %a@ then@ %a@]" kw pp_expr guard pp_then elsethen
 
-and pp_complete_conditional pp_expr kw pp_then fmt { condition; then_ ; else_if; else_ } =
-    fprintf fmt "@[%s@ %a@ then@ %a%a@ else@ %a@]" kw
+and pp_complete_conditional ?else_:(else_kw=" else") pp_expr kw pp_then fmt { condition; then_ ; else_if; else_ } =
+    fprintf fmt "@[%s@ %a@ then@ %a%a%s@ %a@]" kw
             pp_expr condition
             pp_then then_
             (pp_list (pp_elseif pp_expr pp_then kw)) else_if
+            else_kw
             pp_then else_
 
 let rec pp_expr fmt = function
@@ -118,7 +119,7 @@ and pp_foridx fmt = function
     { variable ; range=Some(e) } -> fprintf fmt "@[%s in %a@]" variable pp_expr e
   | { variable ; range=None } -> fprintf fmt "@[%s@]" variable
 
-let pp_conditional kw = pp_complete_conditional pp_expr kw
+let pp_conditional kw ?else_:(else_kw="else") = pp_complete_conditional ~else_:else_kw pp_expr kw
                                          
 let expr2str ?max:(n=8) e = 
   pp_set_max_boxes str_formatter n ;
@@ -160,7 +161,7 @@ let rec pp_statement_desc fmt = function
   | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
                                                       
   | IfStmt c -> pp_conditional "if" pp_statements fmt c ; fprintf fmt "end if"
-  | WhenStmt c -> pp_conditional "when" pp_statements fmt c ; fprintf fmt "end when"
+  | WhenStmt c -> pp_conditional "when" ~else_:"" pp_statements fmt c ; fprintf fmt "end when"
                   
   | Break -> fprintf fmt "@[break@]"
   | Return -> fprintf fmt "@[return@]"
