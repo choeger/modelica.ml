@@ -167,11 +167,22 @@ annotation : ANNOTATION LPAREN RPAREN { {types = []; components = []; modificati
 comment : s=option(STRING) m=option(annotation) { { annotated_elem=s ; annotation=m} }
                         
 statement : s=statement_body comment=comment SEMICOLON { {commented=s ; comment} }
-                        
-statement_body : e=expr { ExprStmt e }
+
+else_statements : ELSE else_ = list(statement) { else_ }
+                | { [] }
+
+component_reference : x = IDENT { Ide x }
+                    | DOT x = IDENT { RootIde x }                                                     
+                    | object_=component_reference DOT field=IDENT { Proj { object_ ; field } }
+                    | lhs = component_reference LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
+                                                                                        { ArrayAccess { lhs; indices } }
+                                
+statement_body : procedure=component_reference LPAREN arguments = function_args RPAREN
+                 { let (pargs, pnamed_args) = arguments in Call { procedure ; pargs; pnamed_args } }                                                                 
                | BREAK { Break }
                | RETURN { Return }
-                        
+               | IF condition=expr THEN then_ = list(statement) else_ = else_statements END IF
+                 { IfStmt { condition; then_ ; else_if = []; else_ } }       
                                                
                                                
                                                
