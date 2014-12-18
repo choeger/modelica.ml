@@ -48,9 +48,9 @@
 %left SEMICOLON 
 %left GT LT NEQ GEQ LEQ EQ 
 %left PLUS MINUS DOTPLUS DOTMINUS     /* medium precedence */
+%right UMinus
 %left TIMES DIV DOTTIMES DOTDIV
 %left POWER DOTPOWER
-%nonassoc UMINUS        
 %nonassoc below_app
 %left app_prec     
 %left DOT LBRACKET /* highest precedence */
@@ -136,7 +136,11 @@ expr:
   | object_ = expr DOT field = QIDENT
        { Proj { object_ ; field } }
 
-
+  | MINUS e = expr { UMinus e } %prec UMinus
+  | PLUS e = expr { UPlus e } %prec UMinus
+  | DOTMINUS e = expr { UDMinus e } %prec UMinus
+  | DOTPLUS e = expr { UDPlus e } %prec UMinus
+  
   | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
        { If { condition ; then_ ; else_if ; else_ } }
     

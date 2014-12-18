@@ -56,7 +56,7 @@ let test_cases = [
   expr "1.234" (Real(1.234));
   expr "x" (Ide("x")) ;
   expr "new_foo" (Ide "new_foo");
-  expr "-1" (Int(-1));
+  expr "1" (Int(1));
 
   (* TODO: copy/move to lexer test suite as approporiate *)
   expr "derfoo" (Ide "derfoo") ;

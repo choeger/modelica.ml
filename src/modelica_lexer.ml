@@ -275,9 +275,9 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | ']' ->  RBRACKET
     | '\'' -> s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; quoted_content (Text.of_char '\'')
     | '"' ->  s_cursor.str_start <- Sedlexing.lexeme_end buf ;  s_cursor.str_line <- m_cursor.m_line ; string_content Text.empty
-    | Opt('-'), number, '.', Opt( number ), Opt ( 'e', Opt('+' | '-'), number ) ->  ( FLOAT ( float_of_string (Sedlexing.Utf8.lexeme buf) ) )
+    | number, '.', Opt( number ), Opt ( 'e', Opt('+' | '-'), number ) ->  ( FLOAT ( float_of_string (Sedlexing.Utf8.lexeme buf) ) )
     | '.' ->  ( DOT )
-    | Opt('-'), number ->  ( INT ( int_of_string (current () ) ))
+    | number ->  ( INT ( int_of_string (current () ) ))
 
     | "//", Star ( Compl ('\n' | '\r') ) -> token ()
     | "/*" -> terminate_comment ()
