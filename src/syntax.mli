@@ -117,7 +117,7 @@ and statement = statement_desc commented
 and statements = statement list
 
 and statement_desc = Assignment of assignment
-                   | ExprStmt of exp
+                   | Call of call_statement
                    | IfStmt of if_statement
                    | WhenStmt of when_statement
                    | Break
@@ -127,6 +127,8 @@ and statement_desc = Assignment of assignment
 
 and assignment = { target : exp ; source : exp }
 
+and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : exp StrMap.t}
+                   
 and 'a else_condition = { guard : exp ; elsethen : 'a }
                    
 and 'a condition_struct = { condition : exp ; then_ : 'a ; else_if : 'a else_condition list ; else_ : 'a }
