@@ -31,27 +31,37 @@ open Utils
 open Batteries
 open Modelica_parser
 open Syntax
+open Syntax_fragments
 open Modelica_lexer
 open Pprint_modelica
-       
-let expr_test input f =
+
+let parse_test parser input f = 
   let ucs = state_from_utf8_string input in
   let next () = next_token ucs in
   let last () = last_token ucs in
   fun () ->
   try
-    f (expr_parser "test" next last)
+    f (parser "test" next last)
   with 
     SyntaxError e -> assert_failure (Printf.sprintf "Syntax Error at %s:\n%s" (show_location e) (error_message e input))
+       
+let expr_test input f =
+  parse_test expr_parser
 
-let expr input expected = 
+let parser_test_case parser lprinter sprinter input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::
-       expr_test input (fun e -> assert_equal ~msg:"equality of parsed expression" ~printer:expr2str expected e ) ) ;
+       parse_test parser input (fun e -> assert_equal ~msg:"equality of parser result" ~printer:sprinter expected e ) ) ;
      ("re-parsing" >::
-       expr_test input (fun e -> expr_test (expr2str ~max:100 e) (fun e -> assert_equal ~msg:"equality of re-parsed expression" ~printer:expr2str expected e) ())) ; 
+        parse_test parser input
+                   (fun e -> parse_test parser (lprinter e)
+                                        (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter expected e) ())) ; 
   ]
-      
+                                    
+let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2str input expected
+
+let stmt input expected = parser_test_case stmt_parser (stmt2str ~max:100) stmt2str input expected
+
 let test_cases = [ 
   expr "1.234" (Real(1.234));
   expr "x" (Ide("x")) ;
@@ -147,19 +157,14 @@ let test_cases = [
   expr "x for x in foo" (Compr {exp = Ide "x"; idxs = [{variable="x"; range=Some (Ide "foo")}]});
   expr "x for x" (Compr {exp = Ide "x"; idxs = [{variable="x"; range=None}]});
   
-(*
-    
-    it("Should parse return statements") {
-      "return;" parsed_with statement should create (Return())
-    }
+  stmt "return;" (uncommented Return) ;
 
-    it("Should parse break statements") {
-      "break;" parsed_with statement should create (Break())
-    }
+  stmt "break;" (uncommented Break) ;
 
-    it("Should parse simple if-then statements") {
-      "if true then break; end if;" parsed_with statement should create (IfStmt(BoolLit(true), List(Break())))
-    }
+  stmt "if true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
+
+  (*
+}
 
     it("Should parse application statements") {
       "f();" parsed_with statement should create (ExprStmt(App(Ide("f"))))
