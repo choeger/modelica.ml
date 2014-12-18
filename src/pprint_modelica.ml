@@ -46,11 +46,20 @@ let rec pp_enum ?(sep="") pp_element fmt enum = match (Enum.get enum) with
 	      end
   | None -> ()
 
-and pp_expr fmt = function
+let rec pp_elseif pp_expr pp_then kw fmt {guard; elsethen} =
+  fprintf fmt "@[ else%s@ %a@ then@ %a@]" kw pp_expr guard pp_then elsethen
+
+and pp_complete_conditional pp_expr kw pp_then fmt { condition; then_ ; else_if; else_ } =
+    fprintf fmt "@[%s@ %a@ then@ %a%a@ else@ %a@]" kw
+            pp_expr condition
+            pp_then then_
+            (pp_list (pp_elseif pp_expr pp_then kw)) else_if
+            pp_then else_
+
+let rec pp_expr fmt = function
     Ide(x) -> fprintf fmt "@[%s@]" x
   | RootIde(x) -> fprintf fmt "@[.%s@]" x
-  | If {condition; then_; else_if; else_} -> fprintf fmt "@[if@ %a@ then@ %a@ %a@ else@ %a @]"
-                                                     pp_expr condition pp_expr then_ (pp_list (pp_elseif pp_expr "elseif")) else_if pp_expr else_
+  | If c -> pp_complete_conditional pp_expr "if" pp_expr fmt c
   | Int(i) -> fprintf fmt "@[%d@]" i
   | Real(f) -> fprintf fmt "@[%f@]" f
   | Bool(b) -> fprintf fmt "@[%b@]" b
@@ -101,18 +110,68 @@ and pp_expr fmt = function
   | ExplicitClosure e -> fprintf fmt "@[function %a@]" pp_expr e
   | Tuple es -> fprintf fmt "@[(%a)@]" (pp_list ~sep:", " pp_expr) es
   | Empty -> fprintf fmt "@[()@]"
-
-and pp_elseif pp kw fmt {guard; elsethen} =
-              fprintf fmt "@[%s@ %a@ then@ %a@]" kw pp_expr guard pp elsethen
-              
+                     
 and pp_named_arg fmt (name,expr) =
   fprintf fmt "@[%s = %a@]" name pp_expr expr
 
 and pp_foridx fmt = function
     { variable ; range=Some(e) } -> fprintf fmt "@[%s in %a@]" variable pp_expr e
   | { variable ; range=None } -> fprintf fmt "@[%s@]" variable
+
+let pp_conditional kw = pp_complete_conditional pp_expr kw
                                          
 let expr2str ?max:(n=8) e = 
   pp_set_max_boxes str_formatter n ;
   (pp_expr str_formatter e) ;
   flush_str_formatter ()
+
+let pp_typedef fmt { commented = { td_name ; sort ; type_exp ; cns ; type_options } ; comment } = ()
+                      
+let pp_type_redeclaration fmt { redecl_each ; redecl_type } =
+  if redecl_each then
+    fprintf fmt "@[each@ %a@]" pp_typedef redecl_type
+  else
+    pp_typedef fmt redecl_type
+
+let pp_component_redeclaration fmt { each ; def } = ()
+
+let pp_component_modification fmt { commented = { mod_each ; mod_final ; mod_name ; mod_modification ; mod_rhs } ; comment } = ()
+                                                      
+let pp_modification fmt { types ; components ; modifications } =
+  pp_list pp_type_redeclaration fmt types ;
+  pp_list pp_component_redeclaration fmt components ;
+  pp_list pp_component_modification fmt modifications
+
+let pp_comment_string fmt = function
+  | None -> ()
+  | Some s -> fprintf fmt " %s" s 
+          
+let pp_comment fmt { annotated_elem ; annotation } = 
+  pp_comment_string fmt annotated_elem ;
+  match annotation with
+  | Some m -> pp_modification fmt m
+  | None -> ()
+
+let pp_idx fmt = function
+    {variable; range=None} -> fprintf fmt "@[%s@]" variable
+  | {variable; range=Some e} -> fprintf fmt "@[%s@ =@ %a@]" variable pp_expr e
+              
+let pp_for_loop pp fmt { idx ; body } =
+  fprintf fmt "@[for@ %a@ loop@ %a@ end for@]" (pp_list ~sep:", " pp_idx) idx pp body
+          
+let rec pp_statement_desc fmt = function
+    Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
+  | ExprStmt e -> pp_expr fmt e
+                          
+  | IfStmt c -> pp_conditional "if" pp_statements fmt c                                                            
+  | WhenStmt c -> pp_conditional "when" pp_statements fmt c
+                  
+  | Break -> fprintf fmt "@[return@]"
+  | Return -> fprintf fmt "@[break@]"
+  | ForStmt loop -> pp_for_loop pp_statements fmt loop
+  | WhileStmt { while_ ; do_ } -> fprintf fmt "[@while@ %a@ loop@ %a@ end@ while@]" pp_expr while_ pp_statements do_
+
+and pp_statements fmt stmts = (pp_list pp_statement) fmt stmts
+       
+and pp_statement fmt { commented ; comment } =
+  fprintf fmt "@[%a@%a;@]" pp_statement_desc commented pp_comment comment 
