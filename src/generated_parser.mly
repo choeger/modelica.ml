@@ -171,7 +171,9 @@ statement : s=statement_body comment=comment SEMICOLON { {commented=s ; comment}
 else_statements : ELSE else_ = list(statement) { else_ }
                 | { [] }
 
-elseif_statement : ELSE IF guard = expr THEN elsethen=list(statement) { { guard ; elsethen } }
+elseif_statement : ELSEIF guard = expr THEN elsethen=list(statement) { { guard ; elsethen } }
+
+elsewhen_statement : ELSEWHEN guard = expr THEN elsethen=list(statement) { { guard ; elsethen } }
                     
 component_reference : x = IDENT { Ide x }
                     | DOT x = IDENT { RootIde x }                                                     
@@ -186,7 +188,9 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                | BREAK { Break }
                | RETURN { Return }
                | IF condition=expr THEN then_ = list(statement) else_if = list(elseif_statement) else_ = else_statements END IF
-                 { IfStmt { condition; then_ ; else_if; else_ } }       
+                    { IfStmt { condition; then_ ; else_if; else_ } }
+               | WHEN condition=expr THEN then_ = list(statement) else_if = list(elsewhen_statement) else_ = else_statements END WHEN
+                    { IfStmt { condition; then_ ; else_if; else_ } }                                                                                                                         
                | FOR idx = list(index) LOOP body=list(statement) END FOR { ForStmt { idx; body } }
                | WHILE while_=expr LOOP do_ = list(statement) END WHILE { WhileStmt { while_; do_ } }
                | target=lexpr COLONEQ source=expr { Assignment { target; source } }                       
