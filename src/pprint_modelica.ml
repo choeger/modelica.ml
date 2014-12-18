@@ -159,8 +159,8 @@ let rec pp_statement_desc fmt = function
     Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
   | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
                                                       
-  | IfStmt c -> pp_conditional "if" pp_statements fmt c                                                            
-  | WhenStmt c -> pp_conditional "when" pp_statements fmt c
+  | IfStmt c -> pp_conditional "if" pp_statements fmt c ; fprintf fmt "end if"
+  | WhenStmt c -> pp_conditional "when" pp_statements fmt c ; fprintf fmt "end when"
                   
   | Break -> fprintf fmt "@[break@]"
   | Return -> fprintf fmt "@[return@]"
