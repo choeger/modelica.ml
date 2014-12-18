@@ -26,7 +26,7 @@
  *
  *)
 
-%token GT LT NEQ GEQ LEQ EQ EQEQ LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE SEMICOLON COMMA DOT COLON
+%token GT LT NEQ GEQ LEQ EQ EQEQ LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE SEMICOLON COMMA DOT COLON COLONEQ
 
 %token <int> INT
 %token <float> FLOAT
@@ -178,7 +178,9 @@ component_reference : x = IDENT { Ide x }
                     | object_=component_reference DOT field=IDENT { Proj { object_ ; field } }
                     | lhs = component_reference LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
                                                                                         { ArrayAccess { lhs; indices } }
-                                
+lexpr : e=component_reference { e }
+      | LPAREN es=list(expr) RPAREN { Tuple es }
+                      
 statement_body : procedure=component_reference LPAREN arguments = function_args RPAREN
                  { let (pargs, pnamed_args) = arguments in Call { procedure ; pargs; pnamed_args } }                                                                 
                | BREAK { Break }
@@ -187,7 +189,7 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                  { IfStmt { condition; then_ ; else_if; else_ } }       
                | FOR idx = list(index) LOOP body=list(statement) END FOR { ForStmt { idx; body } }
                | WHILE while_=expr LOOP do_ = list(statement) END WHILE { WhileStmt { while_; do_ } }
-                                               
+               | target=lexpr COLONEQ source=expr { Assignment { target; source } }                       
 
                                                
 

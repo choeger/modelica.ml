@@ -247,6 +247,7 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | Plus ( white_space ) -> token ()
     | eof ->  ( EOF )
 
+    | ":=" -> COLONEQ
     | ':' -> COLON
     | ',' -> COMMA
     | ';' -> SEMICOLON
