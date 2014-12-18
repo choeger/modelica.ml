@@ -185,7 +185,7 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                | RETURN { Return }
                | IF condition=expr THEN then_ = list(statement) else_if = list(elseif_statement) else_ = else_statements END IF
                  { IfStmt { condition; then_ ; else_if; else_ } }       
-                                               
+               | FOR idx = list(index) LOOP body=list(statement) END FOR { ForStmt { idx; body } }
                                                
                                                
 

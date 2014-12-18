@@ -151,13 +151,9 @@ let pp_comment fmt { annotated_elem ; annotation } =
   match annotation with
   | Some m -> pp_modification fmt m
   | None -> ()
-
-let pp_idx fmt = function
-    {variable; range=None} -> fprintf fmt "@[%s@]" variable
-  | {variable; range=Some e} -> fprintf fmt "@[%s@ =@ %a@]" variable pp_expr e
               
 let pp_for_loop pp fmt { idx ; body } =
-  fprintf fmt "@[for@ %a@ loop@ %a@ end for@]" (pp_list ~sep:", " pp_idx) idx pp body
+  fprintf fmt "@[for@ %a@ loop@ %a@ end for@]" (pp_list ~sep:", " pp_foridx) idx pp body
           
 let rec pp_statement_desc fmt = function
     Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
