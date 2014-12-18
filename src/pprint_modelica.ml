@@ -165,7 +165,7 @@ let rec pp_statement_desc fmt = function
   | Break -> fprintf fmt "@[break@]"
   | Return -> fprintf fmt "@[return@]"
   | ForStmt loop -> pp_for_loop pp_statements fmt loop
-  | WhileStmt { while_ ; do_ } -> fprintf fmt "[@while@ %a@ loop@ %a@ end@ while@]" pp_expr while_ pp_statements do_
+  | WhileStmt { while_ ; do_ } -> fprintf fmt "@[while@ %a@ loop@ %a@ end@ while@]" pp_expr while_ pp_statements do_
 
 and pp_statements fmt stmts = (pp_list pp_statement) fmt stmts
        
