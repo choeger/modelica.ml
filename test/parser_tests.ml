@@ -156,22 +156,20 @@ let test_cases = [
   (* comprehension *)
   expr "x for x in foo" (Compr {exp = Ide "x"; idxs = [{variable="x"; range=Some (Ide "foo")}]});
   expr "x for x" (Compr {exp = Ide "x"; idxs = [{variable="x"; range=None}]});
-  
+
+  (* statements *)
   stmt "return;" (uncommented Return) ;
-
   stmt "break;" (uncommented Break) ;
-
   stmt "if true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
-
   stmt "if true then break; else if true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
+  stmt "f(1, x=3);" (uncommented (Call { procedure=Ide "f"; pargs = [Int 1]; pnamed_args = StrMap.add "x" (Int 3) StrMap.empty } ) );
+  stmt "x := 23;" (uncommented (Assignment { target=Ide "x" ; source = Int 23 } ));
+  stmt "while true loop break; break; end loop;" (uncommented (WhileStmt { while_ = Bool true ; do_ = [uncommented Break; uncommented Break] ; } ) );
+  stmt "for x loop break; break; end loop;" (uncommented (ForStmt { idx = [{variable = "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
+  stmt "for x in a loop break; break; end loop;" (uncommented (ForStmt { idx = [{variable = "x"; range=Some (Ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
 
-  (*
-}
-
-    it("Should parse application statements") {
-      "f();" parsed_with statement should create (ExprStmt(App(Ide("f"))))
-    }
-
+  
+                     (*
     it("Should parse equations") {
       "x = 0;" parsed_with equation should create (
         SimpleEquation(Ide("x"), IntLit(0))
