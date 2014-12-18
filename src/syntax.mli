@@ -241,11 +241,14 @@ and 'a flagged_type = { flag : 'a ; flagged : texp }
                      
 and package = { pkg_name : string ; root : path ; subPkgs : path StrMap.t ; classes : path StrMap.t ; }
 
-and redeclaration = { redecl_each : bool ; redecl_type : typedef; }
+and type_redeclaration = { redecl_each : bool ; redecl_type : typedef; }
 
-and redeclaration_redefinition = { each : bool ; def : definition; }
+and component_redeclaration = { each : bool ; def : definition; }
 
-and redefinition_struct = { redef_each : bool ; redef_final : bool; redef_name : name; redef_modification : modification option ; redef_rhs : exp option } 
-and redefinition = redefinition_struct commented
-and modification = { types : redeclaration list ; components : redeclaration_redefinition list ; redefinitions : redefinition list ; }
+and component_modification_struct = { mod_each : bool ; mod_final : bool; mod_name : name; mod_modification : modification option ; mod_rhs : exp option }
+                               
+and component_modification = component_modification_struct commented
+and modification = { types : type_redeclaration list ;
+                     components : component_redeclaration list ;
+                     modifications : component_modification list ; }
 
