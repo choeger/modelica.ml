@@ -171,6 +171,8 @@ statement : s=statement_body comment=comment SEMICOLON { {commented=s ; comment}
 else_statements : ELSE else_ = list(statement) { else_ }
                 | { [] }
 
+elseif_statement : ELSE IF guard = expr THEN elsethen=list(statement) { { guard ; elsethen } }
+                    
 component_reference : x = IDENT { Ide x }
                     | DOT x = IDENT { RootIde x }                                                     
                     | object_=component_reference DOT field=IDENT { Proj { object_ ; field } }
@@ -181,8 +183,8 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                  { let (pargs, pnamed_args) = arguments in Call { procedure ; pargs; pnamed_args } }                                                                 
                | BREAK { Break }
                | RETURN { Return }
-               | IF condition=expr THEN then_ = list(statement) else_ = else_statements END IF
-                 { IfStmt { condition; then_ ; else_if = []; else_ } }       
+               | IF condition=expr THEN then_ = list(statement) else_if = list(elseif_statement) else_ = else_statements END IF
+                 { IfStmt { condition; then_ ; else_if; else_ } }       
                                                
                                                
                                                

@@ -163,6 +163,8 @@ let test_cases = [
 
   stmt "if true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
 
+  stmt "if true then break; else if true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
+
   (*
 }
 
