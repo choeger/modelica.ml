@@ -62,11 +62,14 @@
 
 
 %start <Syntax.exp> modelica_expr
+%start <Syntax.statement> modelica_stmt
 
 %%
 
 modelica_expr: e = expr EOF { e }
 
+modelica_stmt : s = statement EOF { s }                        
+                        
 optional_expr : e = expr { e }
               | { Empty}                                                  
                         
@@ -159,6 +162,15 @@ named_argument : x=IDENT EQ e=expr { (x,e) }
 named_function_args : args=separated_nonempty_list (COMMA, named_argument) { StrMap.of_enum (List.enum args) }
                     | { StrMap.empty }                                                            
 
+annotation : ANNOTATION LPAREN RPAREN { {types = []; components = []; modifications = []} } 
+                        
+comment : s=option(STRING) m=option(annotation) { { annotated_elem=s ; annotation=m} }
+                        
+statement : s=statement_body comment=comment SEMICOLON { {commented=s ; comment} }
+                        
+statement_body : e=expr { ExprStmt e }
+               | BREAK { Break }
+               | RETURN { Return }
                         
                                                
                                                
