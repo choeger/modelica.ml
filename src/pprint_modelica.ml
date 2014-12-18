@@ -161,17 +161,22 @@ let pp_for_loop pp fmt { idx ; body } =
           
 let rec pp_statement_desc fmt = function
     Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
-  | ExprStmt e -> pp_expr fmt e
-                          
+  | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "[@%a@]" pp_expr (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
+                                                      
   | IfStmt c -> pp_conditional "if" pp_statements fmt c                                                            
   | WhenStmt c -> pp_conditional "when" pp_statements fmt c
                   
-  | Break -> fprintf fmt "@[return@]"
-  | Return -> fprintf fmt "@[break@]"
+  | Break -> fprintf fmt "@[break@]"
+  | Return -> fprintf fmt "@[return@]"
   | ForStmt loop -> pp_for_loop pp_statements fmt loop
   | WhileStmt { while_ ; do_ } -> fprintf fmt "[@while@ %a@ loop@ %a@ end@ while@]" pp_expr while_ pp_statements do_
 
 and pp_statements fmt stmts = (pp_list pp_statement) fmt stmts
        
 and pp_statement fmt { commented ; comment } =
-  fprintf fmt "@[%a@%a;@]" pp_statement_desc commented pp_comment comment 
+  fprintf fmt "@[%a%a;@]" pp_statement_desc commented pp_comment comment 
+
+let stmt2str ?max:(n=8) s = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_statement str_formatter s) ;
+  flush_str_formatter ()
