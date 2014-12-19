@@ -189,7 +189,7 @@ component_reference : x = IDENT { Ide x }
                     | lhs = component_reference LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
                                                                                         { ArrayAccess { lhs; indices } }
 lexpr : e=component_reference { e }
-      | LPAREN es=list(expr) RPAREN { Tuple es }
+      | LPAREN es=separated_list(COMMA, expr) RPAREN { Tuple es }
                       
 statement_body : procedure=component_reference LPAREN arguments = function_args RPAREN
                  { let (pargs, pnamed_args) = arguments in Call { procedure ; pargs; pnamed_args } }                                                                 
