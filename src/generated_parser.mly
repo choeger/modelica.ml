@@ -63,13 +63,16 @@
 
 %start <Syntax.exp> modelica_expr
 %start <Syntax.statement> modelica_stmt
+%start <Syntax.equation> modelica_eq
 
 %%
 
 modelica_expr: e = expr EOF { e }
 
 modelica_stmt : s = statement EOF { s }                        
-                        
+
+modelica_eq : eq = equation EOF { eq }                              
+                              
 optional_expr : e = expr { e }
               | { Empty}                                                  
                         
@@ -196,5 +199,8 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                | target=lexpr COLONEQ source=expr { Assignment { target; source } }                       
 
                                                
+equation : commented=equation_body comment=comment SEMICOLON { { commented ; comment } }
 
-
+equation_body : e = expr { ExpEquation e }
+              | eq_lhs = expr EQ eq_rhs = expr { SimpleEquation { eq_lhs ; eq_rhs } }
+              

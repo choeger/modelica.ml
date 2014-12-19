@@ -62,6 +62,8 @@ let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2
 
 let stmt input expected = parser_test_case stmt_parser (stmt2str ~max:100) stmt2str input expected
 
+let eq input expected = parser_test_case eq_parser (eq2str ~max:100) eq2str input expected
+                                           
 let test_cases = [ 
   expr "1.234" (Real(1.234));
   expr "x" (Ide("x")) ;
@@ -169,35 +171,37 @@ let test_cases = [
   stmt "for x loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = "x"; range=Some (Ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
 
-  
-                     (*
-    it("Should parse equations") {
-      "x = 0;" parsed_with equation should create (
-        SimpleEquation(Ide("x"), IntLit(0))
-      )
-    }    
+  (* equations *)
+  eq "x = 0;" (uncommented (SimpleEquation { eq_lhs = Ide "x"; eq_rhs = Int 0 })) ;
 
-    it("Should parse if-equations") {
-      "if true then x.y = 0; end if;" parsed_with equation should create (
-        IfEquation(BoolLit(true), SimpleEquation(Proj(Ide("x"),"y"), IntLit(0))::Nil)
-      )
-    }    
+  eq "if true then x.y = 0; end if;" (uncommented (IfEquation { condition= Bool true; then_ = [uncommented (SimpleEquation { eq_lhs = Proj { object_ = Ide "x"; field= "y" } ;
+                                                                                                                            eq_rhs = Int 0 } )] ;
+                                                                else_if = []; else_ = [];
+                                                              })) ;
 
-    it("Should parse slighty complex if-equations") { // a[i].d.d = 0;
-      "if c(a[i]) then a[i].p.r = {0,0,0}; end if;" parsed_with equation should create (
-        IfEquation(App(Ide("c"), List(ArrAcc(Ide("a"), List(Ide("i"))))), 
-                   SimpleEquation(Proj(Proj(ArrAcc(Ide("a"), List(Ide("i"))),"p"),"r"),
-                                  Array(List(IntLit(0),IntLit(0),IntLit(0))))::Nil)
-      )
+  eq "if c(a[i]) then a[i].p.r = {0,0,0}; end if;"  (uncommented (IfEquation {
+                                                                      condition=App { fun_=Ide "c" ; args=[]; named_args=StrMap.empty };
+                                                                      then_ = [uncommented (SimpleEquation { eq_lhs = Proj { object_ = Proj { object_ =
+                                                                                                                                                ArrayAccess { lhs= Ide "x";
+                                                                                                                                                              indices=[Ide"i"] }; 
+                                                                                                                                              field="p" } ;
+                                                                                                               field = "r"
+                                                                                                             } ;
+                                                                                               eq_rhs = Array [Int 0; Int 0; Int 0];
+                                                                                             })] ;
+                                                                      else_if = []; else_ = [];
+                                                                   })) ;
 
-    }
-
-    it("Should parse nested for/if equations") {
-      "for i loop if true then x = 0; end if; end for;" parsed_with equation should create (
-        ForEquation(List(Idx("i", None)), IfEquation(BoolLit(true), SimpleEquation(Ide("x"), IntLit(0))::Nil)::Nil)
-      )
-    }
-
+  eq "for i loop if true then x = 0; end if; end for;" (uncommented (ForEquation { idx= [{variable="i" ; range=None}];
+                                                                                   body=[uncommented (
+                                                                                             IfEquation {
+                                                                                                 condition= Bool true;
+                                                                                                 then_ = [uncommented (SimpleEquation { eq_lhs = Ide "x" ;
+                                                                                                                                       eq_rhs = Int 0 })];
+                                                                                                                      else_if = []; else_ = []
+                                                                                                                      
+                                                                                               })] }));
+(*
     it ("Should parse type-ide's") {
       "Modelica" parsed_with type_exp should create (TIde("Modelica"))
     }

@@ -194,3 +194,8 @@ and pp_equation fmt { commented ; comment } =
   fprintf fmt "@[%a%a;@]" pp_equation_desc commented pp_comment comment 
 
 and pp_equations fmt eqs = (pp_list pp_equation) fmt eqs
+
+let eq2str ?max:(n=8) eq = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_equation str_formatter eq) ;
+  flush_str_formatter ()
