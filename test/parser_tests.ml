@@ -62,7 +62,7 @@ let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2
 
 let stmt input expected = parser_test_case stmt_parser (stmt2str ~max:100) stmt2str input expected
 
-let eq input expected = parser_test_case eq_parser (eq2str ~max:100) eq2str input expected
+let eq input expected = parser_test_case eq_parser (eq2str ~max:100) (eq2str ~max:20) input expected
                                            
 let test_cases = [ 
   expr "1.234" (Real(1.234));
@@ -180,9 +180,11 @@ let test_cases = [
                                                               })) ;
 
   eq "if c(a[i]) then a[i].p.r = {0,0,0}; end if;"  (uncommented (IfEquation {
-                                                                      condition=App { fun_=Ide "c" ; args=[]; named_args=StrMap.empty };
+                                                                      condition=App { fun_=Ide "c" ;
+                                                                                      args=[ArrayAccess {lhs = Ide "a" ; indices = [Ide "i"]}];
+                                                                                      named_args=StrMap.empty };
                                                                       then_ = [uncommented (SimpleEquation { eq_lhs = Proj { object_ = Proj { object_ =
-                                                                                                                                                ArrayAccess { lhs= Ide "x";
+                                                                                                                                                ArrayAccess { lhs= Ide "a";
                                                                                                                                                               indices=[Ide"i"] }; 
                                                                                                                                               field="p" } ;
                                                                                                                field = "r"

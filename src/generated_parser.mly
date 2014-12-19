@@ -10,7 +10,7 @@
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
  *   * Neither the name of the TU Berlin nor the
- *     names of its contributors may be used to endorse or promote products
+ *     names of its contributors may be used to orse or promote products
  *     derived from this software without specific prior written permission.
 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
@@ -41,10 +41,10 @@
 %token BREAK ENCAPSULATED IF OUTER STREAM CLASS END IMPORT OUTPUT THEN CONNECT ENUMERATION IMPURE
 %token PACKAGE TRUE CONNECTOR EQUATION IN PARAMETER TYPE CONSTANT EXPANDABLE INITIAL PARTIAL WHEN
 %token CONSTRAINEDBY EXTENDS INNER PROTECTED WHILE DER EXTERNAL INPUT PUBLIC WITHIN
-                                   
+%token ENDWHEN ENDIF ENDFOR ENDWHILE
+
 %right lowest /* lowest precedence */
 %nonassoc IDENT INT FLOAT STRING LPAREN RPAREN RBRACKET LBRACE RBRACE 
-%right IF
 
 %left COMMA 
 %left SEMICOLON 
@@ -110,7 +110,7 @@ simple_expr:
         { MArray els }
   | FUNCTION e = expr
         { ExplicitClosure e }           
-  | END { End }
+  | END { End } %prec END
   | DER { Der }
   | INITIAL { Initial }
   | COLON { Colon }
@@ -195,12 +195,12 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                  { let (pargs, pnamed_args) = arguments in Call { procedure ; pargs; pnamed_args } }                                                                 
                | BREAK { Break }
                | RETURN { Return }
-               | IF condition=expr THEN then_ = list(statement) else_if = list(elseif_statement) else_ = else_statements END IF
+               | IF condition=expr THEN then_ = list(statement) else_if = list(elseif_statement) else_ = else_statements ENDIF
                     { IfStmt { condition; then_ ; else_if; else_ } }
-               | WHEN condition=expr THEN then_ = list(statement) else_if = list(elsewhen_statement) END WHEN
+               | WHEN condition=expr THEN then_ = list(statement) else_if = list(elsewhen_statement) ENDWHEN
                     { WhenStmt { condition; then_ ; else_if; else_ = []} }                                                                                                                         
-               | FOR idx = list(index) LOOP body=list(statement) END FOR { ForStmt { idx; body } }
-               | WHILE while_=expr LOOP do_ = list(statement) END WHILE { WhileStmt { while_; do_ } }
+               | FOR idx = list(index) LOOP body=list(statement) ENDFOR { ForStmt { idx; body } }
+               | WHILE while_=expr LOOP do_ = list(statement) ENDWHILE { WhileStmt { while_; do_ } }
                | target=lexpr COLONEQ source=expr { Assignment { target; source } }                       
 
                                                
@@ -213,12 +213,10 @@ elseif_equation : ELSEIF guard = expr THEN elsethen=list(equation) { { guard ; e
 
 elsewhen_equation : ELSEWHEN guard = expr THEN elsethen=list(equation) { { guard ; elsethen } }
 
-endif : END IF {}
-
 equation_body : e = simple_expr { ExpEquation e }
               | eq_lhs = simple_expr EQ eq_rhs = expr { SimpleEquation { eq_lhs ; eq_rhs } }                                              
-              | IF condition=expr THEN then_ = list(equation) else_if = list(elseif_equation) else_ = else_equations endif
+              | IF condition=expr THEN then_ = list(equation) else_if = list(elseif_equation) else_ = else_equations ENDIF
                    { IfEquation { condition; then_ ; else_if; else_ } } 
-              | WHEN condition=expr THEN then_ = list(equation) else_if = list(elsewhen_equation) END WHEN
+              | WHEN condition=expr THEN then_ = list(equation) else_if = list(elsewhen_equation) ENDWHEN
                    { WhenEquation { condition; then_ ; else_if; else_ = []} }                                                                                                                         
-              | FOR idx = list(index) LOOP body=list(equation) END FOR { ForEquation { idx; body } }
+              | FOR idx = list(index) LOOP body=list(equation) ENDFOR { ForEquation { idx; body } }

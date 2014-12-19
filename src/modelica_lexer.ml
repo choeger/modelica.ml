@@ -30,7 +30,7 @@ open Lexing
 open Generated_parser
 open Sedlexing
 open Batteries
-       
+open Utils       
 type cursor = Location.t
 
 open Location
@@ -149,20 +149,24 @@ let last_token { src; buf; m_cursor ; } = m_cursor.m_last
 (* For strings containing multiple lines, we keep track of the positions on our own *)
                                           
 let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
+
+  let last_loc () =
+    { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ; 
+      pos_cnum = lexeme_start buf ; pos_fname = src }
+  in
   
-  let lift token =
-    let loc_start = match token with
+  let lift token =    
+    let loc_start = match token with      
         STRING(_) | QIDENT(_) -> { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ; 
 		                   pos_cnum = s_cursor.str_start ; pos_fname = src }
-      | _ -> { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ; 
-	       pos_cnum = lexeme_start buf ; pos_fname = src }
+      | _ -> last_loc ()
     in
     let loc_end = match token with
         (* the only tokens that can span multiple lines are strings and quoted identifiers *)
         STRING(_) | QIDENT(_) -> { pos_lnum = s_cursor.str_line ; pos_bol = s_cursor.str_bol ; 
 		                   pos_cnum = s_cursor.str_end ; pos_fname = src }
       | _ -> { loc_start with pos_cnum = lexeme_start buf + lexeme_length buf }
-    in     
+    in
     let tok = { token ; cursor = { loc_start ; loc_end ; loc_ghost = false } } 
     in m_cursor.m_last <- Some tok ; tok
   in
@@ -238,7 +242,7 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | "within" -> WITHIN
     |  _ as x -> IDENT (x)
   in
-
+  
   let rec token () =
     match%sedlex buf with
     | "\r\n" -> newline () ; token ()
@@ -323,4 +327,18 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | eof -> EOF
     | any -> quoted_content (Text.append_char (UChar.of_int (Sedlexing.lexeme_char buf 0)) current)
     | _ -> failwith "no match on 'any'. This cannot happen"                                                                 
-  in lift (token ())
+
+
+  and merge { token=t; cursor } = match t with
+      END -> begin
+            let { m_line ; m_bol } = m_cursor in
+            match token () with
+              IF -> { token = ENDIF ; cursor = { cursor with loc_end = last_loc () } }
+            | FOR -> { token = ENDFOR ; cursor =  { cursor with loc_end = last_loc () } }
+            | WHILE -> { token = ENDWHILE ; cursor = { cursor with loc_end = last_loc () } }
+            | WHEN -> { token = ENDWHEN ; cursor = { cursor with loc_end = last_loc () } }
+            | _ -> Sedlexing.rollback buf ; m_cursor.m_line <- m_line ; m_cursor.m_bol <- m_bol ; { token=t; cursor }
+      end
+    | _ -> { token=t; cursor }
+      
+  in merge (lift (token ()))
