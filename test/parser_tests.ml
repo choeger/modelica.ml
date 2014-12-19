@@ -156,8 +156,8 @@ let test_cases = [
 
        
   (* comprehension *)
-  expr "x for x in foo" (Compr {exp = Ide "x"; idxs = [{variable="x"; range=Some (Ide "foo")}]});
-  expr "x for x" (Compr {exp = Ide "x"; idxs = [{variable="x"; range=None}]});
+  expr "{x for x in foo}" (Array[Compr {exp = Ide "x"; idxs = [{variable="x"; range=Some (Ide "foo")}]}]);
+  expr "{x for x}" (Array [Compr {exp = Ide "x"; idxs = [{variable="x"; range=None}]}]);
 
   (* statements *)
   stmt "return;" (uncommented Return) ;

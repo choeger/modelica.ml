@@ -44,6 +44,8 @@
                                    
 %right lowest /* lowest precedence */
 %nonassoc IDENT INT FLOAT STRING LPAREN RPAREN RBRACKET LBRACE RBRACE 
+%right IF
+
 %left COMMA 
 %left SEMICOLON 
 %left GT LT NEQ GEQ LEQ EQ 
@@ -54,6 +56,7 @@
 %nonassoc below_app
 %left app_prec     
 %left DOT LBRACKET /* highest precedence */
+
 
 %{
    open Syntax
@@ -75,8 +78,12 @@ modelica_eq : eq = equation EOF { eq }
                               
 optional_expr : e = expr { e }
               | { Empty}                                                  
-                        
-expr:
+
+expr : e = simple_expr { e }
+     | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
+       { If { condition ; then_ ; else_if ; else_ } }
+
+simple_expr:
   | TRUE { Bool(true) }
   | FALSE { Bool(false) }
   | i = INT 
@@ -95,7 +102,7 @@ expr:
         { e }
   | LPAREN hd=optional_expr COMMA tl=separated_nonempty_list(COMMA, optional_expr) RPAREN
         { Tuple (hd::tl) }
-  | LBRACE es=separated_list(COMMA, expr) RBRACE
+  | LBRACE es=array_args RBRACE
         { Array es }
   | lhs = expr LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
         { ArrayAccess { lhs; indices } }
@@ -107,9 +114,6 @@ expr:
   | DER { Der }
   | INITIAL { Initial }
   | COLON { Colon }
-
-  | exp = expr FOR idxs = separated_nonempty_list(COMMA, index)
-        { Compr { exp ; idxs } }
 
   | fun_ = expr LPAREN arguments = function_args RPAREN
         { let (args, named_args) = arguments in App { fun_ ; args; named_args } }
@@ -146,9 +150,6 @@ expr:
   | PLUS e = expr { UPlus e } %prec UMinus
   | DOTMINUS e = expr { UDMinus e } %prec UMinus
   | DOTPLUS e = expr { UDPlus e } %prec UMinus
-  
-  | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
-       { If { condition ; then_ ; else_if ; else_ } }
     
 else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
 
@@ -156,10 +157,14 @@ index_range : IN e = expr { e }
                                                  
 index : variable = IDENT range = option(index_range) { { variable ; range } }
 
+array_args : es=separated_list(COMMA, expr) { es }
+           | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { [Compr { exp ; idxs }] }
+
 function_args : e = expr COMMA fs = function_args { let (args, named_args) = fs in (e::args, named_args) }
               | e = expr { ([e], StrMap.empty) }
               | m = named_function_args { ([], m) }
-                                 
+              | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { ([Compr { exp ; idxs }],StrMap.empty) }  
+               
 named_argument : x=IDENT EQ e=expr { (x,e) }
 
 named_function_args : args=separated_nonempty_list (COMMA, named_argument) { StrMap.of_enum (List.enum args) }
@@ -201,6 +206,19 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                                                
 equation : commented=equation_body comment=comment SEMICOLON { { commented ; comment } }
 
-equation_body : e = expr { ExpEquation e }
-              | eq_lhs = expr EQ eq_rhs = expr { SimpleEquation { eq_lhs ; eq_rhs } }
-              
+else_equations : ELSE else_ = list(equation) { else_ }
+                | { [] }
+
+elseif_equation : ELSEIF guard = expr THEN elsethen=list(equation) { { guard ; elsethen } }
+
+elsewhen_equation : ELSEWHEN guard = expr THEN elsethen=list(equation) { { guard ; elsethen } }
+
+endif : END IF {}
+
+equation_body : e = simple_expr { ExpEquation e }
+              | eq_lhs = simple_expr EQ eq_rhs = expr { SimpleEquation { eq_lhs ; eq_rhs } }                                              
+              | IF condition=expr THEN then_ = list(equation) else_if = list(elseif_equation) else_ = else_equations endif
+                   { IfEquation { condition; then_ ; else_if; else_ } } 
+              | WHEN condition=expr THEN then_ = list(equation) else_if = list(elsewhen_equation) END WHEN
+                   { WhenEquation { condition; then_ ; else_if; else_ = []} }                                                                                                                         
+              | FOR idx = list(index) LOOP body=list(equation) END FOR { ForEquation { idx; body } }
