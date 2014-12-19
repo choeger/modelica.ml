@@ -119,7 +119,10 @@ and pp_foridx fmt = function
     { variable ; range=Some(e) } -> fprintf fmt "@[%s in %a@]" variable pp_expr e
   | { variable ; range=None } -> fprintf fmt "@[%s@]" variable
 
-let pp_conditional kw ?else_:(else_kw="else") = pp_complete_conditional ~else_:else_kw pp_expr kw
+let pp_conditional kw ?else_:(else_kw="else") pp_then fmt c=
+  fprintf fmt "@[" ;
+  pp_complete_conditional ~else_:else_kw pp_expr kw pp_then fmt c;
+  fprintf fmt "end@ %s@]" kw 
                                          
 let expr2str ?max:(n=8) e = 
   pp_set_max_boxes str_formatter n ;
@@ -160,8 +163,8 @@ let rec pp_statement_desc fmt = function
     Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
   | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
                                                       
-  | IfStmt c -> pp_conditional "if" pp_statements fmt c ; fprintf fmt "end if"
-  | WhenStmt c -> pp_conditional "when" ~else_:"" pp_statements fmt c ; fprintf fmt "end when"
+  | IfStmt c -> pp_conditional "if" pp_statements fmt c 
+  | WhenStmt c -> pp_conditional "when" ~else_:"" pp_statements fmt c 
                   
   | Break -> fprintf fmt "@[break@]"
   | Return -> fprintf fmt "@[return@]"
@@ -177,3 +180,17 @@ let stmt2str ?max:(n=8) s =
   pp_set_max_boxes str_formatter n ;
   (pp_statement str_formatter s) ;
   flush_str_formatter ()
+
+
+let rec pp_equation_desc fmt = function
+    SimpleEquation { eq_lhs ; eq_rhs } -> fprintf fmt "@[%a@ =@ %a@]"
+                                                  pp_expr eq_lhs pp_expr eq_rhs
+  | ForEquation loop -> pp_for_loop pp_equations fmt loop
+  | IfEquation c -> pp_conditional "if" pp_equations fmt c 
+  | WhenEquation c -> pp_conditional "when" ~else_:"" pp_equations fmt c
+  | ExpEquation e -> pp_expr fmt e
+
+and pp_equation fmt { commented ; comment } =
+  fprintf fmt "@[%a%a;@]" pp_equation_desc commented pp_comment comment 
+
+and pp_equations fmt eqs = (pp_list pp_equation) fmt eqs
