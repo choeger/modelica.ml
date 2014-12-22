@@ -67,7 +67,8 @@
 %start <Syntax.exp> modelica_expr
 %start <Syntax.statement> modelica_stmt
 %start <Syntax.equation> modelica_eq
-
+%start <Syntax.texp> modelica_texpr
+                                                    
 %%
 
 modelica_expr: e = expr EOF { e }
@@ -75,7 +76,9 @@ modelica_expr: e = expr EOF { e }
 modelica_stmt : s = statement EOF { s }                        
 
 modelica_eq : eq = equation EOF { eq }                              
-                              
+
+modelica_texpr : texpr = type_expression EOF { texpr }
+                            
 optional_expr : e = expr { e }
               | { Empty}                                                  
 
@@ -220,3 +223,5 @@ equation_body : e = simple_expr { ExpEquation e }
               | WHEN condition=expr THEN then_ = list(equation) else_if = list(elsewhen_equation) ENDWHEN
                    { WhenEquation { condition; then_ ; else_if; else_ = []} }                                                                                                                         
               | FOR idx = list(index) LOOP body=list(equation) ENDFOR { ForEquation { idx; body } }
+
+type_expression : x = IDENT { TIde x }

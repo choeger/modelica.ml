@@ -48,6 +48,8 @@ let guard parser next last = try parser next
                              with
                              | Generated_parser.Error -> raise ( SyntaxError ( locate (last ()) ) )
 
+let texpr_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_texpr)
+
 let expr_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_expr)
 
 let stmt_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_stmt)

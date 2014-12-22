@@ -199,3 +199,13 @@ let eq2str ?max:(n=8) eq =
   pp_set_max_boxes str_formatter n ;
   (pp_equation str_formatter eq) ;
   flush_str_formatter ()
+
+let rec pp_texpr fmt = function
+  | TIde x -> fprintf fmt "@[%s@]" x
+  | TProj { class_type; type_element } -> fprintf fmt "@[%a.%s@]" pp_texpr class_type type_element
+  | TRootide x -> fprintf fmt "@[.%s@]" x
+
+let texpr2str ?max:(n=8) te = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_texpr str_formatter te) ;
+  flush_str_formatter ()

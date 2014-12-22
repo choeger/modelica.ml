@@ -205,11 +205,11 @@ let test_cases = [
                                                                                                                       else_if = []; else_ = []
                                                                                                                       
                                                                                                })] }));
-  texp "Modelica" (TIde "Modelica");
-  texp "Modelica.Icons" (TProj {class_type=TIde "Modelica"; type_element="Icons"});
-  texp ".x" (TRootIde "x");
-  texp ".x.y" (TProj { class_type=TRootIde "x"; type_element= "y" });
-  texp "Modelica.Icons.InterfacesPackage" (TProj  { class_type=TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage"});
+  texpr "Modelica" (TIde "Modelica");
+  texpr "Modelica.Icons" (TProj {class_type=TIde "Modelica"; type_element="Icons"});
+  texpr ".x" (TRootide "x");
+  texpr ".x.y" (TProj { class_type=TRootide "x"; type_element= "y" });
+  texpr "Modelica.Icons.InterfacesPackage" (TProj  { class_type=TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage"});
 
 (*
     it ("Should parse unnamed imports") {
