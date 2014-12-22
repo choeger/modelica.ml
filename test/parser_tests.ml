@@ -57,7 +57,9 @@ let parser_test_case parser lprinter sprinter input expected =
                    (fun e -> parse_test parser (lprinter e)
                                         (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter expected e) ())) ; 
   ]
-                                    
+
+let texpr input expected = parser_test_case texpr_parser (texpr2str ~max:100) texpr2str input expected
+                                            
 let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2str input expected
 
 let stmt input expected = parser_test_case stmt_parser (stmt2str ~max:100) stmt2str input expected
@@ -203,27 +205,13 @@ let test_cases = [
                                                                                                                       else_if = []; else_ = []
                                                                                                                       
                                                                                                })] }));
+  texp "Modelica" (TIde "Modelica");
+  texp "Modelica.Icons" (TProj {class_type=TIde "Modelica"; type_element="Icons"});
+  texp ".x" (TRootIde "x");
+  texp ".x.y" (TProj { class_type=TRootIde "x"; type_element= "y" });
+  texp "Modelica.Icons.InterfacesPackage" (TProj  { class_type=TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage"});
+
 (*
-    it ("Should parse type-ide's") {
-      "Modelica" parsed_with type_exp should create (TIde("Modelica"))
-    }
-
-    it ("Should parse type-names") {
-      "Modelica.Icons" parsed_with type_exp should create (TProj(TIde("Modelica"), "Icons"))
-    }
-
-    it("Should parse type root-identifiers") {
-      ".x" parsed_with type_exp should create (TRootIde("x"))
-    }
-
-    it("Should parse root-identifiers in type-projections") {
-      ".x.y" parsed_with type_exp should create (TProj(TRootIde("x"), "y"))
-    }
-
-    it ("Should parse longer type-names") {
-      "Modelica.Icons.InterfacesPackage" parsed_with type_exp should create (TProj(TProj(TIde("Modelica"), "Icons"),"InterfacesPackage"))
-    }
-
     it ("Should parse unnamed imports") {
       "import X;" parsed_with _import should create (UnnamedImport(List("X")))
     }
