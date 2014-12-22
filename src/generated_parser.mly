@@ -225,3 +225,6 @@ equation_body : e = simple_expr { ExpEquation e }
               | FOR idx = list(index) LOOP body=list(equation) ENDFOR { ForEquation { idx; body } }
 
 type_expression : x = IDENT { TIde x }
+                | DOT x = IDENT { TRootide x } 
+                | class_type=type_expression DOT type_element = IDENT { TProj {class_type; type_element} }
+                            
