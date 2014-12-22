@@ -221,8 +221,6 @@ and exp = Pow of binary_exp
                        
 and idx = { variable : string ; range : exp option }
 
-and path = string list
-
 and tprojection = { class_type : texp ; type_element : string }
 
 and array_type = { base_type : texp ; dims : exp list }
@@ -237,12 +235,9 @@ and texp = TIde of string
          | TVar of variability flagged_type
          | TCon of connectivity flagged_type
          | TCau of causality flagged_type
-         | TPkg of package
-
+                             
 and 'a flagged_type = { flag : 'a ; flagged : texp }
                      
-and package = { pkg_name : string ; root : path ; subPkgs : path StrMap.t ; classes : path StrMap.t ; }
-
 and type_redeclaration = { redecl_each : bool ; redecl_type : typedef; }
 
 and component_redeclaration = { each : bool ; def : definition; }
