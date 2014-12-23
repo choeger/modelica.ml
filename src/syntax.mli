@@ -87,11 +87,11 @@ and der_spec = { der_name : name ; idents : string list }
 and sort = Package | Class | Model | Block | Connector | ExpandableConnector | Record
            | Function | Type | Operator | OperatorRecord | OperatorFunction 
 
-and connectivity = Flow | Sream | NoConn
+and connectivity = Flow | Stream | NoConn
 
 and variability = Constant | Parameter | Discrete | Continuous
 
-and causality = Input | Output | Acausal
+and causality = Input | Output
 
 and named_import = { from : name ; selected : string }
                                    
