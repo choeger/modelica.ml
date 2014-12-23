@@ -200,11 +200,27 @@ let eq2str ?max:(n=8) eq =
   (pp_equation str_formatter eq) ;
   flush_str_formatter ()
 
+let pp_variability fmt = function
+  | Constant -> fprintf fmt "constant"
+  | Parameter -> fprintf fmt "parameter"
+  | Discrete -> fprintf fmt "discrete"
+
+let pp_causality fmt = function
+  | Input -> fprintf fmt "input"
+  | Output -> fprintf fmt "output"
+
+let pp_connectivity fmt = function
+  | Flow -> fprintf fmt "flow"
+  | Stream -> fprintf fmt "stream"
+                      
 let rec pp_texpr fmt = function
   | TIde x -> fprintf fmt "@[%s@]" x
   | TProj { class_type; type_element } -> fprintf fmt "@[%a.%s@]" pp_texpr class_type type_element
   | TRootide x -> fprintf fmt "@[.%s@]" x
-
+  | TVar { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_variability flag pp_texpr flagged
+  | TCon { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_connectivity flag pp_texpr flagged
+  | TCau { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_causality flag pp_texpr flagged
+                          
 let texpr2str ?max:(n=8) te = 
   pp_set_max_boxes str_formatter n ;
   (pp_texpr str_formatter te) ;
