@@ -224,7 +224,21 @@ equation_body : e = simple_expr { ExpEquation e }
                    { WhenEquation { condition; then_ ; else_if; else_ = []} }                                                                                                                         
               | FOR idx = list(index) LOOP body=list(equation) ENDFOR { ForEquation { idx; body } }
 
+variability : CONSTANT { Constant }
+            | PARAMETER { Parameter } 
+            | DISCRETE { Discrete }
+                       
+connectivity : FLOW { Flow }
+             | STREAM { Stream } 
+
+causality : INPUT { Input }                      
+          | OUTPUT { Output } 
+                  
 type_expression : x = IDENT { TIde x }
                 | DOT x = IDENT { TRootide x } 
                 | class_type=type_expression DOT type_element = IDENT { TProj {class_type; type_element} }
+                | flag=variability flagged=type_expression { TVar { flag ; flagged } }
+                | flag=causality flagged=type_expression { TCau { flag ; flagged } }
+                | flag=connectivity flagged=type_expression { TCon { flag ; flagged } }
+                                                           
                             
