@@ -210,7 +210,16 @@ let test_cases = [
   texpr ".x" (TRootide "x");
   texpr ".x.y" (TProj { class_type=TRootide "x"; type_element= "y" });
   texpr "Modelica.Icons.InterfacesPackage" (TProj  { class_type=TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage"});
-
+  texpr "input Real" (TCau {flag = Input ; flagged = TIde "Real" });
+  texpr "constant Real" (TVar {flag = Constant ; flagged = TIde "Real" });
+  texpr "flow Real" (TCon {flag = Flow ; flagged = TIde "Real" });
+  texpr "output parameter discrete stream Real" (TCau { flag = Output ; flagged = TVar { flag = Parameter ;
+                                                                                         flagged =
+                                                                                           TVar { flag = Discrete ;
+                                                                                                  flagged =
+                                                                                                    TCon { flag = Stream ;
+                                                                                                           flagged = TIde "Real" } } } } ) ;
+  
 (*
     it ("Should parse unnamed imports") {
       "import X;" parsed_with _import should create (UnnamedImport(List("X")))
