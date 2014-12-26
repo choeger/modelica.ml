@@ -220,7 +220,8 @@ let rec pp_texpr fmt = function
   | TVar { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_variability flag pp_texpr flagged
   | TCon { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_connectivity flag pp_texpr flagged
   | TCau { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_causality flag pp_texpr flagged
-                          
+  | TArray { base_type ; dims } -> fprintf fmt "@[%a[%a]@]" pp_texpr base_type (pp_list ~sep:", " pp_expr) dims
+                                       
 let texpr2str ?max:(n=8) te = 
   pp_set_max_boxes str_formatter n ;
   (pp_texpr str_formatter te) ;

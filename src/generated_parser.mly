@@ -240,5 +240,5 @@ type_expression : x = IDENT { TIde x }
                 | flag=variability flagged=type_expression { TVar { flag ; flagged } }
                 | flag=causality flagged=type_expression { TCau { flag ; flagged } }
                 | flag=connectivity flagged=type_expression { TCon { flag ; flagged } }
-                                                           
+                | base_type = type_expression LBRACKET dims = separated_list(COMMA, expr) RBRACKET { TArray { base_type ; dims } }
                             
