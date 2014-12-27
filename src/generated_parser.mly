@@ -173,7 +173,7 @@ named_argument : x=IDENT EQ e=expr { (x,e) }
 named_function_args : args=separated_nonempty_list (COMMA, named_argument) { StrMap.of_enum (List.enum args) }
                     | { StrMap.empty }                                                            
 
-annotation : ANNOTATION LPAREN RPAREN { {types = []; components = []; modifications = []} } 
+annotation : ANNOTATION m=modification { m }
                         
 comment : s=option(STRING) m=option(annotation) { { annotated_elem=s ; annotation=m} }
                         
@@ -241,4 +241,6 @@ type_expression : x = IDENT { TIde x }
                 | flag=causality flagged=type_expression { TCau { flag ; flagged } }
                 | flag=connectivity flagged=type_expression { TCon { flag ; flagged } }
                 | base_type = type_expression LBRACKET dims = separated_list(COMMA, expr) RBRACKET { TArray { base_type ; dims } }
-                            
+                | mod_type = type_expression modification = modification { TMod { mod_type ; modification } }
+
+modification : LPAREN RPAREN { { types = [] ; components = [] ; modifications = [] } }

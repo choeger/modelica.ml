@@ -220,7 +220,7 @@ let test_cases = [
                                                                                                     TCon { flag = Stream ;
                                                                                                            flagged = TIde "Real" } } } } ) ;
   texpr "Real[2,3]" (TArray {base_type = TIde "Real"; dims = [Int 2 ; Int 3]} ) ;
-
+  texpr "T()" (TMod { mod_type = TIde "T" ; modification = no_modification } ) ;
   
 (*
     it ("Should parse unnamed imports") {
