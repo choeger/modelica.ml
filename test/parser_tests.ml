@@ -58,6 +58,8 @@ let parser_test_case parser lprinter sprinter input expected =
                                         (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter expected e) ())) ; 
   ]
 
+let import input expected = parser_test_case import_parser (import2str ~max:100) import2str input expected
+
 let texpr input expected = parser_test_case texpr_parser (texpr2str ~max:100) texpr2str input expected
                                             
 let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2str input expected
@@ -222,19 +224,13 @@ let test_cases = [
   texpr "Real[2,3]" (TArray {base_type = TIde "Real"; dims = [Int 2 ; Int 3]} ) ;
   texpr "T()" (TMod { mod_type = TIde "T" ; modification = no_modification } ) ;
   
+
+  import "import X" (uncommented (Unnamed ["X"])) ;
+  import "import Y=X" (uncommented (NamedImport {from = ["Y"] ; selected = "X" }));
+  
+  import "import X.*" (uncommented (UnqualifiedImport ["X"]));
+
 (*
-    it ("Should parse unnamed imports") {
-      "import X;" parsed_with _import should create (UnnamedImport(List("X")))
-    }
-
-    it ("Should parse named imports") {
-      "import Y=X;" parsed_with _import should create (NamedImport("Y", List("X")))
-    }
-
-    it ("Should parse qualified imports") {
-      "import X.*;" parsed_with _import should create (UnqualifiedImport(List("X")))
-    }
-
     it("Should parse extends-statements") {
       "extends Modelica.Icons.InterfacesPackage;" parsed_with _extends(Public) should create (
         Extend(TProj(TProj(TIde("Modelica"), "Icons"),"InterfacesPackage")))

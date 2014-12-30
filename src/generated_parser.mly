@@ -68,7 +68,8 @@
 %start <Syntax.statement> modelica_stmt
 %start <Syntax.equation> modelica_eq
 %start <Syntax.texp> modelica_texpr
-                                                    
+%start <Syntax.import> modelica_import
+                       
 %%
 
 modelica_expr: e = expr EOF { e }
@@ -78,7 +79,9 @@ modelica_stmt : s = statement EOF { s }
 modelica_eq : eq = equation EOF { eq }                              
 
 modelica_texpr : texpr = type_expression EOF { texpr }
-                            
+
+modelica_import : import = import EOF { import }
+                                         
 optional_expr : e = expr { e }
               | { Empty}                                                  
 
@@ -244,3 +247,5 @@ type_expression : x = IDENT { TIde x }
                 | mod_type = type_expression modification = modification { TMod { mod_type ; modification } }
 
 modification : LPAREN RPAREN { { types = [] ; components = [] ; modifications = [] } }
+
+import : IMPORT comment = comment { { commented = Unnamed [] ; comment } }

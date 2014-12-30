@@ -228,3 +228,14 @@ let texpr2str ?max:(n=8) te =
   pp_set_max_boxes str_formatter n ;
   (pp_texpr str_formatter te) ;
   flush_str_formatter ()
+
+let pp_import_desc fmt = function
+    Unnamed name -> fprintf fmt "@[import@ %a@]" (pp_list ~sep:"." pp_print_string) name 
+
+let pp_import fmt {commented;comment} =
+  fprintf fmt "@[%a%a@]" pp_import_desc commented pp_comment comment
+                            
+let import2str ?max:(n=8) import = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_import str_formatter import) ;
+  flush_str_formatter ()
