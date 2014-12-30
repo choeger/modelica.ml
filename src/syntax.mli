@@ -94,10 +94,12 @@ and variability = Constant | Parameter | Discrete
 and causality = Input | Output
 
 and named_import = { from : name ; selected : string }
-                                   
-and import = NamedImport of (named_import commented)
-           | Unnamed of (name commented)
-           | UnqualifiedImport of (name commented)
+
+and import = import_desc commented
+                     
+and import_desc = NamedImport of named_import
+                | Unnamed of name
+                | UnqualifiedImport of name
 
 and visibility = Public | Protected
 
