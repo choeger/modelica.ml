@@ -248,4 +248,6 @@ type_expression : x = IDENT { TIde x }
 
 modification : LPAREN RPAREN { { types = [] ; components = [] ; modifications = [] } }
 
-import : IMPORT comment = comment { { commented = Unnamed [] ; comment } }
+import : IMPORT name=separated_nonempty_list(DOT, IDENT) comment = comment { { commented = Unnamed name ; comment } }
+       | IMPORT from=separated_nonempty_list(DOT, IDENT) EQ selected=IDENT comment = comment { { commented = NamedImport {from;selected} ; comment } } 
+       | IMPORT name=separated_nonempty_list(DOT, IDENT) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }

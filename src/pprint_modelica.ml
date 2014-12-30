@@ -231,7 +231,9 @@ let texpr2str ?max:(n=8) te =
 
 let pp_import_desc fmt = function
     Unnamed name -> fprintf fmt "@[import@ %a@]" (pp_list ~sep:"." pp_print_string) name 
-
+  | NamedImport {from; selected} -> fprintf fmt "@[import@ %a@ =@ %s@]" (pp_list ~sep:"." pp_print_string) from selected
+  | UnqualifiedImport name -> fprintf fmt "@[import@ %a.*@]" (pp_list ~sep:"." pp_print_string) name 
+    
 let pp_import fmt {commented;comment} =
   fprintf fmt "@[%a%a@]" pp_import_desc commented pp_comment comment
                             
