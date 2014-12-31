@@ -237,9 +237,7 @@ let test_cases = [
                                                  TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage" } ;
                             ext_visibility = Public ; ext_annotation = None }
    in
-   extend "extends Modelica.Icons.InterfacesPackage" extend_statement ;
-
-  );
+   extend "extends Modelica.Icons.InterfacesPackage" extend_statement );
 
     (* it("Should parse a simple component") {
       "parameter FluidHeatFlow.Media.Medium medium;" parsed_with _def(Public) should create (

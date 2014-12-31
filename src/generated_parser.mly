@@ -248,7 +248,7 @@ type_expression : x = IDENT { TIde x }
                 | flag=variability flagged=type_expression { TVar { flag ; flagged } }
                 | flag=causality flagged=type_expression { TCau { flag ; flagged } }
                 | flag=connectivity flagged=type_expression { TCon { flag ; flagged } }
-                | base_type = type_expression LBRACKET dims = separated_list(COMMA, expr) RBRACKET { TArray { base_type ; dims } }
+                | base_type = type_expression dims = array_subscripts { TArray { base_type ; dims } }
                 | mod_type = type_expression modification = modification { TMod { mod_type ; modification } }
 
 modification : LPAREN RPAREN { { types = [] ; components = [] ; modifications = [] } }
@@ -262,3 +262,19 @@ visibility : PROTECTED { visibility := Protected ; Protected }
        | { !visibility }
                                                                                     
 extends : ext_visibility=visibility EXTENDS ext_type = type_expression ext_annotation=option(annotation) { { ext_type ; ext_visibility ; ext_annotation } } 
+
+flag (F) : F { true } | { false }
+
+scope : INNER { Inner }
+      | OUTER { Outer }
+      | INNER OUTER { InnerOuter }
+      | { Local }
+          
+type_prefix : final = flag(FINAL) scope = scope visibility = visibility replaceable = flag(REPLACEABLE)                                                                     
+                { final ; scope ; visibility ; replaceable }
+
+array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
+                                                                                            
+declaration : x = IDENT dims = option(array_subscripts) m=option(modification) { (x, dims, m) } 
+
+component_clause : def_options = type_prefix def_type = type_expression components=separated_nonempty_list(COMMA, declaration)                                                                     { List.map (function (def_name, None, None) -> { def_name ; def_type ; def_options ; def_constraint ; def_rhs ; def_if ; }) components }                                                                                            
