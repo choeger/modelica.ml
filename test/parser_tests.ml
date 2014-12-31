@@ -60,6 +60,8 @@ let parser_test_case parser lprinter sprinter input expected =
 
 let import input expected = parser_test_case import_parser (import2str ~max:100) import2str input expected
 
+let extend input expected = parser_test_case extends_parser (extend2str ~max:100) extend2str input expected
+
 let texpr input expected = parser_test_case texpr_parser (texpr2str ~max:100) texpr2str input expected
                                             
 let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2str input expected
@@ -230,13 +232,16 @@ let test_cases = [
   
   import "import X.*" (uncommented (UnqualifiedImport ["X"]));
 
-(*
-    it("Should parse extends-statements") {
-      "extends Modelica.Icons.InterfacesPackage;" parsed_with _extends(Public) should create (
-        Extend(TProj(TProj(TIde("Modelica"), "Icons"),"InterfacesPackage")))
-    }
 
-    it("Should parse a simple component") {
+  (let extend_statement = { ext_type = TProj { class_type=
+                                                 TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage" } ;
+                            ext_visibility = Public ; ext_annotation = None }
+   in
+   extend "extends Modelica.Icons.InterfacesPackage" extend_statement ;
+
+  );
+
+    (* it("Should parse a simple component") {
       "parameter FluidHeatFlow.Media.Medium medium;" parsed_with _def(Public) should create (
         List(Def("medium", TVariability(Parameter, TProj(TProj(TIde("FluidHeatFlow"), "Media"), "Medium")))))
     }

@@ -61,6 +61,8 @@
 %{
    open Syntax
    open Utils
+
+   let visibility = ref Public
 %}
 
 
@@ -69,7 +71,8 @@
 %start <Syntax.equation> modelica_eq
 %start <Syntax.texp> modelica_texpr
 %start <Syntax.import> modelica_import
-                       
+%start <Syntax.extend> modelica_extends
+                                                 
 %%
 
 modelica_expr: e = expr EOF { e }
@@ -81,7 +84,9 @@ modelica_eq : eq = equation EOF { eq }
 modelica_texpr : texpr = type_expression EOF { texpr }
 
 modelica_import : import = import EOF { import }
-                                         
+
+modelica_extends : extends = extends EOF { extends }
+                                  
 optional_expr : e = expr { e }
               | { Empty}                                                  
 
@@ -251,3 +256,9 @@ modification : LPAREN RPAREN { { types = [] ; components = [] ; modifications = 
 import : IMPORT name=separated_nonempty_list(DOT, IDENT) comment = comment { { commented = Unnamed name ; comment } }
        | IMPORT from=separated_nonempty_list(DOT, IDENT) EQ selected=IDENT comment = comment { { commented = NamedImport {from;selected} ; comment } } 
        | IMPORT name=separated_nonempty_list(DOT, IDENT) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
+
+visibility : PROTECTED { visibility := Protected ; Protected }
+       | PUBLIC { visibility := Public ; Public }
+       | { !visibility }
+                                                                                    
+extends : ext_visibility=visibility EXTENDS ext_type = type_expression ext_annotation=option(annotation) { { ext_type ; ext_visibility ; ext_annotation } } 

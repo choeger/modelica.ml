@@ -146,15 +146,17 @@ let pp_modification fmt { types ; components ; modifications } =
   pp_list pp_component_redeclaration fmt components ;
   pp_list pp_component_modification fmt modifications
 
+let pp_annotation fmt = function
+    None -> ()
+  | Some m -> fprintf fmt "@[annotation%a@]" pp_modification m
+          
 let pp_comment_string fmt = function
   | None -> ()
   | Some s -> fprintf fmt " %s" s 
           
 let pp_comment fmt { annotated_elem ; annotation } = 
   pp_comment_string fmt annotated_elem ;
-  match annotation with
-  | Some m -> pp_modification fmt m
-  | None -> ()
+  pp_annotation fmt annotation 
               
 let pp_for_loop pp fmt { idx ; body } =
   fprintf fmt "@[for@ %a@ loop@ %a@ end for@]" (pp_list ~sep:", " pp_foridx) idx pp body
@@ -240,4 +242,15 @@ let pp_import fmt {commented;comment} =
 let import2str ?max:(n=8) import = 
   pp_set_max_boxes str_formatter n ;
   (pp_import str_formatter import) ;
+  flush_str_formatter ()
+
+let pp_extend fmt = function
+  | { ext_type ; ext_visibility ; ext_annotation } ->
+     fprintf fmt "@[%s@ extends@ %a%a@]"
+             (match ext_visibility with Public -> "public" | Protected -> "protected")
+             pp_texpr ext_type pp_annotation ext_annotation
+
+let extend2str ?max:(n=8) extends = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_extend str_formatter extends) ;
   flush_str_formatter ()
