@@ -72,8 +72,11 @@
 %start <Syntax.texp> modelica_texpr
 %start <Syntax.import> modelica_import
 %start <Syntax.extend> modelica_extends
+%start <Syntax.definition list> modelica_definitions
                                                  
 %%
+
+modelica_definitions : defs = component_clause EOF { defs }
 
 modelica_expr: e = expr EOF { e }
 
@@ -270,11 +273,42 @@ scope : INNER { Inner }
       | INNER OUTER { InnerOuter }
       | { Local }
           
-type_prefix : final = flag(FINAL) scope = scope visibility = visibility replaceable = flag(REPLACEABLE)                                                                     
-                { final ; scope ; visibility ; replaceable }
+type_prefix : replaceable = flag(REPLACEABLE) final = flag(FINAL) scope = scope visibility = visibility                                                                  
+                { { final ; scope ; visibility ; replaceable } }
 
 array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
-                                                                                            
-declaration : x = IDENT dims = option(array_subscripts) m=option(modification) { (x, dims, m) } 
 
-component_clause : def_options = type_prefix def_type = type_expression components=separated_nonempty_list(COMMA, declaration)                                                                     { List.map (function (def_name, None, None) -> { def_name ; def_type ; def_options ; def_constraint ; def_rhs ; def_if ; }) components }                                                                                            
+decl_condition : IF cond=expr { cond }
+
+decl_modification : m=modification { (Some(m), None) }
+                  | EQ e=expr { (None, Some(e)) }
+                  | COLONEQ e=expr { (None, Some(e)) }
+                                                                                            
+declaration : x = IDENT dims = option(array_subscripts) m=decl_modification cond=option(decl_condition) comment=comment 
+              { let (modification, rhs) = m in (x, dims, modification, cond, rhs, comment) } 
+
+component_clause : def_options = type_prefix def_type = type_expression components=separated_nonempty_list(COMMA, declaration) 
+                     {  let def_constraint = None in
+                        List.map (function 
+                                   (def_name, None, None, def_if, def_rhs, comment) -> { commented = 
+                                                                                         { def_name ; def_type ; def_options ; def_constraint ; def_rhs ; def_if ; } ;
+                                                                                         comment }
+                                 | (def_name, Some(dims), None, def_if, def_rhs, comment) -> { commented = 
+                                                                                               { def_name ; def_type = TArray { base_type = def_type ; dims } ;
+                                                                                                 def_options ; def_constraint ; def_rhs ; def_if ; } ;
+                                                                                               comment }
+                                 | (def_name, Some(dims), Some(modification), def_if, def_rhs, comment) -> { commented = 
+                                                                                                             { def_name ; 
+                                                                                                               def_type = TArray { base_type =
+                                                                                                                                   TMod { mod_type = def_type ; modification } ;
+                                                                                                                                   dims } ;
+                                                                                                               def_options ; def_constraint ; def_rhs ; def_if ; } ;
+                                                                                                             comment }
+                                 | (def_name, None, Some(modification), def_if, def_rhs, comment) -> { commented = 
+                                                                                                       { def_name ; 
+                                                                                                         def_type = TMod { mod_type = def_type ; modification } ; 
+                                                                                                         def_options ; def_constraint ; def_rhs ; def_if ; } ;
+                                                                                                       comment }
+                                ) 
+                       components }
+
