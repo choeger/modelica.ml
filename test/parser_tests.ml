@@ -242,6 +242,14 @@ let test_cases = [
    extend "extends Modelica.Icons.InterfacesPackage" extend_statement );
 
   defs "Real p" [uncommented {empty_def with def_name = "p" ; def_type = TIde "Real" ;}] ;
+  defs "Real p, q" [uncommented {empty_def with def_name = "p" ; def_type = TIde "Real" ;} ;
+                    uncommented {empty_def with def_name = "q" ; def_type = TIde "Real" ;}
+                   ] ;  
+  defs "parameter Real p" [uncommented {empty_def with def_name = "p" ; def_type = TVar { flag = Parameter ; flagged = TIde "Real" } ;}] ;
+  defs "public parameter Real p" [uncommented {empty_def with def_name = "p" ; def_type = TVar { flag = Parameter ; flagged = TIde "Real" } ;}] ;
+  defs "protected parameter Real p" [uncommented {empty_def with def_name = "p" ; def_type = TVar { flag = Parameter ; flagged = TIde "Real" } ;
+                                                                 def_options = { no_def_options with visibility = Protected } ;}] ;
+
   
     (* it("Should parse a simple component") {
       "parameter FluidHeatFlow.Media.Medium medium;" parsed_with _def(Public) should create (
