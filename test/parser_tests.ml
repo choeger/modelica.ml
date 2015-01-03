@@ -69,6 +69,8 @@ let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2
 let stmt input expected = parser_test_case stmt_parser (stmt2str ~max:100) stmt2str input expected
 
 let eq input expected = parser_test_case eq_parser (eq2str ~max:100) (eq2str ~max:20) input expected
+
+let defs input expected = parser_test_case defs_parser (defs2str ~max:100) (defs2str ~max:20) input expected
                                            
 let test_cases = [ 
   expr "1.234" (Real(1.234));
@@ -239,6 +241,8 @@ let test_cases = [
    in
    extend "extends Modelica.Icons.InterfacesPackage" extend_statement );
 
+  defs "Real p" [uncommented {empty_def with def_name = "p" ; def_type = TIde "Real" ;}] ;
+  
     (* it("Should parse a simple component") {
       "parameter FluidHeatFlow.Media.Medium medium;" parsed_with _def(Public) should create (
         List(Def("medium", TVariability(Parameter, TProj(TProj(TIde("FluidHeatFlow"), "Media"), "Medium")))))
