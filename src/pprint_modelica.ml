@@ -26,9 +26,9 @@
  *
  *)
 
-open Batteries
-open Utils
+module Enum = BatEnum
 open Format
+open Utils
 open Syntax
 
 let rec pp_list ?(sep="") pp_element fmt = function
@@ -296,7 +296,8 @@ let pp_def_desc fmt { def_name; def_type; def_constraint;
 let pp_definition fmt { commented ; comment } =
   fprintf fmt "@[%a%a@]" pp_def_desc commented pp_comment comment
 
-let def2str ?max:(n=8) def = 
+let defs2str ?max:(n=8) defs = 
   pp_set_max_boxes str_formatter n ;
-  (pp_definition str_formatter def) ;
+  pp_print_list ~pp_sep:pp_print_newline pp_definition str_formatter defs ;
   flush_str_formatter ()
+                      
