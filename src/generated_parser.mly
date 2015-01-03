@@ -283,7 +283,8 @@ decl_condition : IF cond=expr { cond }
 decl_modification : m=modification { (Some(m), None) }
                   | EQ e=expr { (None, Some(e)) }
                   | COLONEQ e=expr { (None, Some(e)) }
-                                                                                            
+                  | { (None, None) }
+                      
 declaration : x = IDENT dims = option(array_subscripts) m=decl_modification cond=option(decl_condition) comment=comment 
               { let (modification, rhs) = m in (x, dims, modification, cond, rhs, comment) } 
 
