@@ -76,7 +76,7 @@
                                                  
 %%
 
-modelica_definitions : defs = component_clause EOF { defs }
+modelica_definitions : defs = component_clauses EOF { defs }
 
 modelica_expr: e = expr EOF { e }
 
@@ -288,6 +288,9 @@ decl_modification : m=modification { (Some(m), None) }
 declaration : x = IDENT dims = option(array_subscripts) m=decl_modification cond=option(decl_condition) comment=comment 
               { let (modification, rhs) = m in (x, dims, modification, cond, rhs, comment) } 
 
+component_clauses : defs = component_clause { defs }
+                  | defs = component_clause SEMICOLON defs2 = component_clauses { List.append defs defs2 }
+                                                                  
 component_clause : def_options = type_prefix def_type = type_expression components=separated_nonempty_list(COMMA, declaration) 
                      {  let def_constraint = None in
                         List.map (function 
