@@ -89,7 +89,7 @@ modelica_texpr : texpr = type_expression EOF { texpr }
 modelica_import : import = import EOF { import }
 
 modelica_extends : extends = extends EOF { extends }
-                                  
+                                     
 optional_expr : e = expr { e }
               | { Empty}                                                  
 
@@ -311,4 +311,3 @@ component_clause : def_options = type_prefix def_type = type_expression componen
                                                                                                        comment }
                                 ) 
                        components }
-

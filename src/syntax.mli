@@ -51,7 +51,7 @@ and typedef_struct = { td_name : string ; sort : sort ; type_exp : texp ; cns : 
 
 and typedef = typedef_struct commented
 
-and constraint_ = exp commented
+and constraint_ = texp commented
 
 and algorithm = statement list
 

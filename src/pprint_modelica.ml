@@ -38,6 +38,10 @@ let rec pp_list ?(sep="") pp_element fmt = function
       pp_element h sep (pp_list ~sep pp_element) t
   | [] -> ()
 
+let pp_option ?(default="") pp_element fmt = function
+  | Some a -> Format.fprintf fmt "%a" pp_element a
+  | None -> Format.fprintf fmt "%s" default
+            
 let rec pp_enum ?(sep="") pp_element fmt enum = match (Enum.get enum) with
   | Some h -> Format.fprintf fmt "%a" pp_element h ; 
 	      begin match (Enum.peek enum) with
@@ -253,4 +257,46 @@ let pp_extend fmt = function
 let extend2str ?max:(n=8) extends = 
   pp_set_max_boxes str_formatter n ;
   (pp_extend str_formatter extends) ;
+  flush_str_formatter ()
+
+let pp_def_if fmt cond =
+  fprintf fmt "@[@ if@ %a@]" pp_expr cond
+
+let pp_def_rhs fmt rhs =
+  fprintf fmt "@[@ =@ %a@]" pp_expr rhs
+
+let pp_visibility fmt = function
+  | Public -> pp_print_string fmt "public"
+  | Protected -> pp_print_string fmt "protected"
+
+let pp_scope fmt = function
+  | Inner -> pp_print_string fmt "inner"
+  | Outer -> pp_print_string fmt "inner"
+  | InnerOuter ->  pp_print_string fmt "inner outer"
+  | Local -> ()
+
+let pp_def_options fmt { final ; scope ; visibility ; replaceable } =
+  fprintf fmt "@[%a%s%s%a@]" pp_visibility visibility
+          (if final then "final" else "")
+          (if replaceable then "replaceable" else "")
+          pp_scope scope
+
+let pp_constraint fmt { commented ; comment } =
+  fprintf fmt "@[constrainedby %a%a@]"  pp_texpr commented  pp_comment comment                  
+          
+let pp_def_desc fmt { def_name; def_type; def_constraint;
+                      def_rhs; def_if; def_options} =
+  fprintf fmt "@[%a@ %a@ %a%a%a%a@]" pp_def_options def_options
+          pp_texpr def_type
+          pp_print_string def_name  
+          (pp_option pp_def_rhs) def_rhs
+          (pp_option pp_def_if) def_if
+          (pp_option pp_constraint) def_constraint
+          
+let pp_definition fmt { commented ; comment } =
+  fprintf fmt "@[%a%a@]" pp_def_desc commented pp_comment comment
+
+let def2str ?max:(n=8) def = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_definition str_formatter def) ;
   flush_str_formatter ()
