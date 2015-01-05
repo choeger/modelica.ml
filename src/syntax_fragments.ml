@@ -34,6 +34,8 @@ open Utils
 let empty_app f = { fun_ = f ; args = [] ; named_args = StrMap.empty }
        
 let no_comment = { annotated_elem = None ; annotation = None }
+
+let unannotated annotated_elem = { annotated_elem ; annotation = None }
                    
 let uncommented a = { commented = a ; comment = no_comment }
                       
