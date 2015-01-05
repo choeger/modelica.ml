@@ -39,3 +39,13 @@ let no_modification = { types = [] ; components = [] ; modifications = [] }
 let no_def_options = { final = false ; replaceable = false ; scope = Local ; visibility = Public }
                         
 let empty_def  = { def_name ="" ; def_type = TIde ""; def_options = no_def_options ; def_constraint = None ; def_rhs = None ; def_if = None }
+
+exception EmptyTypeName
+                   
+let rec type_name_ class_type = function
+  | [] -> class_type
+  | type_element::r -> type_name_ (TProj { class_type ; type_element}) r
+
+let type_name = function
+  | [] -> raise EmptyTypeName
+  | x::r -> type_name_ (TIde x) r
