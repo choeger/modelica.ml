@@ -60,7 +60,7 @@ and pp_complete_conditional ?else_:(else_kw=" else") pp_expr kw pp_then fmt { co
             (pp_list (pp_elseif pp_expr pp_then kw)) else_if
             else_kw
             pp_then else_
-
+            
 let rec pp_expr fmt = function
     Ide(x) -> fprintf fmt "@[%s@]" x
   | RootIde(x) -> fprintf fmt "@[.%s@]" x
@@ -194,15 +194,32 @@ let pp_typedef_options fmt { type_visibility ; type_replaceable ; type_final ; p
           (if type_replaceable then " replaceable" else "")
           (if partial then " partial" else "")
           (if encapsulated then " encapsulated" else "")
-                                 
+
+let element_sep fmt () = fprintf fmt ";@."
+    
+let pp_elements pp fmt = function
+    [] -> ()
+  | es -> fprintf fmt "@[%a;@.@]" (pp_print_list ~pp_sep:element_sep pp) es
+
+let pp_elements_prefixed prefix pp fmt = function
+    [] -> ()
+  | es -> fprintf fmt "@[%s@.@[%a;@]@.@]" prefix (pp_print_list ~pp_sep:element_sep pp) es
+                  
+let pp_typedef_struct pp pp_constraint fmt { td_name ; sort ; type_exp ; cns ; type_options } =
+  fprintf fmt "@[%a%a@ %s@ =@ %a%a@]" pp_typedef_options type_options
+          pp_typedef_sort sort
+          td_name
+          pp type_exp
+          (pp_option pp_constraint) cns
+          
 let rec pp_type_redeclaration fmt { redecl_each ; redecl_type } =
   if redecl_each then
-    fprintf fmt "@[each@ %a%a@]" (pp_typedef_struct pp_texpr) redecl_type.commented
+    fprintf fmt "@[each@ %a%a@]" (pp_typedef_struct pp_texpr pp_constraint) redecl_type.commented
             pp_comment redecl_type.comment
   else
-    fprintf fmt "@[%a%a@]" (pp_typedef_struct pp_texpr) redecl_type.commented
+    fprintf fmt "@[%a%a@]" (pp_typedef_struct pp_texpr pp_constraint) redecl_type.commented
             pp_comment redecl_type.comment
-
+            
 and pp_component_redeclaration fmt { each ; def } = ()
 
 and pp_component_modification fmt { commented = { mod_each ; mod_final ; mod_name ; mod_modification ; mod_rhs } ; comment } = ()
@@ -288,19 +305,54 @@ and pp_def_desc fmt { def_name; def_type; def_constraint;
           pp_texpr def_type
           pp_print_string def_name  
           (pp_option pp_def_rhs) def_rhs
-          (pp_option pp_def_if) def_if
+         (pp_option pp_def_if) def_if
           (pp_option pp_constraint) def_constraint
           
 and pp_definition fmt { commented ; comment } =
   fprintf fmt "@[%a%a@]" pp_def_desc commented pp_comment comment
 
-and pp_typedef_struct pp fmt { td_name ; sort ; type_exp ; cns ; type_options } =
-  fprintf fmt "@[%a%a@ %s@ =@ %a%a@]" pp_typedef_options type_options
-          pp_typedef_sort sort
-          td_name
-          pp type_exp
-          (pp_option pp_constraint) cns
+and pp_enum_literal fmt {commented ; comment} =
+  fprintf fmt "@[%s%a@]" commented pp_comment comment                                           
+          
+and pp_composition fmt { typedefs ; redeclared_types ; imports ;
+                         extensions ; defs ;
+                         redeclared_defs ; cargo ; } =
 
+  let pp_redeclared pp fmt x = fprintf fmt "@[redeclare@ %a@]" pp x in
+
+  fprintf fmt "@[" ;
+  pp_elements pp_import fmt imports ;
+  pp_elements pp_extend fmt extensions ;
+  pp_elements pp_typedef fmt typedefs ;
+  pp_elements (pp_redeclared pp_typedef) fmt redeclared_types ;
+  pp_elements pp_definition fmt defs ;
+  pp_elements (pp_redeclared pp_definition) fmt defs ;  
+  fprintf fmt "@]" ;  
+                                                         
+and pp_extension x fmt (composition,modification) =
+  fprintf fmt "@[extends@ %s%a@ %a@ end@ %s@]" x (pp_option pp_modification) modification pp_composition composition x
+
+and pp_der_spec fmt { der_name; idents } =
+  fprintf fmt "@[der(%a,%a)@]" (pp_list ~sep:"." pp_print_string) der_name (pp_list ~sep:", " pp_print_string) idents
+          
+and pp_typedef_desc fmt = function
+  | OpenEnumeration -> fprintf fmt "@[enumeration@ (:)@]"                               
+  | Enumeration tds -> pp_typedef_struct (pp_list ~sep:", " pp_enum_literal) pp_constraint fmt tds
+  | Short tds -> pp_typedef_struct pp_texpr pp_constraint fmt tds
+  | Extension tds -> pp_typedef_struct (pp_extension tds.td_name) pp_constraint fmt tds
+  | Composition tds -> pp_typedef_struct pp_composition pp_constraint fmt tds
+  | DerSpec tds -> pp_typedef_struct pp_der_spec pp_constraint fmt tds
+
+and pp_typedef fmt {commented;comment} =
+  pp_typedef_desc fmt commented ; pp_comment fmt comment
+                                             
+and pp_behaviour fmt { algorithms ; equations ; initial_algorithm ; initial_equations ; external_ } =
+  pp_elements_prefixed "initial equation" pp_equation fmt initial_equations ;
+  List.iter (pp_elements_prefixed "initial algorithm" pp_statement fmt) algorithms ;
+  pp_elements_prefixed "equation" pp_equation fmt equations ;
+  List.iter (pp_elements_prefixed "algorithm" pp_statement fmt) algorithms
+                    
+                                             
 let eq2str ?max:(n=8) eq = 
   pp_set_max_boxes str_formatter n ;
   (pp_equation str_formatter eq) ;
