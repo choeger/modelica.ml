@@ -251,43 +251,49 @@ let test_cases = [
                                                                  def_options = { no_def_options with visibility = Protected } ;}] ;
 
   
-    (* it("Should parse a simple component") {
-      "parameter FluidHeatFlow.Media.Medium medium;" parsed_with _def(Public) should create (
-        List(Def("medium", TVariability(Parameter, TProj(TProj(TIde("FluidHeatFlow"), "Media"), "Medium")))))
-    }
+  defs "parameter FluidHeatFlow.Media.Medium medium" [uncommented { empty_def with def_name = "medium" ;
+                                                                                   def_type = TVar { flag = Parameter ;
+                                                                                                     flagged =
+                                                                                                       type_name ["FluidHeatFlow";
+                                                                                                                  "Media";
+                                                                                                                  "Medium"];
+                                                                                                   }
+                                                                  }];
+                                                                                   
+  defs "Medium medium := Medium()" [uncommented { empty_def with def_name = "medium" ;
+                                                                 def_type = TIde "Medium" ;
+                                                                 def_rhs = Some ( App ( empty_app (Ide "Medium") ) ) ;
+                                                }] ;
 
-    it("Should parse component-comments") {
-      "parameter Modelica.SIunits.Density rho=1.225 \"Air Density\";" parsed_with _def(Public) should create (
-        List(Def("rho", TVariability(Parameter, TProj(TProj(TIde("Modelica"), "SIunits"), "Density")), None,
-                 Some(RealLit(1.225)), None, DefOptions(), Comment(Some("Air Density")))))
-    }
+  
+  defs "replaceable T t constrainedby S" [uncommented { empty_def with def_name = "t" ;
+                                                                       def_type = TIde "T" ;
+                                                                       def_constraint = Some (uncommented ( TIde "S" )) ;
+                                                                       def_options = { no_def_options with replaceable = true } ;
+                                                      }] ;
 
+
+  defs "Density rho=1.225 \"Air Density\"" [{ commented = { empty_def with def_name = "rho";
+                                                                           def_type = TIde "Density";
+                                                                           def_rhs = Some (Real 1.225) ;
+                                                          } ;
+                                              comment = unannotated ( Some "Air Density"  )}];
+  
+
+  defs "Real friction_pos[:, 2]=[0; 1] \"[w,tau] positive sliding friction characteristic (w>=0)\""
+       [{ commented = { empty_def with def_name = "friction_pos";
+                                       def_type = TArray { base_type=TIde "Real"; dims = [Colon ; Int 2] } ;
+                                       def_rhs = Some (MArray [[Int 0];[Int 1]]) ;
+                      } ;
+          comment = unannotated ( Some "[w,tau] positive sliding friction characteristic (w>=0)" ) 
+        }];
+(*
     it("Should parse typedef-comments") {
       """class A "Test" end A;""" parsed_with typedef should create (
         TypeDef(name = "A", rhs = Composition(), comment = Comment(Some("Test")))
       )
     }
 
-
-    it("Should parse component comments on matrix definitions") {
-      "parameter Real friction_pos[:, 2]=[0, 1] \"[w,tau] positive sliding friction characteristic (w>=0)\";" parsed_with 
-        _def(Public) should create (
-          List(Def("friction_pos", TArrayExp(TVariability(Parameter,TIde("Real")),List(Colon, IntLit(2))), None,
-                 Some(MArray(List(List(IntLit(0),IntLit(1))))), None, DefOptions(), Comment(Some("[w,tau] positive sliding friction characteristic (w>=0)"))))
-          )
-    }
-
-
-    it("Should parse a simple definition") {
-      "parameter FluidHeatFlow.Media.Medium medium := FluidHeatFlow.Media.Medium();" parsed_with _def(Public) should create(
-        List(Def("medium", TVariability(Parameter, TProj(TProj(TIde("FluidHeatFlow"), "Media"), "Medium")), None, Some(App(Proj(Proj(Ide("FluidHeatFlow"),"Media"),"Medium"))))))
-    }
-
-    it("Should parse constrained component declarations") {
-      "replaceable T t constrainedby S;" parsed_with _def(Public) should create (
-        List(Def("t", TIde("T"), Some(Constraint(TIde("S"))), options = DefOptions(replaceable = true) ))
-      )
-    }
 
     it("Should parse flags") {
       "partial" parsed_with flag("partial ") should create (true)
