@@ -189,7 +189,7 @@ let pp_typedef_sort fmt = function
   | OperatorFunction  -> fprintf fmt "operator function"
 
 let pp_typedef_options fmt { type_visibility ; type_replaceable ; type_final ; partial ; encapsulated } =
-    fprintf fmt "@[%a%s%s%s%s@]" pp_visibility type_visibility
+    fprintf fmt "@[%a %s%s%s%s@]" pp_visibility type_visibility
           (if type_final then " final" else "")
           (if type_replaceable then " replaceable" else "")
           (if partial then " partial" else "")
