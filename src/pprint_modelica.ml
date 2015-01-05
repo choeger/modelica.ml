@@ -338,19 +338,26 @@ and pp_der_spec fmt { der_name; idents } =
 and pp_short_rhs fmt te =
   fprintf fmt "@[=@ %a@]" pp_texpr te
 
-and pp_composition_rhs x fmt c =
-  fprintf fmt "@[@ %a@ end %s@]" pp_composition c x
+and pp_composition_rhs x cmt fmt c =
+  fprintf fmt "@[%a%a@ end %s@]" pp_comment cmt pp_composition c x
           
-and pp_typedef_desc fmt = function
-  | OpenEnumeration -> fprintf fmt "@[enumeration@ (:)@]"                               
-  | Enumeration tds -> pp_typedef_struct (pp_list ~sep:", " pp_enum_literal) pp_constraint fmt tds
-  | Short tds -> pp_typedef_struct pp_short_rhs pp_constraint fmt tds
-  | Extension tds -> pp_typedef_struct (pp_extension tds.td_name) pp_constraint fmt tds
-  | Composition tds -> pp_typedef_struct (pp_composition_rhs tds.td_name) pp_constraint fmt tds
-  | DerSpec tds -> pp_typedef_struct pp_der_spec pp_constraint fmt tds
+and pp_typedef fmt = function
+  | {commented=OpenEnumeration ; comment} -> fprintf fmt "@[enumeration@ (:)%a@]" pp_comment comment
 
-and pp_typedef fmt {commented;comment} =
-  pp_typedef_desc fmt commented ; pp_comment fmt comment
+  | {commented=Enumeration tds ; comment} -> pp_typedef_struct (pp_list ~sep:", " pp_enum_literal) pp_constraint fmt tds ;
+                                             pp_comment fmt comment
+                                                        
+  | {commented=Short tds ; comment} -> pp_typedef_struct pp_short_rhs pp_constraint fmt tds ;
+                                       pp_comment fmt comment
+                                                  
+  | {commented=Extension tds ; comment} -> pp_typedef_struct (pp_extension tds.td_name) pp_constraint fmt tds ;
+                                           pp_comment fmt comment
+                                                      
+  | {commented=Composition tds; comment} -> pp_typedef_struct (pp_composition_rhs tds.td_name {comment with annotation=None}) pp_constraint fmt tds ;
+                                            pp_comment fmt { comment with annotated_elem = None }
+                                                       
+  | {commented=DerSpec tds;comment} -> pp_typedef_struct pp_der_spec pp_constraint fmt tds ;
+                                       pp_comment fmt comment
                                              
 and pp_behaviour fmt { algorithms ; equations ; initial_algorithms ; initial_equations ; external_ } =
   pp_elements_prefixed "initial equation" pp_equation fmt initial_equations ;
