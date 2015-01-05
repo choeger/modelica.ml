@@ -339,43 +339,54 @@ let test_cases = [
                                     } ));
 
 
+  typedef "model X redeclare type T = S; end X"
+          (uncommented (Composition { empty_typedef with td_name = "X" ;
+                                                         type_exp = { empty_composition with
+                                                                      redeclared_types = [ uncommented (
+                                                                      Short { empty_typedef with td_name = "T" ;
+                                                                                                 type_exp = TIde "S"
+                                                                            })] ;
+                                                                    } ;
+                                                         sort = Model ;
+                                    } ));
+
+  typedef "model X equation 1 = 1; end X"
+          (uncommented (Composition { empty_typedef with td_name = "X" ;
+                                                         type_exp = { empty_composition with
+                                                                      cargo = { empty_behavior with
+                                                                                equations = [ uncommented (
+                                                                                                  SimpleEquation {
+                                                                                                      eq_lhs=Int 1;
+                                                                                                      eq_rhs=Int 1}
+                                                                                                )]
+                                                                              } ;
+                                                                    } ;
+                                                         sort = Model ;
+                                    } ));
+
+  typedef "type E = enumeration(x)" (uncommented (Enumeration {empty_typedef with td_name="T" ;
+                                                                                  type_exp = [uncommented "x"];
+
+                                                              } )) ;
+
+  typedef "function f external \"C\" f(); end f" (uncommented (Composition { empty_typedef with td_name = "X" ;
+                                                         type_exp = { empty_composition with
+                                                                      cargo = { empty_behavior with
+                                                                                external_ = Some (
+                                                                                                unannotated {
+                                                                                                    lang="C" ;
+                                                                                                    ext_lhs=Some (App (empty_app (Ide "f")));
+                                                                                                    ext_ident = "";
+                                                                                                    ext_args = []
+                                                                                                  }
+                                                                                              )
+                                                                              } ;
+                                                                    } ;
+                                                         sort = Function } ));
+                                                                            
+
+
 (*
-    it("Should parse lexical redeclarations") {
-      "model X redeclare type T = S; end X;" parsed_with typedef should create (
-        TypeDef("X", Model, Composition(redeclared_types = TypeDef("T", Type, TIde("S"))::Nil))
-        )
-    }
-      
-    it("Should parse enumerations") {
-      "type E = enumeration(x);" parsed_with typedef should create (
-        TypeDef("E", Type, Enumeration(EnumLiteral("x")::Nil))
-        )
-    }
-
-    it("Should parse constrained types") {
-      "type E = A constrainedby B;" parsed_with typedef should create (
-        TypeDef("E", Type, TIde("A"), Some(Constraint(TIde("B"))))
-        )
-    }
-
-    it("Should parse equations as payload of type-definitions") {
-      "class X equation 1 = 1; end X;" parsed_with typedef should create (
-        TypeDef("X", Class, Composition(cargo = Behavior(equations = SimpleEquation(IntLit(1), IntLit(1))::Nil)))
-      )
-    }
-
-    it("Should parse external definitions") {
-      "function f external \"C\" f(); end f;" parsed_with typedef should create (
-        TypeDef("f", Function, Composition(cargo = Behavior(external = Some(ExternalDef("C", None, App(Ide("f"))))) ))
-      )
-    }
-
-    it("Should parse the encapsulated flag") {
-      "encapsulated class X end X;" parsed_with typedef should create (
-        TypeDef("X", Class, Composition(), None, TypeDefOptions(encapsulated=true))
-      )
-    }
-
     val line_annotation = Mod(redefs = Redef(name = List("Line"), mod = Some(
           Mod(redefs = Redef(name=List("points"), rhs=Some(Array(List(
             /* points */
