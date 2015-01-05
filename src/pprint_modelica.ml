@@ -346,9 +346,9 @@ and pp_typedef_desc fmt = function
 and pp_typedef fmt {commented;comment} =
   pp_typedef_desc fmt commented ; pp_comment fmt comment
                                              
-and pp_behaviour fmt { algorithms ; equations ; initial_algorithm ; initial_equations ; external_ } =
+and pp_behaviour fmt { algorithms ; equations ; initial_algorithms ; initial_equations ; external_ } =
   pp_elements_prefixed "initial equation" pp_equation fmt initial_equations ;
-  List.iter (pp_elements_prefixed "initial algorithm" pp_statement fmt) algorithms ;
+  List.iter (pp_elements_prefixed "initial algorithm" pp_statement fmt) initial_algorithms ;
   pp_elements_prefixed "equation" pp_equation fmt equations ;
   List.iter (pp_elements_prefixed "algorithm" pp_statement fmt) algorithms
                     

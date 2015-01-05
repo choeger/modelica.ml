@@ -64,7 +64,7 @@ and algorithm = statement list
 
 and behavior = {algorithms : algorithm list ;
                 equations : equation list ;
-                initial_algorithm : algorithm list ;
+                initial_algorithms : algorithm list ;
                 initial_equations : equation list ;
                 external_ : external_def option }
 
