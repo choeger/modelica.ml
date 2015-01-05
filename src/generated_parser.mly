@@ -275,7 +275,7 @@ scope : INNER { Inner }
       | INNER OUTER { InnerOuter }
       | { Local }
           
-type_prefix : replaceable = flag(REPLACEABLE) final = flag(FINAL) scope = scope visibility = visibility                                                                  
+type_prefix : visibility = visibility replaceable = flag(REPLACEABLE) final = flag(FINAL) scope = scope                                                                  
                 { { final ; scope ; visibility ; replaceable } }
 
 array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
@@ -290,12 +290,14 @@ decl_modification : m=modification { (Some(m), None) }
 declaration : x = IDENT dims = option(array_subscripts) m=decl_modification cond=option(decl_condition) comment=comment 
               { let (modification, rhs) = m in (x, dims, modification, cond, rhs, comment) } 
 
+constraining_clause : CONSTRAINEDBY commented= type_expression comment=comment { { commented ; comment } }
+              
 component_clauses : defs = component_clause { defs }
-                  | defs = component_clause SEMICOLON defs2 = component_clauses { List.append defs defs2 }
+                  | defs = component_clause SEMICOLON defs2 = component_clauses { List.append defs defs2 } 
                                                                   
-component_clause : def_options = type_prefix def_type = type_expression components=separated_nonempty_list(COMMA, declaration) 
-                     {  let def_constraint = None in
-                        List.map (function 
+component_clause : def_options = type_prefix def_type = type_expression components=separated_nonempty_list(COMMA, declaration)
+                   def_constraint=option(constraining_clause)
+                     { List.map (function 
                                    (def_name, None, None, def_if, def_rhs, comment) -> { commented = 
                                                                                          { def_name ; def_type ; def_options ; def_constraint ; def_rhs ; def_if ; } ;
                                                                                          comment }
