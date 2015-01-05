@@ -54,7 +54,7 @@ and typedef_desc = Short of texp typedef_struct
                  | Enumeration of (enum_literal list) typedef_struct
                  | OpenEnumeration 
                  | DerSpec of der_spec typedef_struct
-                 | Extension of composition * (modification option) typedef_struct
+                 | Extension of (composition * (modification option)) typedef_struct
 
 and typedef = typedef_desc commented
 
@@ -63,7 +63,7 @@ and constraint_ = texp commented
 and algorithm = statement list
 
 and behavior = {algorithms : algorithm list ;
-                equation : equation list ;
+                equations : equation list ;
                 initial_algorithm : algorithm list ;
                 initial_equations : equation list ;
                 external_ : external_def option }
@@ -81,7 +81,7 @@ and composition = { typedefs : typedef list ;
                     cargo : behavior ;
                   }
 
-and enum_literal = { enum_name : string ; c: comment }
+and enum_literal = string commented
 
 and der_spec = { der_name : name ; idents : string list }
 
