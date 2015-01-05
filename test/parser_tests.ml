@@ -54,8 +54,8 @@ let parser_test_case parser lprinter sprinter input expected =
        parse_test parser input (fun e -> assert_equal ~msg:"equality of parser result" ~printer:sprinter expected e ) ) ;
      ("re-parsing" >::
         parse_test parser input
-                   (fun e -> parse_test parser (lprinter e)
-                                        (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter expected e) ())) ; 
+                   (fun firstpass -> parse_test parser (lprinter firstpass)
+                                        (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter firstpass e) ())) ; 
   ]
 
 let import input expected = parser_test_case import_parser (import2str ~max:100) import2str input expected
@@ -292,6 +292,20 @@ let test_cases = [
 
   typedef "type T = A" (uncommented (Short { empty_typedef with td_name = "T" ; type_exp = TIde "A" })) ;
 
+  (let def = uncommented { empty_def with def_name = "x" ; def_type = TIde "S" } in
+   typedef "class T S x; end T" (uncommented (Composition { empty_typedef with td_name = "T" ;
+                                                                               type_exp = {empty_composition with defs = [def] };
+                                                                               sort = Class ;
+                                                          } )));
+
+  (let def = uncommented { empty_def with def_name = "x" ; def_type = TIde "S" } in
+               typedef "class T S x; end T" { commented = Composition { empty_typedef with td_name = "T" ;
+                                                                                           type_exp = {empty_composition with defs = [def] };
+                                                                                           sort = Class ;
+                                                                      } ;
+                                              comment = unannotated ( Some "comment" ) ;
+                                            } );
+  
 (*
     it("Should parse typedef-comments") {
       """class A "Test" end A;""" parsed_with typedef should create (
