@@ -156,7 +156,7 @@ let pp_annotation fmt = function
           
 let pp_comment_string fmt = function
   | None -> ()
-  | Some s -> fprintf fmt " %s" s 
+  | Some s -> fprintf fmt " \"%s\"" s 
           
 let pp_comment fmt { annotated_elem ; annotation } = 
   pp_comment_string fmt annotated_elem ;
@@ -277,12 +277,12 @@ let pp_scope fmt = function
 
 let pp_def_options fmt { final ; scope ; visibility ; replaceable } =
   fprintf fmt "@[%a%s%s%a@]" pp_visibility visibility
-          (if final then "final" else "")
-          (if replaceable then "replaceable" else "")
+          (if final then " final" else "")
+          (if replaceable then " replaceable" else "")
           pp_scope scope
 
 let pp_constraint fmt { commented ; comment } =
-  fprintf fmt "@[constrainedby %a%a@]"  pp_texpr commented  pp_comment comment                  
+  fprintf fmt "@[@ constrainedby %a%a@]"  pp_texpr commented  pp_comment comment                  
           
 let pp_def_desc fmt { def_name; def_type; def_constraint;
                       def_rhs; def_if; def_options} =
