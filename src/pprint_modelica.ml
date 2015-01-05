@@ -118,11 +118,14 @@ let rec pp_expr fmt = function
                      
 and pp_named_arg fmt (name,expr) =
   fprintf fmt "@[%s = %a@]" name pp_expr expr
-
+          
 and pp_foridx fmt = function
     { variable ; range=Some(e) } -> fprintf fmt "@[%s in %a@]" variable pp_expr e
   | { variable ; range=None } -> fprintf fmt "@[%s@]" variable
 
+let pp_for_loop pp fmt { idx ; body } =
+  fprintf fmt "@[for@ %a@ loop@ %a@ end for@]" (pp_list ~sep:", " pp_foridx) idx pp body
+                                         
 let pp_conditional kw ?else_:(else_kw="else") pp_then fmt c=
   fprintf fmt "@[" ;
   pp_complete_conditional ~else_:else_kw pp_expr kw pp_then fmt c;
@@ -131,132 +134,6 @@ let pp_conditional kw ?else_:(else_kw="else") pp_then fmt c=
 let expr2str ?max:(n=8) e = 
   pp_set_max_boxes str_formatter n ;
   (pp_expr str_formatter e) ;
-  flush_str_formatter ()
-
-let pp_typedef fmt { commented = { td_name ; sort ; type_exp ; cns ; type_options } ; comment } = ()
-                      
-let pp_type_redeclaration fmt { redecl_each ; redecl_type } =
-  if redecl_each then
-    fprintf fmt "@[each@ %a@]" pp_typedef redecl_type
-  else
-    pp_typedef fmt redecl_type
-
-let pp_component_redeclaration fmt { each ; def } = ()
-
-let pp_component_modification fmt { commented = { mod_each ; mod_final ; mod_name ; mod_modification ; mod_rhs } ; comment } = ()
-                                                      
-let pp_modification fmt { types ; components ; modifications } =
-  pp_list pp_type_redeclaration fmt types ;
-  pp_list pp_component_redeclaration fmt components ;
-  pp_list pp_component_modification fmt modifications
-
-let pp_annotation fmt = function
-    None -> ()
-  | Some m -> fprintf fmt "@[annotation%a@]" pp_modification m
-          
-let pp_comment_string fmt = function
-  | None -> ()
-  | Some s -> fprintf fmt " \"%s\"" s 
-          
-let pp_comment fmt { annotated_elem ; annotation } = 
-  pp_comment_string fmt annotated_elem ;
-  pp_annotation fmt annotation 
-              
-let pp_for_loop pp fmt { idx ; body } =
-  fprintf fmt "@[for@ %a@ loop@ %a@ end for@]" (pp_list ~sep:", " pp_foridx) idx pp body
-          
-let rec pp_statement_desc fmt = function
-    Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
-  | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
-                                                      
-  | IfStmt c -> pp_conditional "if" pp_statements fmt c 
-  | WhenStmt c -> pp_conditional "when" ~else_:"" pp_statements fmt c 
-                  
-  | Break -> fprintf fmt "@[break@]"
-  | Return -> fprintf fmt "@[return@]"
-  | ForStmt loop -> pp_for_loop pp_statements fmt loop
-  | WhileStmt { while_ ; do_ } -> fprintf fmt "@[while@ %a@ loop@ %a@ end@ while@]" pp_expr while_ pp_statements do_
-
-and pp_statements fmt stmts = (pp_list pp_statement) fmt stmts
-       
-and pp_statement fmt { commented ; comment } =
-  fprintf fmt "@[%a%a;@]" pp_statement_desc commented pp_comment comment 
-
-let stmt2str ?max:(n=8) s = 
-  pp_set_max_boxes str_formatter n ;
-  (pp_statement str_formatter s) ;
-  flush_str_formatter ()
-
-
-let rec pp_equation_desc fmt = function
-    SimpleEquation { eq_lhs ; eq_rhs } -> fprintf fmt "@[%a@ =@ %a@]"
-                                                  pp_expr eq_lhs pp_expr eq_rhs
-  | ForEquation loop -> pp_for_loop pp_equations fmt loop
-  | IfEquation c -> pp_conditional "if" pp_equations fmt c 
-  | WhenEquation c -> pp_conditional "when" ~else_:"" pp_equations fmt c
-  | ExpEquation e -> pp_expr fmt e
-
-and pp_equation fmt { commented ; comment } =
-  fprintf fmt "@[%a%a;@]" pp_equation_desc commented pp_comment comment 
-
-and pp_equations fmt eqs = (pp_list pp_equation) fmt eqs
-
-let eq2str ?max:(n=8) eq = 
-  pp_set_max_boxes str_formatter n ;
-  (pp_equation str_formatter eq) ;
-  flush_str_formatter ()
-
-let pp_variability fmt = function
-  | Constant -> fprintf fmt "constant"
-  | Parameter -> fprintf fmt "parameter"
-  | Discrete -> fprintf fmt "discrete"
-
-let pp_causality fmt = function
-  | Input -> fprintf fmt "input"
-  | Output -> fprintf fmt "output"
-
-let pp_connectivity fmt = function
-  | Flow -> fprintf fmt "flow"
-  | Stream -> fprintf fmt "stream"
-                      
-let rec pp_texpr fmt = function
-  | TIde x -> fprintf fmt "@[%s@]" x
-  | TProj { class_type; type_element } -> fprintf fmt "@[%a.%s@]" pp_texpr class_type type_element
-  | TRootide x -> fprintf fmt "@[.%s@]" x
-  | TVar { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_variability flag pp_texpr flagged
-  | TCon { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_connectivity flag pp_texpr flagged
-  | TCau { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_causality flag pp_texpr flagged
-  | TArray { base_type ; dims } -> fprintf fmt "@[%a[%a]@]" pp_texpr base_type (pp_list ~sep:", " pp_expr) dims
-  | TMod { mod_type ; modification } -> fprintf fmt  "@[%a(%a)@]" pp_texpr mod_type pp_modification modification
-
-                                           
-let texpr2str ?max:(n=8) te = 
-  pp_set_max_boxes str_formatter n ;
-  (pp_texpr str_formatter te) ;
-  flush_str_formatter ()
-
-let pp_import_desc fmt = function
-    Unnamed name -> fprintf fmt "@[import@ %a@]" (pp_list ~sep:"." pp_print_string) name 
-  | NamedImport {from; selected} -> fprintf fmt "@[import@ %a@ =@ %s@]" (pp_list ~sep:"." pp_print_string) from selected
-  | UnqualifiedImport name -> fprintf fmt "@[import@ %a.*@]" (pp_list ~sep:"." pp_print_string) name 
-    
-let pp_import fmt {commented;comment} =
-  fprintf fmt "@[%a%a@]" pp_import_desc commented pp_comment comment
-                            
-let import2str ?max:(n=8) import = 
-  pp_set_max_boxes str_formatter n ;
-  (pp_import str_formatter import) ;
-  flush_str_formatter ()
-
-let pp_extend fmt = function
-  | { ext_type ; ext_visibility ; ext_annotation } ->
-     fprintf fmt "@[%s@ extends@ %a%a@]"
-             (match ext_visibility with Public -> "public" | Protected -> "protected")
-             pp_texpr ext_type pp_annotation ext_annotation
-
-let extend2str ?max:(n=8) extends = 
-  pp_set_max_boxes str_formatter n ;
-  (pp_extend str_formatter extends) ;
   flush_str_formatter ()
 
 let pp_def_if fmt cond =
@@ -281,10 +158,131 @@ let pp_def_options fmt { final ; scope ; visibility ; replaceable } =
           (if replaceable then " replaceable" else "")
           pp_scope scope
 
-let pp_constraint fmt { commented ; comment } =
+let def_sep fmt () =
+  fprintf fmt ";@."
+
+let pp_variability fmt = function
+  | Constant -> fprintf fmt "constant"
+  | Parameter -> fprintf fmt "parameter"
+  | Discrete -> fprintf fmt "discrete"
+
+let pp_causality fmt = function
+  | Input -> fprintf fmt "input"
+  | Output -> fprintf fmt "output"
+
+let pp_connectivity fmt = function
+  | Flow -> fprintf fmt "flow"
+  | Stream -> fprintf fmt "stream"
+          
+let pp_typedef_sort fmt = function
+  | Class -> fprintf fmt "class"
+  | Record -> fprintf fmt "record"
+  | Package -> fprintf fmt "package"
+  | Model -> fprintf fmt "model"
+  | Block  -> fprintf fmt "block"
+  | Connector -> fprintf fmt "connector"
+  | ExpandableConnector -> fprintf fmt "expandable connector"
+  | Function -> fprintf fmt "function"
+  | Type -> fprintf fmt "type"
+  | Operator -> fprintf fmt "operator"
+  | OperatorRecord -> fprintf fmt "operator record"
+  | OperatorFunction  -> fprintf fmt "operator function"
+
+let pp_typedef_options fmt { type_visibility ; type_replaceable ; type_final ; partial ; encapsulated } =
+    fprintf fmt "@[%a%s%s%s%s@]" pp_visibility type_visibility
+          (if type_final then " final" else "")
+          (if type_replaceable then " replaceable" else "")
+          (if partial then " partial" else "")
+          (if encapsulated then " encapsulated" else "")
+                                 
+let rec pp_type_redeclaration fmt { redecl_each ; redecl_type } =
+  if redecl_each then
+    fprintf fmt "@[each@ %a%a@]" (pp_typedef_struct pp_texpr) redecl_type.commented
+            pp_comment redecl_type.comment
+  else
+    fprintf fmt "@[%a%a@]" (pp_typedef_struct pp_texpr) redecl_type.commented
+            pp_comment redecl_type.comment
+
+and pp_component_redeclaration fmt { each ; def } = ()
+
+and pp_component_modification fmt { commented = { mod_each ; mod_final ; mod_name ; mod_modification ; mod_rhs } ; comment } = ()
+                                                      
+and pp_modification fmt { types ; components ; modifications } =
+  pp_list pp_type_redeclaration fmt types ;
+  pp_list pp_component_redeclaration fmt components ;
+  pp_list pp_component_modification fmt modifications
+
+and pp_annotation fmt = function
+    None -> ()
+  | Some m -> fprintf fmt "@[annotation%a@]" pp_modification m
+          
+and pp_comment_string fmt = function
+  | None -> ()
+  | Some s -> fprintf fmt " \"%s\"" s 
+          
+and pp_comment fmt { annotated_elem ; annotation } = 
+  pp_comment_string fmt annotated_elem ;
+  pp_annotation fmt annotation 
+                    
+and pp_statement_desc fmt = function
+    Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
+  | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
+                                                      
+  | IfStmt c -> pp_conditional "if" pp_statements fmt c 
+  | WhenStmt c -> pp_conditional "when" ~else_:"" pp_statements fmt c 
+                  
+  | Break -> fprintf fmt "@[break@]"
+  | Return -> fprintf fmt "@[return@]"
+  | ForStmt loop -> pp_for_loop pp_statements fmt loop
+  | WhileStmt { while_ ; do_ } -> fprintf fmt "@[while@ %a@ loop@ %a@ end@ while@]" pp_expr while_ pp_statements do_
+
+and pp_statements fmt stmts = (pp_list pp_statement) fmt stmts
+       
+and pp_statement fmt { commented ; comment } =
+  fprintf fmt "@[%a%a;@]" pp_statement_desc commented pp_comment comment 
+
+and pp_equation_desc fmt = function
+    SimpleEquation { eq_lhs ; eq_rhs } -> fprintf fmt "@[%a@ =@ %a@]"
+                                                  pp_expr eq_lhs pp_expr eq_rhs
+  | ForEquation loop -> pp_for_loop pp_equations fmt loop
+  | IfEquation c -> pp_conditional "if" pp_equations fmt c 
+  | WhenEquation c -> pp_conditional "when" ~else_:"" pp_equations fmt c
+  | ExpEquation e -> pp_expr fmt e
+
+and pp_equation fmt { commented ; comment } =
+  fprintf fmt "@[%a%a;@]" pp_equation_desc commented pp_comment comment 
+
+and pp_equations fmt eqs = (pp_list pp_equation) fmt eqs
+
+                      
+and pp_texpr fmt = function
+  | TIde x -> fprintf fmt "@[%s@]" x
+  | TProj { class_type; type_element } -> fprintf fmt "@[%a.%s@]" pp_texpr class_type type_element
+  | TRootide x -> fprintf fmt "@[.%s@]" x
+  | TVar { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_variability flag pp_texpr flagged
+  | TCon { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_connectivity flag pp_texpr flagged
+  | TCau { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_causality flag pp_texpr flagged
+  | TArray { base_type ; dims } -> fprintf fmt "@[%a[%a]@]" pp_texpr base_type (pp_list ~sep:", " pp_expr) dims
+  | TMod { mod_type ; modification } -> fprintf fmt  "@[%a(%a)@]" pp_texpr mod_type pp_modification modification
+                                           
+and pp_import_desc fmt = function
+    Unnamed name -> fprintf fmt "@[import@ %a@]" (pp_list ~sep:"." pp_print_string) name 
+  | NamedImport {from; selected} -> fprintf fmt "@[import@ %a@ =@ %s@]" (pp_list ~sep:"." pp_print_string) from selected
+  | UnqualifiedImport name -> fprintf fmt "@[import@ %a.*@]" (pp_list ~sep:"." pp_print_string) name 
+    
+and pp_import fmt {commented;comment} =
+  fprintf fmt "@[%a%a@]" pp_import_desc commented pp_comment comment
+                            
+and pp_extend fmt = function
+  | { ext_type ; ext_visibility ; ext_annotation } ->
+     fprintf fmt "@[%s@ extends@ %a%a@]"
+             (match ext_visibility with Public -> "public" | Protected -> "protected")
+             pp_texpr ext_type pp_annotation ext_annotation
+
+and pp_constraint fmt { commented ; comment } =
   fprintf fmt "@[@ constrainedby %a%a@]"  pp_texpr commented  pp_comment comment                  
           
-let pp_def_desc fmt { def_name; def_type; def_constraint;
+and pp_def_desc fmt { def_name; def_type; def_constraint;
                       def_rhs; def_if; def_options} =
   fprintf fmt "@[%a@ %a@ %a%a%a%a@]" pp_def_options def_options
           pp_texpr def_type
@@ -293,14 +291,47 @@ let pp_def_desc fmt { def_name; def_type; def_constraint;
           (pp_option pp_def_if) def_if
           (pp_option pp_constraint) def_constraint
           
-let pp_definition fmt { commented ; comment } =
+and pp_definition fmt { commented ; comment } =
   fprintf fmt "@[%a%a@]" pp_def_desc commented pp_comment comment
 
-let def_sep fmt () =
-  fprintf fmt ";@."
+and pp_typedef_struct pp fmt { td_name ; sort ; type_exp ; cns ; type_options } =
+  fprintf fmt "@[%a%a@ %s@ =@ %a%a@]" pp_typedef_options type_options
+          pp_typedef_sort sort
+          td_name
+          pp type_exp
+          (pp_option pp_constraint) cns
+
+let eq2str ?max:(n=8) eq = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_equation str_formatter eq) ;
+  flush_str_formatter ()
+          
+let import2str ?max:(n=8) import = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_import str_formatter import) ;
+  flush_str_formatter ()
+
+let extend2str ?max:(n=8) e = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_extend str_formatter e) ;
+  flush_str_formatter ()
+          
+let texpr2str ?max:(n=8) te = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_texpr str_formatter te) ;
+  flush_str_formatter ()
           
 let defs2str ?max:(n=8) defs = 
   pp_set_max_boxes str_formatter n ;
   pp_print_list ~pp_sep:def_sep pp_definition str_formatter defs ;
   flush_str_formatter ()
                       
+let stmt2str ?max:(n=8) s = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_statement str_formatter s) ;
+  flush_str_formatter ()
+
+let texpr2str ?max:(n=8) te = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_texpr str_formatter te) ;
+  flush_str_formatter ()
