@@ -32,7 +32,6 @@
 open Utils
 
 type name = string list
-
                    
 (**
  * The stored definition unit
@@ -45,11 +44,19 @@ and comment = string option annotated
                      
 and unit_ = { within : name option; toplevel_defs : typedef list }
                     
-and typedef_options = { type_replaceable : bool ; type_final : bool ; partial : bool ; encapsulated : bool }
+and typedef_options = { type_visibility : visibility ; type_replaceable : bool ;
+                        type_final : bool ; partial : bool ; encapsulated : bool }
                          
-and typedef_struct = { td_name : string ; sort : sort ; type_exp : texp ; cns : constraint_ option ; type_options : typedef_options }
+and 'a typedef_struct = { td_name : string ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options }
 
-and typedef = typedef_struct commented
+and typedef_desc = Short of texp typedef_struct
+                 | Composition of composition typedef_struct
+                 | Enumeration of (enum_literal list) typedef_struct
+                 | OpenEnumeration 
+                 | DerSpec of der_spec typedef_struct
+                 | Extension of composition * (modification option) typedef_struct
+
+and typedef = typedef_desc commented
 
 and constraint_ = texp commented
 
@@ -64,12 +71,6 @@ and behavior = {algorithms : algorithm list ;
 and external_def_struct = { lang : string ; ext_lhs : exp option ; ext_ident : string ; ext_args : exp list }
 and external_def = external_def_struct annotated
   
-
-and class_spec = Composition of composition
-               | Enumeration of enum_literal list
-               | OpenEnumeration
-               | DerSpec of der_spec
-               | Extension of composition * (modification option)
                    
 and composition = { typedefs : typedef list ;
                     redeclared_types : typedef list ;
@@ -240,7 +241,7 @@ and texp = TIde of string
                              
 and 'a flagged_type = { flag : 'a ; flagged : texp }
                      
-and type_redeclaration = { redecl_each : bool ; redecl_type : typedef; }
+and type_redeclaration = { redecl_each : bool ; redecl_type : texp typedef_struct commented ; }
 
 and component_redeclaration = { each : bool ; def : definition; }
 
