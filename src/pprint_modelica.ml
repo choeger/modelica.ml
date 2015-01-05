@@ -206,7 +206,7 @@ let pp_elements_prefixed prefix pp fmt = function
   | es -> fprintf fmt "@[%s@.@[%a;@]@.@]" prefix (pp_print_list ~pp_sep:element_sep pp) es
                   
 let pp_typedef_struct pp pp_constraint fmt { td_name ; sort ; type_exp ; cns ; type_options } =
-  fprintf fmt "@[%a%a@ %s@ =@ %a%a@]" pp_typedef_options type_options
+  fprintf fmt "@[%a%a@ %s@ %a%a@]" pp_typedef_options type_options
           pp_typedef_sort sort
           td_name
           pp type_exp
@@ -326,7 +326,7 @@ and pp_composition fmt { typedefs ; redeclared_types ; imports ;
   pp_elements pp_typedef fmt typedefs ;
   pp_elements (pp_redeclared pp_typedef) fmt redeclared_types ;
   pp_elements pp_definition fmt defs ;
-  pp_elements (pp_redeclared pp_definition) fmt defs ;  
+  pp_elements (pp_redeclared pp_definition) fmt redeclared_defs ;  
   fprintf fmt "@]" ;  
                                                          
 and pp_extension x fmt (composition,modification) =
@@ -334,13 +334,19 @@ and pp_extension x fmt (composition,modification) =
 
 and pp_der_spec fmt { der_name; idents } =
   fprintf fmt "@[der(%a,%a)@]" (pp_list ~sep:"." pp_print_string) der_name (pp_list ~sep:", " pp_print_string) idents
+
+and pp_short_rhs fmt te =
+  fprintf fmt "@[=@ %a@]" pp_texpr te
+
+and pp_composition_rhs x fmt c =
+  fprintf fmt "@[@ %a@ end %s@]" pp_composition c x
           
 and pp_typedef_desc fmt = function
   | OpenEnumeration -> fprintf fmt "@[enumeration@ (:)@]"                               
   | Enumeration tds -> pp_typedef_struct (pp_list ~sep:", " pp_enum_literal) pp_constraint fmt tds
-  | Short tds -> pp_typedef_struct pp_texpr pp_constraint fmt tds
+  | Short tds -> pp_typedef_struct pp_short_rhs pp_constraint fmt tds
   | Extension tds -> pp_typedef_struct (pp_extension tds.td_name) pp_constraint fmt tds
-  | Composition tds -> pp_typedef_struct pp_composition pp_constraint fmt tds
+  | Composition tds -> pp_typedef_struct (pp_composition_rhs tds.td_name) pp_constraint fmt tds
   | DerSpec tds -> pp_typedef_struct pp_der_spec pp_constraint fmt tds
 
 and pp_typedef fmt {commented;comment} =
