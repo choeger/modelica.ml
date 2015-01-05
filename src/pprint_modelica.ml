@@ -372,7 +372,12 @@ let texpr2str ?max:(n=8) te =
   pp_set_max_boxes str_formatter n ;
   (pp_texpr str_formatter te) ;
   flush_str_formatter ()
-          
+
+let td2str ?max:(n=8) td = 
+  pp_set_max_boxes str_formatter n ;
+  pp_typedef str_formatter td ;
+  flush_str_formatter ()             
+                      
 let defs2str ?max:(n=8) defs = 
   pp_set_max_boxes str_formatter n ;
   pp_print_list ~pp_sep:def_sep pp_definition str_formatter defs ;

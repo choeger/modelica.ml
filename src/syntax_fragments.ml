@@ -45,6 +45,11 @@ let no_def_options = { final = false ; replaceable = false ; scope = Local ; vis
                         
 let empty_def  = { def_name ="" ; def_type = TIde ""; def_options = no_def_options ; def_constraint = None ; def_rhs = None ; def_if = None }
 
+let no_type_options = { type_visibility = Public ; partial = false ; encapsulated = false ;
+                        type_final = false ; type_replaceable = false ;}
+
+let empty_typedef = { td_name = "" ; type_exp = TIde "" ; type_options = no_type_options ; cns = None ; sort = Type}
+                   
 exception EmptyTypeName
                    
 let rec type_name_ class_type = function

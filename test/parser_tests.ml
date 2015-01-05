@@ -71,6 +71,8 @@ let stmt input expected = parser_test_case stmt_parser (stmt2str ~max:100) stmt2
 let eq input expected = parser_test_case eq_parser (eq2str ~max:100) (eq2str ~max:20) input expected
 
 let defs input expected = parser_test_case defs_parser (defs2str ~max:100) (defs2str ~max:20) input expected
+
+let typedef input expected = parser_test_case td_parser (td2str ~max:100) (td2str ~max:20) input expected
                                            
 let test_cases = [ 
   expr "1.234" (Real(1.234));
@@ -287,6 +289,9 @@ let test_cases = [
                       } ;
           comment = unannotated ( Some "[w,tau] positive sliding friction characteristic (w>=0)" ) 
         }];
+
+  typedef "type T = A" (uncommented (Short { empty_typedef with td_name = "T" ; type_exp = TIde "A" })) ;
+
 (*
     it("Should parse typedef-comments") {
       """class A "Test" end A;""" parsed_with typedef should create (
