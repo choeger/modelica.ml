@@ -76,7 +76,7 @@
                                                  
 %%
 
-modelica_definitions : defs = component_clauses EOF { defs }
+modelica_definitions : reset_visibility defs = component_clauses EOF { defs }
 
 modelica_expr: e = expr EOF { e }
 
@@ -260,6 +260,8 @@ import : IMPORT name=separated_nonempty_list(DOT, IDENT) comment = comment { { c
        | IMPORT from=separated_nonempty_list(DOT, IDENT) EQ selected=IDENT comment = comment { { commented = NamedImport {from;selected} ; comment } } 
        | IMPORT name=separated_nonempty_list(DOT, IDENT) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
 
+reset_visibility : {visibility := Public}
+                                                                                    
 visibility : PROTECTED { visibility := Protected ; Protected }
        | PUBLIC { visibility := Public ; Public }
        | { !visibility }
