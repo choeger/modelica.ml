@@ -60,6 +60,7 @@
 
 %{
    open Syntax
+   open Syntax_fragments
    open Utils
 
    let visibility = ref Public
@@ -337,14 +338,19 @@ typedef_prefix : type_visibility = visibility type_final = flag (FINAL) type_rep
 type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT EQ type_exp = type_expression
                   comment=comment cns = option(constraining_clause) 
                   { { commented = Short { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
-                                              
+
+                | type_options = typedef_prefix sort = type_sort td_name=IDENT annotated_elem=option(STRING) type_exp=composition 
+                  annotation=option(annotation) END end_name=IDENT cns = option(constraining_clause) 
+                  { { commented = Composition { td_name ; sort ; type_options ; type_exp ; cns} ;  comment = {annotated_elem;annotation}}}
 
 composition : import = import SEMICOLON rest = composition { {rest with imports = import::rest.imports} }
             | extend = extends SEMICOLON rest = composition { {rest with extensions = extend::rest.extensions } }
-            | defs = component_clause SEMICOLON rest = composition { {rest with definitions = defs @ rest.definitions } }
+            | defs = component_clause SEMICOLON rest = composition { {rest with defs = defs @ rest.defs } }
             | REDECLARE defs = component_clause SEMICOLON rest = composition
                 { {rest with redeclared_defs = defs @ rest.redeclared_defs } }
-            | EQUATION eqs = separated_list(SEMICOLON, equation) SEMICOLON
-                { {rest with behaviour = { rest.behaviour with equations = eqs @ rest.behavior.equations } } }
-            | INITIAL EQUATION eqs = separated_list(SEMICOLON, equation) SEMICOLON
-                { {rest with behaviour = { rest.behaviour with initial_equations = eqs @ rest.behavior.initial_equations } } }
+            | EQUATION eqs = separated_list(SEMICOLON, equation) SEMICOLON rest = composition
+                { {rest with cargo = { rest.cargo with equations = eqs @ rest.cargo.equations } } }
+            | INITIAL EQUATION eqs = separated_list(SEMICOLON, equation) SEMICOLON rest = composition
+                { {rest with cargo = { rest.cargo with initial_equations = eqs @ rest.cargo.initial_equations } } }
+
+            | { empty_composition }
