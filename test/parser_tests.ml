@@ -299,41 +299,47 @@ let test_cases = [
                                                           } )));
 
   (let def = uncommented { empty_def with def_name = "x" ; def_type = TIde "S" } in
-               typedef "class T S x; end T" { commented = Composition { empty_typedef with td_name = "T" ;
+               typedef "class T \"comment\" S x; end T" { commented = Composition { empty_typedef with td_name = "T" ;
                                                                                            type_exp = {empty_composition with defs = [def] };
                                                                                            sort = Class ;
                                                                       } ;
                                               comment = unannotated ( Some "comment" ) ;
                                             } );
   
+  typedef "partial model A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
+                                                                               type_exp = empty_composition;
+                                                                               sort = Model ;
+                                                                               type_options = { no_type_options with partial = true };
+                                                             } ));
+
+  typedef "replaceable model A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
+                                                                                     type_exp = empty_composition;
+                                                                                     sort = Model ;
+                                                                                     type_options = {
+                                                                                       no_type_options with type_replaceable = true };
+                                                                } ));
+
+  typedef "encapsulated model A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
+                                                                                       type_exp = empty_composition;
+                                                                                       sort = Model ;
+                                                                                       type_options = {
+                                                                                         no_type_options with encapsulated = true };
+                                                                  } ));
+
+  typedef "replaceable encapsulated partial model A end A"
+          (uncommented (Composition { empty_typedef with td_name = "A" ;
+                                                         type_exp = empty_composition;
+                                                         sort = Model ;
+                                                         type_options = {
+                                                           no_type_options with encapsulated = true ;
+                                                                                partial = true ;
+                                                                                type_replaceable = true ;
+                                                         };
+                                                         
+                                    } ));
+
+
 (*
-    it("Should parse typedef-comments") {
-      """class A "Test" end A;""" parsed_with typedef should create (
-        TypeDef(name = "A", rhs = Composition(), comment = Comment(Some("Test")))
-      )
-    }
-
-
-    it("Should parse flags") {
-      "partial" parsed_with flag("partial ") should create (true)
-    }
-
-    it("Should parse partial models") {
-      "partial model A end A;" parsed_with typedef should create (TypeDef("A", Model, Composition(), options=TypeDefOptions(partial=true)))
-    }
-
-    it("Should parse replaceable models") {
-      "replaceable model A end A;" parsed_with typedef should create (TypeDef("A", Model, Composition(), options=TypeDefOptions(replaceable=true)))
-    }
-
-    it("Should parse encapsulated models") {
-      "encapsulated model A end A;" parsed_with typedef should create (TypeDef("A", Model, Composition(), options=TypeDefOptions(encapsulated=true)))
-    }
-
-    it("Should parse replaceable encapsulated partial models") {
-      "replaceable encapsulated partial model A end A;" parsed_with typedef should create (TypeDef("A", Model, Composition(), options=TypeDefOptions(replaceable=true, partial = true, encapsulated=true)))
-    }
-
     it("Should parse lexical redeclarations") {
       "model X redeclare type T = S; end X;" parsed_with typedef should create (
         TypeDef("X", Model, Composition(redeclared_types = TypeDef("T", Type, TIde("S"))::Nil))

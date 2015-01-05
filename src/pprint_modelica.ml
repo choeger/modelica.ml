@@ -190,10 +190,10 @@ let pp_typedef_sort fmt = function
 
 let pp_typedef_options fmt { type_visibility ; type_replaceable ; type_final ; partial ; encapsulated } =
     fprintf fmt "@[%a %s%s%s%s@]" pp_visibility type_visibility
-          (if type_final then " final" else "")
-          (if type_replaceable then " replaceable" else "")
-          (if partial then " partial" else "")
-          (if encapsulated then " encapsulated" else "")
+          (if type_final then "final " else "")
+          (if type_replaceable then "replaceable " else "")
+          (if encapsulated then "encapsulated " else "")
+          (if partial then "partial " else "")
 
 let element_sep fmt () = fprintf fmt ";@."
     
