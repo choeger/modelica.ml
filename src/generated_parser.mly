@@ -73,7 +73,8 @@
 %start <Syntax.import> modelica_import
 %start <Syntax.extend> modelica_extends
 %start <Syntax.definition list> modelica_definitions
-                                                 
+%start <Syntax.typedef> modelica_type_definition
+                                  
 %%
 
 modelica_definitions : reset_visibility defs = component_clauses EOF { defs }
@@ -82,6 +83,8 @@ modelica_expr: e = expr EOF { e }
 
 modelica_stmt : s = statement EOF { s }                        
 
+modelica_type_definition : t = type_definition EOF { t }
+                              
 modelica_eq : eq = equation EOF { eq }                              
 
 modelica_texpr : texpr = type_expression EOF { texpr }
@@ -319,3 +322,29 @@ component_clause : def_options = type_prefix def_type = type_expression componen
                                                                                                        comment }
                                 ) 
                        components }
+
+type_sort : CLASS { Class }
+           | PACKAGE {Package} 
+           | MODEL { Model } | BLOCK { Block } | CONNECTOR { Connector } | EXPANDABLE CONNECTOR { ExpandableConnector } 
+           | RECORD { Record } | FUNCTION { Function } | TYPE { Type } | OPERATOR { Operator } | OPERATOR RECORD { OperatorRecord } 
+           | OPERATOR FUNCTION { OperatorFunction }
+                     
+typedef_prefix : type_visibility = visibility type_final = flag (FINAL) type_replaceable = flag(REPLACEABLE)
+                 encapsulated = flag(ENCAPSULATED) partial=flag(PARTIAL)                
+                 { { type_visibility ; type_final ; type_replaceable ; encapsulated ; partial } }
+                     
+
+type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT EQ type_exp = type_expression
+                  comment=comment cns = option(constraining_clause) 
+                  { { commented = Short { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
+                                              
+
+composition : import = import SEMICOLON rest = composition { {rest with imports = import::rest.imports} }
+            | extend = extends SEMICOLON rest = composition { {rest with extensions = extend::rest.extensions } }
+            | defs = component_clause SEMICOLON rest = composition { {rest with definitions = defs @ rest.definitions } }
+            | REDECLARE defs = component_clause SEMICOLON rest = composition
+                { {rest with redeclared_defs = defs @ rest.redeclared_defs } }
+            | EQUATION eqs = separated_list(SEMICOLON, equation) SEMICOLON
+                { {rest with behaviour = { rest.behaviour with equations = eqs @ rest.behavior.equations } } }
+            | INITIAL EQUATION eqs = separated_list(SEMICOLON, equation) SEMICOLON
+                { {rest with behaviour = { rest.behaviour with initial_equations = eqs @ rest.behavior.initial_equations } } }
