@@ -29,11 +29,14 @@
 (** useful fragments of Modelica syntax *)
 
 open Syntax
-
+open Utils
+       
+let empty_app f = { fun_ = f ; args = [] ; named_args = StrMap.empty }
+       
 let no_comment = { annotated_elem = None ; annotation = None }
-
+                   
 let uncommented a = { commented = a ; comment = no_comment }
-
+                      
 let no_modification = { types = [] ; components = [] ; modifications = [] }
 
 let no_def_options = { final = false ; replaceable = false ; scope = Local ; visibility = Public }
