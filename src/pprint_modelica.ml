@@ -147,17 +147,21 @@ let pp_visibility fmt = function
   | Protected -> pp_print_string fmt "protected"
 
 let pp_scope fmt = function
-  | Inner -> pp_print_string fmt "inner"
-  | Outer -> pp_print_string fmt "inner"
-  | InnerOuter ->  pp_print_string fmt "inner outer"
+  | Inner -> pp_print_string fmt "inner "
+  | Outer -> pp_print_string fmt "inner "
+  | InnerOuter ->  pp_print_string fmt "inner outer "
   | Local -> ()
 
-let pp_def_options fmt { final ; scope ; visibility ; replaceable } =
-  fprintf fmt "@[%a%s%s%a@]" pp_visibility visibility
-          (if final then " final" else "")
-          (if replaceable then " replaceable" else "")
+let pp_redeclared_def_options fmt { final ; scope ; visibility ; replaceable } =
+  fprintf fmt "@[%s%s%a@]"
+          (if final then "final " else "")
+          (if replaceable then "replaceable " else "")
           pp_scope scope
-
+               
+let pp_def_options fmt o =
+  fprintf fmt "@[%a@ %a@]" pp_visibility o.visibility
+          pp_redeclared_def_options o
+          
 let def_sep fmt () =
   fprintf fmt ";@."
 
@@ -227,8 +231,11 @@ and pp_redeclared_type_def fmt { td_name ; sort ; type_exp ; cns ; type_options 
 and pp_component_redeclaration fmt { each ; def } =
   fprintf fmt "@[redeclare@ %s%a@]"
           (if each then "each " else "")
-          pp_definition def
+          pp_redeclared_definition def
 
+and pp_redeclared_definition fmt { commented ; comment } =
+  fprintf fmt "@[%a%a@]" (pp_def_desc ~pp_def_options:pp_redeclared_def_options) commented pp_comment comment
+          
 and pp_mod_value fmt = function
   | Nested modification -> fprintf fmt "@[(%a)@]" pp_modification modification
   | Rebind e -> fprintf fmt "@[=@ %a@]" pp_expr e
@@ -315,18 +322,18 @@ and pp_extend fmt = function
 
 and pp_constraint fmt { commented ; comment } =
   fprintf fmt "@[@ constrainedby %a%a@]"  pp_texpr commented  pp_comment comment                  
-          
-and pp_def_desc fmt { def_name; def_type; def_constraint;
-                      def_rhs; def_if; def_options} =
+
+and pp_def_desc ?(pp_def_options=pp_def_options) fmt { def_name; def_type; def_constraint;
+                                                   def_rhs; def_if; def_options} =          
   fprintf fmt "@[%a@ %a@ %a%a%a%a@]" pp_def_options def_options
           pp_texpr def_type
           pp_print_string def_name  
           (pp_option pp_def_rhs) def_rhs
          (pp_option pp_def_if) def_if
-          (pp_option pp_constraint) def_constraint
+         (pp_option pp_constraint) def_constraint
           
 and pp_definition fmt { commented ; comment } =
-  fprintf fmt "@[%a%a@]" pp_def_desc commented pp_comment comment
+  fprintf fmt "@[%a%a@]" (pp_def_desc ~pp_def_options:pp_def_options) commented pp_comment comment
 
 and pp_enum_literal fmt {commented ; comment} =
   fprintf fmt "@[%s%a@]" commented pp_comment comment                                           
