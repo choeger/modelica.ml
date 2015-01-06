@@ -352,6 +352,10 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                 | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ ENUMERATION LPAREN COLON RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = OpenEnumeration { td_name ; sort ; type_options ; type_exp = () ; cns} ;  comment } }
 
+                | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ DER LPAREN der_name=separated_nonempty_list(DOT, IDENT)
+                  COMMA idents=separated_nonempty_list(COMMA, IDENT) RPAREN comment = comment cns = option(constraining_clause) 
+                  { { commented = DerSpec { td_name ; sort ; type_options ; type_exp = {der_name;idents} ; cns} ;  comment } }
+
 composition : import = import SEMICOLON rest = composition { {rest with imports = import::rest.imports} }
             | extend = extends SEMICOLON rest = composition { {rest with extensions = extend::rest.extensions } }
             | defs = component_clause SEMICOLON rest = composition { {rest with defs = defs @ rest.defs } }

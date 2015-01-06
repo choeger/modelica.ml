@@ -374,6 +374,12 @@ let test_cases = [
                                                                                       
                                                                   } )) ;
 
+  typedef "type E = der(foo.bar, x, y)" (uncommented (DerSpec {empty_typedef with td_name="E" ;
+                                                                                  type_exp = { der_name = ["foo";"bar"];
+                                                                                               idents = ["x";"y"] }
+                                                                                      
+                                                                  } )) ;
+
   typedef "function f external \"C\" f(); end f"
           (uncommented (Composition {
                             empty_typedef with td_name = "f" ;

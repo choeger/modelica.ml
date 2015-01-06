@@ -330,7 +330,7 @@ and pp_extension x fmt (composition,modification) =
   fprintf fmt "@[extends@ %s%a@ %a@ end@ %s@]" x (pp_option pp_modification) modification pp_composition composition x
 
 and pp_der_spec fmt { der_name; idents } =
-  fprintf fmt "@[der(%a,%a)@]" (pp_list ~sep:"." pp_print_string) der_name (pp_list ~sep:", " pp_print_string) idents
+  fprintf fmt "@[= der(%a,%a)@]" (pp_list ~sep:"." pp_print_string) der_name (pp_list ~sep:", " pp_print_string) idents
 
 and pp_short_rhs fmt te =
   fprintf fmt "@[=@ %a@]" pp_texpr te
