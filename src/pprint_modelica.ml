@@ -188,13 +188,17 @@ let pp_typedef_sort fmt = function
   | OperatorRecord -> fprintf fmt "operator record"
   | OperatorFunction  -> fprintf fmt "operator function"
 
-let pp_typedef_options fmt { type_visibility ; type_replaceable ; type_final ; partial ; encapsulated } =
-    fprintf fmt "@[%a %s%s%s%s@]" pp_visibility type_visibility
+let pp_redeclared_typedef_options fmt { type_visibility ; type_replaceable ; type_final ; partial ; encapsulated } =
+    fprintf fmt "@[%s%s%s%s@]"
           (if type_final then "final " else "")
           (if type_replaceable then "replaceable " else "")
           (if encapsulated then "encapsulated " else "")
           (if partial then "partial " else "")
-
+                                 
+let pp_typedef_options fmt o =
+  fprintf fmt "@[%a %a@]" pp_visibility o.type_visibility
+          pp_redeclared_typedef_options o
+          
 let pp_element pp fmt e = fprintf fmt "%a;" pp e
           
 let pp_elements_prefixed prefix pp fmt = function
@@ -211,9 +215,15 @@ let pp_typedef_struct pp pp_constraint fmt { td_name ; sort ; type_exp ; cns ; t
 let rec pp_type_redeclaration fmt { redecl_each ; redecl_type } =
   fprintf fmt "@[redeclare@ %s%a%a@]"
           (if redecl_each then "each " else "")
-          (pp_typedef_struct pp_texpr pp_constraint) redecl_type.commented
+          pp_redeclared_type_def redecl_type.commented
           pp_comment redecl_type.comment
-            
+          
+and pp_redeclared_type_def fmt { td_name ; sort ; type_exp ; cns ; type_options } =
+  fprintf fmt "@[%a%a@ %s@ =@ %a@]" pp_redeclared_typedef_options type_options
+          pp_typedef_sort sort
+          td_name
+          pp_texpr type_exp
+          
 and pp_component_redeclaration fmt { each ; def } =
   fprintf fmt "@[redeclare@ %s%a@]"
           (if each then "each " else "")
