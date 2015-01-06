@@ -41,7 +41,8 @@
 %token BREAK ENCAPSULATED IF OUTER STREAM CLASS END IMPORT OUTPUT THEN CONNECT ENUMERATION IMPURE
 %token PACKAGE TRUE CONNECTOR EQUATION IN PARAMETER TYPE CONSTANT EXPANDABLE INITIAL PARTIAL WHEN
 %token CONSTRAINEDBY EXTENDS INNER PROTECTED WHILE DER EXTERNAL INPUT PUBLIC WITHIN
-%token ENDWHEN ENDIF ENDFOR ENDWHILE
+%token ENDWHEN ENDIF ENDFOR ENDWHILE INITIAL_EQUATION INITIAL_ALGORITHM
+%token <string> END_IDENT
 
 %right lowest /* lowest precedence */
 %nonassoc IDENT INT FLOAT STRING LPAREN RPAREN RBRACKET LBRACE RBRACE 
@@ -340,7 +341,7 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                   { { commented = Short { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
 
                 | type_options = typedef_prefix sort = type_sort td_name=IDENT annotated_elem=option(STRING) type_exp=composition 
-                  annotation=option(annotation) END end_name=IDENT cns = option(constraining_clause) 
+                  annotation=option(annotation) end_name=END_IDENT cns = option(constraining_clause) 
                   { { commented = Composition { td_name ; sort ; type_options ; type_exp ; cns} ;  comment = {annotated_elem;annotation}}}
 
 composition : import = import SEMICOLON rest = composition { {rest with imports = import::rest.imports} }
@@ -348,9 +349,11 @@ composition : import = import SEMICOLON rest = composition { {rest with imports 
             | defs = component_clause SEMICOLON rest = composition { {rest with defs = defs @ rest.defs } }
             | REDECLARE defs = component_clause SEMICOLON rest = composition
                 { {rest with redeclared_defs = defs @ rest.redeclared_defs } }
-            | EQUATION eqs = separated_list(SEMICOLON, equation) SEMICOLON rest = composition
+            | typedef = type_definition SEMICOLON rest = composition { {rest with typedefs=typedef::rest.typedefs} }
+            | REDECLARE typedef = type_definition SEMICOLON rest = composition { {rest with redeclared_types=typedef::rest.redeclared_types} }
+            | EQUATION eqs = list(equation) rest = composition
                 { {rest with cargo = { rest.cargo with equations = eqs @ rest.cargo.equations } } }
-            | INITIAL EQUATION eqs = separated_list(SEMICOLON, equation) SEMICOLON rest = composition
+            | INITIAL_EQUATION eqs = list(equation) rest = composition
                 { {rest with cargo = { rest.cargo with initial_equations = eqs @ rest.cargo.initial_equations } } }
 
             | { empty_composition }

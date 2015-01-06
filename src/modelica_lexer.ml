@@ -337,8 +337,16 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
             | FOR -> { token = ENDFOR ; cursor =  { cursor with loc_end = last_loc () } }
             | WHILE -> { token = ENDWHILE ; cursor = { cursor with loc_end = last_loc () } }
             | WHEN -> { token = ENDWHEN ; cursor = { cursor with loc_end = last_loc () } }
+            | IDENT(x) -> { token = END_IDENT x; cursor= { cursor with loc_end = last_loc () } }
             | _ -> Sedlexing.rollback buf ; m_cursor.m_line <- m_line ; m_cursor.m_bol <- m_bol ; { token=t; cursor }
-      end
+          end
+    | INITIAL -> begin
+                 let { m_line ; m_bol } = m_cursor in
+                 match token () with
+                   EQUATION -> { token = INITIAL_EQUATION ; cursor = { cursor with loc_end = last_loc () } }
+                 | ALGORITHM -> { token = INITIAL_ALGORITHM ; cursor = { cursor with loc_end = last_loc () } }
+                 | _ -> Sedlexing.rollback buf ; m_cursor.m_line <- m_line ; m_cursor.m_bol <- m_bol ; { token=t; cursor }             
+               end
     | _ -> { token=t; cursor }
       
   in merge (lift (token ()))
