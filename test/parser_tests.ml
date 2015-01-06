@@ -369,21 +369,38 @@ let test_cases = [
 
                                                               } )) ;
 
-  typedef "function f external \"C\" f(); end f" (uncommented (Composition { empty_typedef with td_name = "X" ;
+  typedef "function f external \"C\" f(); end f"
+          (uncommented (Composition {
+                            empty_typedef with td_name = "f" ;
+                                               type_exp = { empty_composition with
+                                                            cargo = { empty_behavior with
+                                                                      external_ = Some (
+                                                                                      unannotated {
+                                                                                          lang="C" ;
+                                                                                          ext_lhs=None;
+                                                                                          ext_ident = "f";
+                                                                                          ext_args = []
+                                                                                        }
+                                                                                    )
+                                                                    } ;
+                                                          } ;
+                                               sort = Function } ));
+                                                                            
+  typedef "function f external \"C\" x = f(); end f"
+          (uncommented (Composition { empty_typedef with td_name = "f" ;
                                                          type_exp = { empty_composition with
                                                                       cargo = { empty_behavior with
                                                                                 external_ = Some (
                                                                                                 unannotated {
                                                                                                     lang="C" ;
-                                                                                                    ext_lhs=Some (App (empty_app (Ide "f")));
-                                                                                                    ext_ident = "";
+                                                                                                    ext_lhs=Some (Ide "x");
+                                                                                                    ext_ident = "f";
                                                                                                     ext_args = []
                                                                                                   }
                                                                                               )
                                                                               } ;
                                                                     } ;
                                                          sort = Function } ));
-                                                                            
 
 
 (*

@@ -355,5 +355,19 @@ composition : import = import SEMICOLON rest = composition { {rest with imports 
                 { {rest with cargo = { rest.cargo with equations = eqs @ rest.cargo.equations } } }
             | INITIAL_EQUATION eqs = list(equation) rest = composition
                 { {rest with cargo = { rest.cargo with initial_equations = eqs @ rest.cargo.initial_equations } } }
-
+            
+            | EXTERNAL lang=STRING lhs=external_lhs ext_ident=IDENT LPAREN ext_args = separated_list(COMMA, expr) RPAREN annotation=option(annotation) SEMICOLON
+              { {empty_composition with cargo = {empty_behavior with external_ = Some { annotated_elem = {lang ; 
+                                                                                                          ext_ident; 
+                                                                                                          ext_lhs = Some lhs; 
+                                                                                                          ext_args}; 
+                                                                                        annotation}}} }
+            | EXTERNAL lang=STRING ext_ident=IDENT LPAREN ext_args = separated_list(COMMA, expr) RPAREN annotation=option(annotation) SEMICOLON
+              { {empty_composition with cargo = {empty_behavior with external_ = Some { annotated_elem = {lang ; 
+                                                                                                          ext_ident; 
+                                                                                                          ext_lhs=None; 
+                                                                                                          ext_args}; 
+                                                                                        annotation}}} }
             | { empty_composition }
+
+external_lhs : e=component_reference EQ { e }
