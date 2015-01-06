@@ -94,8 +94,10 @@
 %start <Syntax.extend> modelica_extends
 %start <Syntax.definition list> modelica_definitions
 %start <Syntax.typedef> modelica_type_definition
-                                  
+%start <Syntax.unit_> modelica_stored_definition                                  
 %%
+
+modelica_stored_definition : within = option(within_clause) toplevel_defs = list(type_definition_clause) EOF { { within; toplevel_defs } }
 
 modelica_definitions : reset_visibility defs = component_clauses EOF { defs }
 
@@ -446,3 +448,8 @@ composition : import = import SEMICOLON rest = composition { {rest with imports 
             | { empty_composition }
 
 external_lhs : e=component_reference EQ { e }
+
+type_definition_clause : td=type_definition SEMICOLON { td }
+
+within_clause : WITHIN name=separated_list(DOT, IDENT) SEMICOLON { name }
+

@@ -64,7 +64,9 @@ let extends_parser src = guard (MenhirLib.Convert.traditional2revised get_token 
 let defs_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_definitions)
 
 let td_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_type_definition)
-                            
+
+let unit_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_stored_definition)
+                          
 let error_message e input =
   let lb = Lexing.from_string (input ^ "\n") in
   highlight_dumb Format.str_formatter lb e ; Format.flush_str_formatter ()

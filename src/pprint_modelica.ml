@@ -425,7 +425,14 @@ and pp_behavior fmt { algorithms ; equations ; initial_algorithms ; initial_equa
                                                                                      (pp_list ~sep:", " pp_expr) ext_args
                                                                                      pp_annotation annotation
   end
-                                             
+
+and pp_within fmt = function
+  | None -> ()
+  | Some name -> fprintf fmt "@[within@ %a;@.@]" (pp_list ~sep:"." pp_print_string) name
+    
+and pp_unit fmt {within ; toplevel_defs} =
+  fprintf fmt "@[%a%a@]" pp_within within (pp_list (pp_element pp_typedef)) toplevel_defs
+    
 let eq2str ?max:(n=8) eq = 
   pp_set_max_boxes str_formatter n ;
   (pp_equation str_formatter eq) ;
@@ -464,4 +471,9 @@ let stmt2str ?max:(n=8) s =
 let texpr2str ?max:(n=8) te = 
   pp_set_max_boxes str_formatter n ;
   (pp_texpr str_formatter te) ;
+  flush_str_formatter ()
+
+let unit2str ?max:(n=8) u = 
+  pp_set_max_boxes str_formatter n ;
+  (pp_unit str_formatter u) ;
   flush_str_formatter ()
