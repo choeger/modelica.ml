@@ -357,11 +357,24 @@ and pp_typedef fmt = function
                                        pp_comment fmt comment
                                              
 and pp_behavior fmt { algorithms ; equations ; initial_algorithms ; initial_equations ; external_ } =
+  let pp_external_lhs fmt e =
+    fprintf fmt "%a =" pp_expr e
+  in
+  
   pp_elements_prefixed "initial equation" pp_equation fmt initial_equations ;
   List.iter (pp_elements_prefixed "initial algorithm" pp_statement fmt) initial_algorithms ;
   pp_elements_prefixed "equation" pp_equation fmt equations ;
-  List.iter (pp_elements_prefixed "algorithm" pp_statement fmt) algorithms
-                    
+  List.iter (pp_elements_prefixed "algorithm" pp_statement fmt) algorithms ;
+  begin
+  match external_ with
+    None -> ()
+  | Some {annotated_elem = {lang;ext_lhs;ext_ident;ext_args}; annotation} -> fprintf fmt "@[external@ \"%s\"%a@ %s(%a)%a;"
+                                                                                     lang
+                                                                                     (pp_option pp_external_lhs) ext_lhs
+                                                                                     ext_ident
+                                                                                     (pp_list ~sep:", " pp_expr) ext_args
+                                                                                     pp_annotation annotation
+  end
                                              
 let eq2str ?max:(n=8) eq = 
   pp_set_max_boxes str_formatter n ;
