@@ -459,6 +459,40 @@ let test_cases = [
                                                              }];}
                                                 }
                               }));             
+
+  typedef "type A = B(redeclare C c)"
+          (uncommented (Short { empty_typedef with
+                                td_name = "A" ;
+                                type_exp = TMod { mod_type=TIde "B" ;
+                                                  modification = { no_modification with
+                                                                   components = [{ each = false ;
+                                                                                   def = 
+                                                                                     uncommented ({
+                                                                                              empty_def with
+                                                                                              def_name = "c" ;
+                                                                                              def_type = TIde "C"
+                                                                                            })
+                                                                            }]}
+                                                }
+                              }));                                                                 
+
+  typedef "type A = B(replaceable C c)"
+          (uncommented (Short { empty_typedef with
+                                td_name = "A" ;
+                                type_exp = TMod { mod_type=TIde "B" ;
+                                                  modification = { no_modification with
+                                                                   components = [{ each = false ;
+                                                                                   def = 
+                                                                                     uncommented ({
+                                                                                              empty_def with
+                                                                                              def_name = "c" ;
+                                                                                              def_type = TIde "C";
+                                                                                              def_options = { no_def_options with
+                                                                                                              replaceable=true }
+                                                                                            })
+                                                                            }]}
+                                                }
+                              }));                                                                 
   
 (*
     val line_annotation = Mod(redefs = Redef(name = List("Line"), mod = Some(

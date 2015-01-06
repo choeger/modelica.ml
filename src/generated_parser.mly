@@ -60,11 +60,29 @@
 
 
 %{
-   open Syntax
-   open Syntax_fragments
-   open Utils
+    open Syntax
+    open Syntax_fragments
+    open Utils
 
-   let visibility = ref Public
+    let visibility = ref Public
+
+    (* merge the two sources of a modelica-style component definition (i.e. the declaration and the component_clause *)
+    let declaration_to_def def_type def_options def_constraint = function
+        (def_name, None, None, def_if, def_rhs, comment) -> 
+           { commented = { def_name ; def_type ; def_options ; def_constraint ; def_rhs ; def_if ; } ;
+             comment }
+      | (def_name, Some(dims), None, def_if, def_rhs, comment) -> 
+           { commented = { def_name ; def_type = TArray { base_type = def_type ; dims } ;
+                           def_options ; def_constraint ; def_rhs ; def_if ; } ;
+             comment }
+      | (def_name, Some(dims), Some(modification), def_if, def_rhs, comment) -> 
+           { commented = { def_name ; def_type = TArray { base_type = TMod { mod_type = def_type ; modification } ; dims } ;
+                           def_options ; def_constraint ; def_rhs ; def_if ; } ;
+             comment }
+      | (def_name, None, Some(modification), def_if, def_rhs, comment) -> 
+           { commented = { def_name ; def_type = TMod { mod_type = def_type ; modification } ; 
+                           def_options ; def_constraint ; def_rhs ; def_if ; } ;
+             comment }
 %}
 
 
@@ -287,9 +305,31 @@ modification_arguments : REDECLARE redecl_each=flag(EACH) type_final=flag(FINAL)
                                                                   type_exp ; cns} ;
                                                     comment } 
                                     } :: rest.types } }
+                       | REDECLARE each=flag(EACH) final=flag(FINAL) replaceable=flag(REPLACEABLE) def=mod_component_clause 
+                         rest=modification_arguments_tail
+                         { {rest with components = 
+                             { each ; def = { def with commented = 
+                                                       { def.commented with def_options = 
+                                                                            {def.commented.def_options with final; replaceable} };
+                                            }
+                         }::rest.components} } 
+                       | each=flag(EACH) final=flag(FINAL) REPLACEABLE def=mod_component_clause 
+                         rest=modification_arguments_tail
+                         { {rest with components = 
+                             { each ; def = { def with commented = 
+                                                       { def.commented with def_options = 
+                                                                            {def.commented.def_options with final; replaceable=true} };
+                                            }
+                         }::rest.components} } 
+
+
 
 modification_arguments_tail : COMMA m = modification_arguments { m }
                             | { { types = [] ; components = [] ; modifications = [] } }
+
+mod_component_clause : scope=scope def_type = type_expression component=declaration
+                       def_constraint=option(constraining_clause)
+                       { declaration_to_def def_type {no_def_options with scope} def_constraint component }
 
 import : IMPORT name=separated_nonempty_list(DOT, IDENT) comment = comment { { commented = Unnamed name ; comment } }
        | IMPORT from=separated_nonempty_list(DOT, IDENT) EQ selected=IDENT comment = comment { { commented = NamedImport {from;selected} ; comment } } 
@@ -332,28 +372,7 @@ component_clauses : defs = component_clause { defs }
                                                                   
 component_clause : def_options = type_prefix def_type = type_expression components=separated_nonempty_list(COMMA, declaration)
                    def_constraint=option(constraining_clause)
-                     { List.map (function 
-                                   (def_name, None, None, def_if, def_rhs, comment) -> { commented = 
-                                                                                         { def_name ; def_type ; def_options ; def_constraint ; def_rhs ; def_if ; } ;
-                                                                                         comment }
-                                 | (def_name, Some(dims), None, def_if, def_rhs, comment) -> { commented = 
-                                                                                               { def_name ; def_type = TArray { base_type = def_type ; dims } ;
-                                                                                                 def_options ; def_constraint ; def_rhs ; def_if ; } ;
-                                                                                               comment }
-                                 | (def_name, Some(dims), Some(modification), def_if, def_rhs, comment) -> { commented = 
-                                                                                                             { def_name ; 
-                                                                                                               def_type = TArray { base_type =
-                                                                                                                                   TMod { mod_type = def_type ; modification } ;
-                                                                                                                                   dims } ;
-                                                                                                               def_options ; def_constraint ; def_rhs ; def_if ; } ;
-                                                                                                             comment }
-                                 | (def_name, None, Some(modification), def_if, def_rhs, comment) -> { commented = 
-                                                                                                       { def_name ; 
-                                                                                                         def_type = TMod { mod_type = def_type ; modification } ; 
-                                                                                                         def_options ; def_constraint ; def_rhs ; def_if ; } ;
-                                                                                                       comment }
-                                ) 
-                       components }
+                     { List.map (declaration_to_def def_type def_options def_constraint) components }
 
 type_sort : CLASS { Class }
            | PACKAGE {Package} 
