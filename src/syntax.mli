@@ -245,9 +245,14 @@ and type_redeclaration = { redecl_each : bool ; redecl_type : texp typedef_struc
 
 and component_redeclaration = { each : bool ; def : definition; }
 
-and component_modification_struct = { mod_each : bool ; mod_final : bool; mod_name : name; mod_modification : modification option ; mod_rhs : exp option }
+and component_modification_struct = { mod_each : bool ; mod_final : bool; mod_name : name;
+                                      mod_value : modification_value option ; }
+
+and modification_value = Nested of modification
+                       | Rebind of exp
                                
 and component_modification = component_modification_struct commented
+
 and modification = { types : type_redeclaration list ;
                      components : component_redeclaration list ;
                      modifications : component_modification list ; }
