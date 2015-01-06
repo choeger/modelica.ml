@@ -379,6 +379,17 @@ let test_cases = [
                                                                                                idents = ["x";"y"] }
                                                                                       
                                                                   } )) ;
+  typedef "class extends X Real p; end X"
+          (uncommented (Extension {empty_typedef with td_name = "X" ;
+                                                      sort = Class ;
+                                                      type_exp = ({ empty_composition with
+                                                                    defs = [uncommented
+                                                                              {empty_def with def_name = "p" ;
+                                                                                              def_type = TIde "Real" ;}] ;
+                                                                  }, None);
+                                  }));
+                                  
+  
 
   typedef "function f external \"C\" f(); end f"
           (uncommented (Composition {

@@ -325,7 +325,15 @@ and pp_composition fmt { typedefs ; redeclared_types ; imports ;
   pp_print_list (pp_element (pp_redeclared pp_definition)) fmt redeclared_defs ;
   pp_behavior fmt cargo ;
   fprintf fmt "@]" ;  
-                                                         
+
+and pp_extension_def fmt { td_name ; sort ; type_exp=(composition,modification) ; cns ; type_options } comment =
+  fprintf fmt "@[%a%a@ extends@ %s%a@ %a%a@]" pp_typedef_options type_options
+          pp_typedef_sort sort
+          td_name
+          (pp_option pp_modification) modification
+          (pp_composition_rhs td_name comment) composition
+          (pp_option pp_constraint) cns
+
 and pp_extension x fmt (composition,modification) =
   fprintf fmt "@[extends@ %s%a@ %a@ end@ %s@]" x (pp_option pp_modification) modification pp_composition composition x
 
@@ -354,8 +362,8 @@ and pp_typedef fmt = function
   | {commented=Short tds ; comment} -> pp_typedef_struct pp_short_rhs pp_constraint fmt tds ;
                                        pp_comment fmt comment
                                                   
-  | {commented=Extension tds ; comment} -> pp_typedef_struct (pp_extension tds.td_name) pp_constraint fmt tds ;
-                                           pp_comment fmt comment
+  | {commented=Extension tds ; comment} -> pp_extension_def fmt tds comment ;
+                                           pp_comment fmt { comment with annotated_elem = None }
                                                       
   | {commented=Composition tds; comment} -> pp_typedef_struct (pp_composition_rhs tds.td_name {comment with annotation=None}) pp_constraint fmt tds ;
                                             pp_comment fmt { comment with annotated_elem = None }

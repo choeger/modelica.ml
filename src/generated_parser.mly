@@ -346,6 +346,12 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                   annotation=option(annotation) end_name=END_IDENT cns = option(constraining_clause) 
                   { { commented = Composition { td_name ; sort ; type_options ; type_exp ; cns} ;  comment = {annotated_elem;annotation}}}
 
+                | type_options = typedef_prefix sort = type_sort EXTENDS td_name=IDENT modification=option(modification) 
+                  annotated_elem=option(STRING) composition=composition annotation=option(annotation) end_name=END_IDENT
+                  cns = option(constraining_clause) 
+                  { { commented = Extension { td_name ; sort ; type_options ; type_exp=(composition,modification) ; cns} ;  
+                      comment = {annotated_elem;annotation}}}
+
                 | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ ENUMERATION LPAREN type_exp=separated_nonempty_list(COMMA, enum_literal) RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = Enumeration { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
 
