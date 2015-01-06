@@ -195,15 +195,11 @@ let pp_typedef_options fmt { type_visibility ; type_replaceable ; type_final ; p
           (if encapsulated then "encapsulated " else "")
           (if partial then "partial " else "")
 
-let element_sep fmt () = fprintf fmt ";@."
-    
-let pp_elements pp fmt = function
-    [] -> ()
-  | es -> fprintf fmt "@[%a;@.@]" (pp_print_list ~pp_sep:element_sep pp) es
-
+let pp_element pp fmt e = fprintf fmt "%a;" pp e
+          
 let pp_elements_prefixed prefix pp fmt = function
     [] -> ()
-  | es -> fprintf fmt "@[%s@.@[%a;@]@.@]" prefix (pp_print_list ~pp_sep:element_sep pp) es
+  | es -> fprintf fmt "@[%s@.@[%a@]@.@]" prefix (pp_print_list pp) es
                   
 let pp_typedef_struct pp pp_constraint fmt { td_name ; sort ; type_exp ; cns ; type_options } =
   fprintf fmt "@[%a%a@ %s@ %a%a@]" pp_typedef_options type_options
@@ -321,12 +317,13 @@ and pp_composition fmt { typedefs ; redeclared_types ; imports ;
   let pp_redeclared pp fmt x = fprintf fmt "@[redeclare@ %a@]" pp x in
 
   fprintf fmt "@[" ;
-  pp_elements pp_import fmt imports ;
-  pp_elements pp_extend fmt extensions ;
-  pp_elements pp_typedef fmt typedefs ;
-  pp_elements (pp_redeclared pp_typedef) fmt redeclared_types ;
-  pp_elements pp_definition fmt defs ;
-  pp_elements (pp_redeclared pp_definition) fmt redeclared_defs ;  
+  pp_print_list pp_import fmt imports ;
+  pp_print_list pp_extend fmt extensions ;
+  pp_print_list (pp_element pp_typedef) fmt typedefs ;
+  pp_print_list (pp_element (pp_redeclared pp_typedef)) fmt redeclared_types ;
+  pp_print_list (pp_element pp_definition) fmt defs ;
+  pp_print_list (pp_element (pp_redeclared pp_definition)) fmt redeclared_defs ;
+  pp_behavior fmt cargo ;
   fprintf fmt "@]" ;  
                                                          
 and pp_extension x fmt (composition,modification) =
@@ -359,7 +356,7 @@ and pp_typedef fmt = function
   | {commented=DerSpec tds;comment} -> pp_typedef_struct pp_der_spec pp_constraint fmt tds ;
                                        pp_comment fmt comment
                                              
-and pp_behaviour fmt { algorithms ; equations ; initial_algorithms ; initial_equations ; external_ } =
+and pp_behavior fmt { algorithms ; equations ; initial_algorithms ; initial_equations ; external_ } =
   pp_elements_prefixed "initial equation" pp_equation fmt initial_equations ;
   List.iter (pp_elements_prefixed "initial algorithm" pp_statement fmt) initial_algorithms ;
   pp_elements_prefixed "equation" pp_equation fmt equations ;
