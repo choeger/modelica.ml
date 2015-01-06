@@ -76,6 +76,7 @@ let typedef input expected = parser_test_case td_parser (td2str ~max:100) (td2st
                                            
 let test_cases = [ 
   expr "1.234" (Real(1.234));
+  expr "10e2" (Real(1000.));
   expr "x" (Ide("x")) ;
   expr "new_foo" (Ide "new_foo");
   expr "1" (Int(1));
@@ -319,6 +320,14 @@ let test_cases = [
                                                                                        no_type_options with type_replaceable = true };
                                                                 } ));
 
+  typedef "replaceable package A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
+                                                                                       type_exp = empty_composition;
+                                                                                       sort = Package ;
+                                                                                       type_options = {
+                                                                                       no_type_options with type_replaceable = true };
+                                                                } ));
+
+  
   typedef "encapsulated model A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
                                                                                        type_exp = empty_composition;
                                                                                        sort = Model ;
@@ -363,7 +372,16 @@ let test_cases = [
                                                                     } ;
                                                          sort = Model ;
                                     } ));
-
+  
+  typedef "model X annotation ();  end X"
+          ({commented = (Composition { empty_typedef with td_name = "X" ;
+                                                         type_exp = empty_composition ;
+                                                         sort = Model ;
+                                    }) ;
+            comment = {annotated_elem = None; annotation = Some no_modification }
+           });
+  
+  
   typedef "type E = enumeration(x)" (uncommented (Enumeration {empty_typedef with td_name="E" ;
                                                                                   type_exp = [uncommented "x"];
 
