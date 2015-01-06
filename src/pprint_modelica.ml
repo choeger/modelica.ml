@@ -335,13 +335,16 @@ and pp_der_spec fmt { der_name; idents } =
 and pp_short_rhs fmt te =
   fprintf fmt "@[=@ %a@]" pp_texpr te
 
+and pp_enum_rhs fmt lits =
+  fprintf fmt "@[= enumeration(%a)@]" (pp_list ~sep:", " pp_enum_literal) lits
+          
 and pp_composition_rhs x cmt fmt c =
   fprintf fmt "@[%a%a@ end %s@]" pp_comment cmt pp_composition c x
           
 and pp_typedef fmt = function
   | {commented=OpenEnumeration ; comment} -> fprintf fmt "@[enumeration@ (:)%a@]" pp_comment comment
 
-  | {commented=Enumeration tds ; comment} -> pp_typedef_struct (pp_list ~sep:", " pp_enum_literal) pp_constraint fmt tds ;
+  | {commented=Enumeration tds ; comment} -> pp_typedef_struct pp_enum_rhs pp_constraint fmt tds ;
                                              pp_comment fmt comment
                                                         
   | {commented=Short tds ; comment} -> pp_typedef_struct pp_short_rhs pp_constraint fmt tds ;

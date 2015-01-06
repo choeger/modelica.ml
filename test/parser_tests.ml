@@ -364,7 +364,7 @@ let test_cases = [
                                                          sort = Model ;
                                     } ));
 
-  typedef "type E = enumeration(x)" (uncommented (Enumeration {empty_typedef with td_name="T" ;
+  typedef "type E = enumeration(x)" (uncommented (Enumeration {empty_typedef with td_name="E" ;
                                                                                   type_exp = [uncommented "x"];
 
                                                               } )) ;
