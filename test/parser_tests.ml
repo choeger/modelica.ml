@@ -494,31 +494,34 @@ let test_cases = [
                                                 }
                               }));                                                                 
   
-(*
-    val line_annotation = Mod(redefs = Redef(name = List("Line"), mod = Some(
-          Mod(redefs = Redef(name=List("points"), rhs=Some(Array(List(
-            /* points */
-            Array(List(UMinus(IntLit(19)), UMinus(IntLit(10)))), 
-            Array(List(IntLit(20), UMinus(IntLit(10)))), 
-            Array(List(IntLit(20), UMinus(IntLit(6)))), 
-            Array(List(IntLit(38), UMinus(IntLit(6))))
-          ))))::Redef(name=List("color"), rhs=Some(
-            /* color */
-            Array(List(IntLit(255), IntLit(0), IntLit(255))))
-          )::Nil)))::Nil)
-
-    it("Should parse an annotation") {
-      "annotation (Line(points={{-19,-10},{20,-10}, {20,-6},{38,-6}}, color={255,0,255}))" parsed_with annotation should create (
-        line_annotation
-      )
-    }
-
-    it("Should parse a connect-statement with an annotation") {
-      "connect(not1.y, rSFlipFlop.R) annotation (Line(points={{-19,-10},{20,-10}, {20,-6},{38,-6}}, color={255,0,255}));" parsed_with equation should create (
-        ExpEquation(App(Ide("connect"), List(Proj(Ide("not1"), "y"), Proj(Ide("rSFlipFlop"), "R"))), Comment(annotation = Some(line_annotation)))
-      )
-    }*)
-
-]
+  (let line = {
+     no_modification
+   with modifications =
+          [uncommented {mod_each=false;mod_final=false;
+                        mod_name=["Line"];
+                        mod_value=Some (Nested {no_modification with
+                                                 modifications =
+                                                   [uncommented {mod_each=false;mod_final=false;
+                                                                 mod_name=["points"];
+                                                                 mod_value= Some (Rebind (
+                                                                                      Array [
+                                                                                          Array [UMinus (Int 19); UMinus (Int 10)];
+                                                                                          Array [Int 20;UMinus (Int 10)];
+                                                                                          Array [Int 20;UMinus (Int 6)];
+                                                                                          Array [Int 38;UMinus (Int 6)];
+                                                                                        ]));
+                                                                };
+                                                    uncommented {mod_each=false;mod_final=false;
+                                                                 mod_name=["color"];
+                                                                 mod_value=Some (Rebind (Array [Int 255;Int 0;Int 255]));
+                                                                }
+                                                   ]})
+                       }]}
+   in
+   let annotation = Some line in
+   eq "connect(not1.y, rSFlipFlop.R) annotation (Line(points={{-19,-10},{20,-10}, {20,-6},{38,-6}}, color={255,0,255}));" 
+      { commented = ExpEquation (App {(empty_app (Ide "connect")) with args=[name ["not1";"y"]; name ["rSFlipFlop"; "R"] ]}) ; 
+        comment = { annotated_elem = None ; annotation } } );
+  ]
 						  
 let suite = "Parser" >::: test_cases

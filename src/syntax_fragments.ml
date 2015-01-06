@@ -1,3 +1,4 @@
+
 (*
  * Copyright (c) 2014, TU Berlin
  * All rights reserved.
@@ -55,12 +56,22 @@ let empty_behavior = { algorithms = [] ; initial_algorithms = [] ; equations = [
 let empty_composition = { defs = [] ; imports = [] ; extensions = [] ; redeclared_defs = [] ;
                           typedefs = [] ; redeclared_types = [] ; cargo = empty_behavior  }
                         
-exception EmptyTypeName
-                   
+exception EmptyName
+
+let rec name_ object_ = function
+  | [] -> object_
+  | field::r -> name_ (Proj { object_ ; field }) r
+
+let name = function
+  | [] -> raise EmptyName
+  | x::r -> name_ (Ide x) r
+                         
 let rec type_name_ class_type = function
   | [] -> class_type
   | type_element::r -> type_name_ (TProj { class_type ; type_element}) r
 
 let type_name = function
-  | [] -> raise EmptyTypeName
+  | [] -> raise EmptyName
   | x::r -> type_name_ (TIde x) r
+
+                       
