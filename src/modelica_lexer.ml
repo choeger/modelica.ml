@@ -187,7 +187,6 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | "block" -> BLOCK
     | "break" -> BREAK
     | "class" -> CLASS
-    | "connect" -> CONNECT
     | "connector" -> CONNECTOR
     | "constant" -> CONSTANT
     | "constrainedby" -> CONSTRAINEDBY
