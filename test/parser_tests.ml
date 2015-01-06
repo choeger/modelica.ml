@@ -369,6 +369,11 @@ let test_cases = [
 
                                                               } )) ;
 
+  typedef "type E = enumeration(:)" (uncommented (OpenEnumeration {empty_typedef with td_name="E" ;
+                                                                                      type_exp = ();
+                                                                                      
+                                                                  } )) ;
+
   typedef "function f external \"C\" f(); end f"
           (uncommented (Composition {
                             empty_typedef with td_name = "f" ;

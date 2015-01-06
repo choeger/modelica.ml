@@ -349,6 +349,8 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                 | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ ENUMERATION LPAREN type_exp=separated_nonempty_list(COMMA, enum_literal) RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = Enumeration { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
 
+                | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ ENUMERATION LPAREN COLON RPAREN comment = comment cns = option(constraining_clause) 
+                  { { commented = OpenEnumeration { td_name ; sort ; type_options ; type_exp = () ; cns} ;  comment } }
 
 composition : import = import SEMICOLON rest = composition { {rest with imports = import::rest.imports} }
             | extend = extends SEMICOLON rest = composition { {rest with extensions = extend::rest.extensions } }

@@ -52,7 +52,7 @@ and 'a typedef_struct = { td_name : string ; sort : sort ; type_exp : 'a ; cns :
 and typedef_desc = Short of texp typedef_struct
                  | Composition of composition typedef_struct
                  | Enumeration of (enum_literal list) typedef_struct
-                 | OpenEnumeration 
+                 | OpenEnumeration of unit typedef_struct
                  | DerSpec of der_spec typedef_struct
                  | Extension of (composition * (modification option)) typedef_struct
 
