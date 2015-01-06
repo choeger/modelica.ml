@@ -259,7 +259,26 @@ type_expression : x = IDENT { TIde x }
                 | base_type = type_expression dims = array_subscripts { TArray { base_type ; dims } }
                 | mod_type = type_expression modification = modification { TMod { mod_type ; modification } }
 
-modification : LPAREN RPAREN { { types = [] ; components = [] ; modifications = [] } }
+modification : LPAREN m=modification_arguments_head RPAREN { m }
+
+modification_arguments_head : m = modification_arguments { m }
+                            | { { types = [] ; components = [] ; modifications = [] } }
+
+modification_arguments : REDECLARE redecl_each=flag(EACH) type_final=flag(FINAL) type_replaceable=flag(REPLACEABLE)
+                         partial=flag(PARTIAL) sort = type_sort 
+                         td_name=IDENT EQ type_exp = type_expression comment=comment cns = option(constraining_clause) 
+                         rest=modification_arguments_tail
+                         { { rest with types = { 
+                                    redecl_each ;
+                                    redecl_type = { commented = { td_name ; sort ; 
+                                                                  type_options = { no_type_options with partial ; 
+                                                                                   type_final; type_replaceable } ; 
+                                                                  type_exp ; cns} ;
+                                                    comment } 
+                                    } :: rest.types } }
+
+modification_arguments_tail : COMMA m = modification_arguments { m }
+                            | { { types = [] ; components = [] ; modifications = [] } }
 
 import : IMPORT name=separated_nonempty_list(DOT, IDENT) comment = comment { { commented = Unnamed name ; comment } }
        | IMPORT from=separated_nonempty_list(DOT, IDENT) EQ selected=IDENT comment = comment { { commented = NamedImport {from;selected} ; comment } } 
