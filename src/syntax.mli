@@ -250,6 +250,9 @@ and component_modification_struct = { mod_each : bool ; mod_final : bool; mod_na
 
 and modification_value = Nested of modification
                        | Rebind of exp
+                       | NestedRebind of nested_and_rebind_modification
+
+and nested_and_rebind_modification = { nested : modification ; new_value : exp }
                                
 and component_modification = component_modification_struct commented
 

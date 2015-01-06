@@ -321,7 +321,16 @@ modification_arguments : REDECLARE redecl_each=flag(EACH) type_final=flag(FINAL)
                                                                             {def.commented.def_options with final; replaceable=true} };
                                             }
                          }::rest.components} } 
+                       | mod_each=flag(EACH) mod_final=flag(FINAL) mod_name = separated_nonempty_list(DOT, IDENT) 
+                         mod_value=option(modification) comment=comment 
+                         rest=modification_arguments_tail
+                         { let m = {commented={mod_name;mod_final;mod_each;mod_value};comment} in 
+                               { rest with modifications = m::rest.modifications } 
+                         }
 
+modification : EQ e=expr | COLONEQ e=expr { Rebind e }
+             | m=class_modification { Nested m }
+             | nested=class_modification EQ new_value=expr { NestedRebind {nested;new_value} }
 
 modification_arguments_tail : COMMA m = modification_arguments { m }
                             | { { types = [] ; components = [] ; modifications = [] } }
