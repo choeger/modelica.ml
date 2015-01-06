@@ -209,17 +209,28 @@ let pp_typedef_struct pp pp_constraint fmt { td_name ; sort ; type_exp ; cns ; t
           (pp_option pp_constraint) cns
           
 let rec pp_type_redeclaration fmt { redecl_each ; redecl_type } =
-  if redecl_each then
-    fprintf fmt "@[each@ %a%a@]" (pp_typedef_struct pp_texpr pp_constraint) redecl_type.commented
-            pp_comment redecl_type.comment
-  else
-    fprintf fmt "@[%a%a@]" (pp_typedef_struct pp_texpr pp_constraint) redecl_type.commented
-            pp_comment redecl_type.comment
+  fprintf fmt "@[redeclare@ %s%a%a@]"
+          (if redecl_each then "each " else "")
+          (pp_typedef_struct pp_texpr pp_constraint) redecl_type.commented
+          pp_comment redecl_type.comment
             
-and pp_component_redeclaration fmt { each ; def } = ()
+and pp_component_redeclaration fmt { each ; def } =
+  fprintf fmt "@[redeclare@ %s%a@]"
+          (if each then "each " else "")
+          pp_definition def
 
-and pp_component_modification fmt { commented = { mod_each ; mod_final ; mod_name ; mod_modification ; mod_rhs } ; comment } = ()
+and pp_mod_value fmt = function
+  | Nested modification -> fprintf fmt "@[(%a)@]" pp_modification modification
+  | Rebind e -> fprintf fmt "@[=@ %a@]" pp_expr e
                                                       
+and pp_component_modification fmt { commented = { mod_each ; mod_final ; mod_name ; mod_value } ; comment } =
+  fprintf fmt "%s%s%a%a%a"
+          (if mod_each then "each " else "")
+          (if mod_final then "final " else "")
+          (pp_list ~sep:"." pp_print_string) mod_name
+          (pp_option pp_mod_value) mod_value
+          pp_comment comment
+                                                                
 and pp_modification fmt { types ; components ; modifications } =
   pp_list pp_type_redeclaration fmt types ;
   pp_list pp_component_redeclaration fmt components ;
