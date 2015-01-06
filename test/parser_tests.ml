@@ -424,7 +424,42 @@ let test_cases = [
                                                                     } ;
                                                          sort = Function } ));
 
-
+  typedef "type A = B(redeclare type C = D)"
+          (uncommented (Short { empty_typedef with
+                                td_name = "A" ;
+                                type_exp = TMod { mod_type=TIde "B" ;
+                                                  modification = { no_modification with
+                                                                   types = [{ redecl_each = false ;
+                                                                              redecl_type =
+                                                                                uncommented ({
+                                                                                              empty_typedef with
+                                                                                              td_name = "C" ;
+                                                                                              type_exp = TIde "D"
+                                                                                            })
+                                                                            }]}
+                                                }
+                              }));                                                                 
+  
+  typedef "type A = B(replaceable type C = D)"
+          (uncommented (Short { empty_typedef with
+                                td_name = "A" ;
+                                type_exp = TMod { mod_type=TIde "B" ;
+                                                  modification = {
+                                                    no_modification with
+                                                    types = [{ redecl_each = false ;
+                                                               redecl_type =
+                                                                 uncommented { empty_typedef with
+                                                                               td_name = "C" ;
+                                                                               type_exp = TIde "D" ;
+                                                                               type_options = {
+                                                                                 no_type_options with
+                                                                                 type_replaceable = true;
+                                                                               }
+                                                                             }
+                                                             }];}
+                                                }
+                              }));             
+  
 (*
     val line_annotation = Mod(redefs = Redef(name = List("Line"), mod = Some(
           Mod(redefs = Redef(name=List("points"), rhs=Some(Array(List(
