@@ -276,6 +276,17 @@ modification_arguments : REDECLARE redecl_each=flag(EACH) type_final=flag(FINAL)
                                                                   type_exp ; cns} ;
                                                     comment } 
                                     } :: rest.types } }
+                       | redecl_each=flag(EACH) type_final=flag(FINAL) REPLACEABLE partial=flag(PARTIAL) sort = type_sort 
+                         td_name=IDENT EQ type_exp = type_expression comment=comment cns = option(constraining_clause) 
+                         rest=modification_arguments_tail
+                         { { rest with types = { 
+                                    redecl_each ;
+                                    redecl_type = { commented = { td_name ; sort ; 
+                                                                  type_options = { no_type_options with partial ; 
+                                                                                   type_final; type_replaceable=true } ; 
+                                                                  type_exp ; cns} ;
+                                                    comment } 
+                                    } :: rest.types } }
 
 modification_arguments_tail : COMMA m = modification_arguments { m }
                             | { { types = [] ; components = [] ; modifications = [] } }
