@@ -384,8 +384,12 @@ and pp_enum_rhs fmt lits =
 and pp_open_enum_rhs fmt () =
   fprintf fmt "@[= enumeration(:)@]" 
 
+and pp_comp_annotation fmt cmt = match cmt.annotation with
+    Some m -> fprintf fmt "annotation (%a);" pp_modification m
+  | None -> ()
+          
 and pp_composition_rhs x cmt fmt c =
-  fprintf fmt "@[%a%a@ end %s@]" pp_comment cmt pp_composition c x
+  fprintf fmt "@[%a%a%a@ end %s@]" pp_comment_string cmt.annotated_elem pp_composition c pp_comp_annotation cmt x 
           
 and pp_typedef fmt = function
   | {commented=OpenEnumeration tds ; comment} -> pp_typedef_struct pp_open_enum_rhs pp_constraint fmt tds ;
@@ -400,8 +404,7 @@ and pp_typedef fmt = function
   | {commented=Extension tds ; comment} -> pp_extension_def fmt tds comment ;
                                            pp_comment fmt { comment with annotated_elem = None }
                                                       
-  | {commented=Composition tds; comment} -> pp_typedef_struct (pp_composition_rhs tds.td_name {comment with annotation=None}) pp_constraint fmt tds ;
-                                            pp_comment fmt { comment with annotated_elem = None }
+  | {commented=Composition tds; comment} -> pp_typedef_struct (pp_composition_rhs tds.td_name comment) pp_constraint fmt tds ;
                                                        
   | {commented=DerSpec tds;comment} -> pp_typedef_struct pp_der_spec pp_constraint fmt tds ;
                                        pp_comment fmt comment

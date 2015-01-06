@@ -397,12 +397,14 @@ typedef_prefix : type_visibility = visibility type_final = flag (FINAL) type_rep
 
 enum_literal : commented=IDENT comment=comment { { commented ; comment } }
 
+composition_annotation : a = annotation SEMICOLON { a }
+
 type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT EQ type_exp = type_expression
                   comment=comment cns = option(constraining_clause) 
                   { { commented = Short { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
 
                 | type_options = typedef_prefix sort = type_sort td_name=IDENT annotated_elem=option(STRING) type_exp=composition 
-                  annotation=option(annotation) end_name=END_IDENT cns = option(constraining_clause) 
+                  annotation=option(composition_annotation) end_name=END_IDENT cns = option(constraining_clause) 
                   { { commented = Composition { td_name ; sort ; type_options ; type_exp ; cns} ;  comment = {annotated_elem;annotation}}}
 
                 | type_options = typedef_prefix sort = type_sort EXTENDS td_name=IDENT modification=option(class_modification) 
