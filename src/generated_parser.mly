@@ -49,17 +49,26 @@
 
 %left COMMA 
 %left SEMICOLON 
+%left COLON
 %right Not
 %left AND OR
 %left GT LT NEQ GEQ LEQ EQEQ 
 %left PLUS MINUS DOTPLUS DOTMINUS     /* medium precedence */
 %right UMinus
+%right FUNCTION
 %left TIMES DIV DOTTIMES DOTDIV
 %left POWER DOTPOWER
 %nonassoc below_app
 %left app_prec     
-%left DOT LBRACKET /* highest precedence */
 
+%left type_mod
+%left type_var
+%left type_conn
+%left type_caus
+%left type_array
+%left type_proj
+
+%left DOT LBRACKET /* highest precedence */
 
 %{
     open Syntax
@@ -121,6 +130,12 @@ optional_expr : e = expr { e }
 expr : e = simple_expr { e }
      | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
        { If { condition ; then_ ; else_if ; else_ } }
+     | start = simple_expr COLON first=simple_expr second=option(preceded(COLON, simple_expr))
+        { Range (match second with Some end_ -> { start; step=Some first; end_ } 
+                                 | None -> {start; step=None; end_=first} ) 
+        }   
+
+
 
 simple_expr:
   | TRUE { Bool(true) }
@@ -143,11 +158,11 @@ simple_expr:
         { Tuple (hd::tl) }
   | LBRACE es=array_args RBRACE
         { Array es }
-  | lhs = expr LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
+  | lhs = simple_expr LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
         { ArrayAccess { lhs; indices } }
   | LBRACKET els = separated_nonempty_list(SEMICOLON, separated_nonempty_list(COMMA, expr)) RBRACKET
         { MArray els }
-  | FUNCTION e = expr
+  | FUNCTION e = simple_expr
         { ExplicitClosure e }           
   | END { End } %prec END
   | DER { Der }
@@ -155,60 +170,60 @@ simple_expr:
   | COLON { Colon }
   | ASSERT { Assert }
 
-  | fun_ = expr LPAREN arguments = function_args RPAREN
+  | fun_ = simple_expr LPAREN arguments = function_args RPAREN
         { let (args, named_args) = arguments in App { fun_ ; args; named_args } }
-                                                   
-  | left = expr PLUS right = expr
+                                                                      
+  | left = simple_expr PLUS right = simple_expr
        { Plus ( {left ; right} ) } 
-  | left = expr MINUS right = expr
+  | left = simple_expr MINUS right = simple_expr
        { Minus ( {left ; right} ) } 
-  | left = expr TIMES right = expr
+  | left = simple_expr TIMES right = simple_expr
        { Mul ( {left ; right} ) } 
-  | left = expr DIV right = expr
+  | left = simple_expr DIV right = simple_expr
        { Div ( {left ; right} ) } 
-  | left = expr POWER right = expr
+  | left = simple_expr POWER right = simple_expr
        { Pow ( {left ; right} ) } 
 
        
-  | left = expr DOTPLUS right = expr
+  | left = simple_expr DOTPLUS right = simple_expr
        { DPlus ( {left ; right} ) } 
-  | left = expr DOTMINUS right = expr
+  | left = simple_expr DOTMINUS right = simple_expr
        { DMinus ( {left ; right} ) } 
-  | left = expr DOTTIMES right = expr
+  | left = simple_expr DOTTIMES right = simple_expr
        { DMul ( {left ; right} ) } 
-  | left = expr DOTDIV right = expr
+  | left = simple_expr DOTDIV right = simple_expr
        { DDiv ( {left ; right} ) } 
-  | left = expr DOTPOWER right = expr
+  | left = simple_expr DOTPOWER right = simple_expr
        { DPow ( {left ; right} ) } 
 
-  | left = expr LT right = expr
+  | left = simple_expr LT right = simple_expr
        { Lt ( {left ; right} ) } 
-  | left = expr GT right = expr
+  | left = simple_expr GT right = simple_expr
        { Gt ( {left ; right} ) } 
-  | left = expr GEQ right = expr
+  | left = simple_expr GEQ right = simple_expr
        { Geq ( {left ; right} ) } 
-  | left = expr LEQ right = expr
+  | left = simple_expr LEQ right = simple_expr
        { Leq ( {left ; right} ) } 
-  | left = expr NEQ right = expr
+  | left = simple_expr NEQ right = simple_expr
        { Neq ( {left ; right} ) } 
-  | left = expr EQEQ right = expr
+  | left = simple_expr EQEQ right = simple_expr
        { Eq ( {left ; right} ) } 
 
-  | left = expr AND right = expr
+  | left = simple_expr AND right = simple_expr
        { And ( {left ; right} ) }
-  | left = expr OR right = expr
+  | left = simple_expr OR right = simple_expr
        { Or ( {left ; right} ) }
 
-  | object_ = expr DOT field = IDENT
+  | object_ = simple_expr DOT field = IDENT
        { Proj { object_ ; field } }
-  | object_ = expr DOT field = QIDENT
+  | object_ = simple_expr DOT field = QIDENT
        { Proj { object_ ; field } }
 
-  | MINUS e = expr { UMinus e } %prec UMinus
-  | PLUS e = expr { UPlus e } %prec UMinus
-  | DOTMINUS e = expr { UDMinus e } %prec UMinus
-  | DOTPLUS e = expr { UDPlus e } %prec UMinus
-  | NOT e = expr { Not e } %prec Not
+  | MINUS e = simple_expr { UMinus e } %prec UMinus
+  | PLUS e = simple_expr { UPlus e } %prec UMinus
+  | DOTMINUS e = simple_expr { UDMinus e } %prec UMinus
+  | DOTPLUS e = simple_expr { UDPlus e } %prec UMinus
+  | NOT e = simple_expr { Not e } %prec Not
 
 else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
 
@@ -292,12 +307,12 @@ causality : INPUT { Input }
                   
 type_expression : x = IDENT { TIde x }
                 | DOT x = IDENT { TRootide x } 
-                | class_type=type_expression DOT type_element = IDENT { TProj {class_type; type_element} }
-                | flag=variability flagged=type_expression { TVar { flag ; flagged } }
-                | flag=causality flagged=type_expression { TCau { flag ; flagged } }
-                | flag=connectivity flagged=type_expression { TCon { flag ; flagged } }
-                | base_type = type_expression dims = array_subscripts { TArray { base_type ; dims } }
-                | mod_type = type_expression modification = class_modification { TMod { mod_type ; modification } }
+                | class_type=type_expression DOT type_element = IDENT { TProj {class_type; type_element} } %prec type_proj
+                | flag=variability flagged=type_expression { TVar { flag ; flagged } } %prec type_var
+                | flag=causality flagged=type_expression { TCau { flag ; flagged } } %prec type_caus
+                | flag=connectivity flagged=type_expression { TCon { flag ; flagged } } %prec type_conn
+                | base_type = type_expression dims = array_subscripts { TArray { base_type ; dims } } %prec type_array
+                | mod_type = type_expression modification = class_modification { TMod { mod_type ; modification } } %prec type_mod
 
 class_modification : LPAREN m=modification_arguments_head RPAREN { m }
 
