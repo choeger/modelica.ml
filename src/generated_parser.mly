@@ -30,8 +30,7 @@
 
 %token <int> INT
 %token <float> FLOAT
-%token <string> IDENT
-%token <string> QIDENT                                 
+%token <string> IDENT                                
 %token <string> STRING
 %token DOTPOWER POWER PLUS MINUS TIMES DIV DOTPLUS DOTMINUS DOTTIMES DOTDIV 
 %token EOF
@@ -135,8 +134,6 @@ expr : e = simple_expr { e }
                                  | None -> {start; step=None; end_=first} ) 
         }   
 
-
-
 simple_expr:
   | TRUE { Bool(true) }
   | FALSE { Bool(false) }
@@ -148,9 +145,7 @@ simple_expr:
         { String(s) }
   | DOT x = IDENT
         { RootIde x}
-  | x = IDENT 
-        { Ide(x) }
-  | x = QIDENT 
+  | x = IDENT
         { Ide(x) }
   | LPAREN e = optional_expr RPAREN
         { e }
@@ -215,8 +210,6 @@ simple_expr:
        { Or ( {left ; right} ) }
 
   | object_ = simple_expr DOT field = IDENT
-       { Proj { object_ ; field } }
-  | object_ = simple_expr DOT field = QIDENT
        { Proj { object_ ; field } }
 
   | MINUS e = simple_expr { UMinus e } %prec UMinus

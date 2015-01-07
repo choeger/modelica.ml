@@ -323,7 +323,7 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     match %sedlex buf with
       "\\\'" -> quoted_content (Text.append_char (UChar.of_char '\'') current)
     | "\r\n" | '\n' | '\r' ->  s_cursor.str_line <- (s_cursor.str_line + 1) ; s_cursor.str_bol <- Sedlexing.lexeme_end buf ; quoted_content (Text.append_char (UChar.of_char '\n') current)  
-    | '\'' -> s_cursor.str_end <- Sedlexing.lexeme_end buf ; QIDENT ( Text.to_string (Text.append_char (UChar.of_char '\'') current) )
+    | '\'' -> s_cursor.str_end <- Sedlexing.lexeme_end buf ; IDENT ( Text.to_string (Text.append_char (UChar.of_char '\'') current) )
     | eof -> EOF
     | any -> quoted_content (Text.append_char (UChar.of_int (Sedlexing.lexeme_char buf 0)) current)
     | _ -> failwith "no match on 'any'. This cannot happen"                                                                 
