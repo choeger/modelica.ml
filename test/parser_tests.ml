@@ -367,6 +367,11 @@ let test_cases = [
                                                                                        Short { empty_typedef with td_name = "T" ;
                                                                                                                   type_exp = TIde "S" ;
                                                                                                                   sort = Package ;
+                                                                                                                  type_options = {
+                                                                                                                    no_type_options with
+                                                                                                                    type_replaceable =
+                                                                                                                      true
+                                                                                                                  }
                                                                                              })] ;
                                                                     } ;
                                                          sort = Model ;
