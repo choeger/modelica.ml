@@ -36,7 +36,7 @@ open Modelica_lexer
 open Pprint_modelica
 
 let parse_test parser input f = 
-  let ucs = state_from_utf8_string input in
+  let ucs = state_from_utf8_string "test input" input in
   let next () = next_token ucs in
   let last () = last_token ucs in
   fun () ->

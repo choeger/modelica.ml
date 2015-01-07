@@ -138,9 +138,9 @@ let white_space = [%sedlex.regexp?
                    0x2000 .. 0x200a | 0x2028 .. 0x2029 | 0x202f.. 0x202f | 0x205f.. 0x205f |
                    0x3000.. 0x3000]
 
-let state_from_utf8_string input = {
+let state_from_utf8_string src input = {
   buf = Utf8.from_string input ;
-  src = "test input" ; 
+  src;
   m_cursor = { m_line = 0; m_bol = 0 ; m_last = None } ; 
   s_cursor = { str_start = 0 ; str_end = 0; str_bol = 0 ; str_line = 0 } }
                                                   
