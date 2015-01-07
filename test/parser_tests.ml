@@ -184,6 +184,11 @@ let test_cases = [
   (* statements *)
   stmt "return;" (uncommented Return) ;
   stmt "break;" (uncommented Break) ;
+  stmt "print(\"... testAllFunctions(..) is logged in \" + file);"
+       (uncommented (Call {procedure=Ide"print" ; pargs = [
+                             Plus { left=String "... testAllFunctions(..) is logged in "; right = Ide "file" }
+                           ]; pnamed_args = StrMap.empty }));
+  
   stmt "if true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
   stmt "if true then break; elseif true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
   stmt "when true then break; elsewhen true then break; end when;" (uncommented (WhenStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
@@ -545,7 +550,20 @@ let test_cases = [
                                                                                             })
                                                                             }]}
                                                 }
-                              }));                                                                 
+                              }));
+
+  typedef "function f algorithm print(\"hello, world!\"); end f"
+          (uncommented
+             (Composition { empty_typedef with td_name = "f" ;
+                                               type_exp = { empty_composition with
+                                                            cargo = { empty_behavior with
+                                                                      algorithms = [[uncommented (
+                                                                                       Call {procedure=Ide "print" ;
+                                                                                            pargs = [String "hello, world!"] ;
+                                                                                            pnamed_args = StrMap.empty } ) ]];
+                                                                    } ;
+                                                          } ;
+                                               sort = Function } ));
   
   (let line = {
      no_modification

@@ -397,10 +397,10 @@ array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
 
 decl_condition : IF cond=expr { cond }
 
-decl_modification : m=class_modification { (Some(m), None) }
-                  | EQ e=expr { (None, Some(e)) }
-                  | COLONEQ e=expr { (None, Some(e)) }
-                  | { (None, None) }
+%inline
+binder : EQ {} | COLONEQ {}
+
+decl_modification : m=option(class_modification) e=option(preceded(binder, expr)) { (m, e) }
                       
 declaration : x = IDENT dims = option(array_subscripts) m=decl_modification cond=option(decl_condition) comment=comment 
               { let (modification, rhs) = m in (x, dims, modification, cond, rhs, comment) } 
@@ -463,7 +463,7 @@ initial_equation_section : equation=equation rest=initial_equation_section
                              { {rest with cargo = { rest.cargo with initial_equations = equation::rest.cargo.initial_equations } } }
                          | rest = end_of_section { rest }
 
-algorithm : stmts=nonempty_list(terminated(statement,SEMICOLON)) { stmts }
+algorithm : stmts=nonempty_list(statement) { stmts }
 
 algorithm_section : alg=algorithm rest=end_of_section
                       { {rest with cargo = { rest.cargo with algorithms = alg::rest.cargo.algorithms } } }
