@@ -94,7 +94,7 @@ and variability = Constant | Parameter | Discrete
 
 and causality = Input | Output
 
-and named_import = { from : name ; selected : string }
+and named_import = { global : name ; local : string }
 
 and import = import_desc commented
                      

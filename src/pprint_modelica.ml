@@ -315,7 +315,7 @@ and pp_texpr fmt = function
                                            
 and pp_import_desc fmt = function
     Unnamed name -> fprintf fmt "@[import@ %a@]" (pp_list ~sep:"." pp_print_string) name 
-  | NamedImport {from; selected} -> fprintf fmt "@[import@ %a@ =@ %s@]" (pp_list ~sep:"." pp_print_string) from selected
+  | NamedImport {global; local} -> fprintf fmt "@[import@ %s@ =@ %a@]" local (pp_list ~sep:"." pp_print_string) global
   | UnqualifiedImport name -> fprintf fmt "@[import@ %a.*@]" (pp_list ~sep:"." pp_print_string) name 
     
 and pp_import fmt {commented;comment} =

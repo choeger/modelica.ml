@@ -233,7 +233,7 @@ let test_cases = [
   
 
   import "import X" (uncommented (Unnamed ["X"])) ;
-  import "import Y=X" (uncommented (NamedImport {from = ["Y"] ; selected = "X" }));
+  import "import Y=X" (uncommented (NamedImport {global = ["X"] ; local = "Y" }));
   
   import "import X.*" (uncommented (UnqualifiedImport ["X"]));
 

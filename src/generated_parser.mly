@@ -342,7 +342,8 @@ mod_component_clause : scope=scope def_type = type_expression component=declarat
                        { declaration_to_def def_type {no_def_options with scope} def_constraint component }
 
 import : IMPORT name=separated_nonempty_list(DOT, IDENT) comment = comment { { commented = Unnamed name ; comment } }
-       | IMPORT from=separated_nonempty_list(DOT, IDENT) EQ selected=IDENT comment = comment { { commented = NamedImport {from;selected} ; comment } } 
+       | IMPORT local=IDENT EQ global=separated_nonempty_list(DOT, IDENT) comment = comment 
+         { { commented = NamedImport {global;local} ; comment } } 
        | IMPORT name=separated_nonempty_list(DOT, IDENT) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
 
 reset_visibility : {visibility := Public}
