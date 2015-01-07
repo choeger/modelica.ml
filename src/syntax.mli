@@ -130,7 +130,10 @@ and statement_desc = Assignment of assignment
                    | ForStmt of for_statement
                    | WhileStmt of while_statement
 
-and assignment = { target : exp ; source : exp }
+and assignment = { target : pattern ; source : exp }
+                   
+and pattern = PRefExpr of exp                   
+            | PTuple of pattern option list
 
 and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : exp StrMap.t}
                    
@@ -221,8 +224,7 @@ and exp = Pow of binary_exp
         | Array of exp list
         | MArray of (exp list) list
         | ExplicitClosure of exp
-        | End | Colon | Empty | Der | Initial | Assert
-        | Tuple of exp list
+        | End | Colon | Der | Initial | Assert
                        
 and idx = { variable : string ; range : exp option }
 

@@ -159,11 +159,6 @@ let test_cases = [
   expr "1 < 2 or 2 < 3" (Or {left= (Lt { left = Int 1 ; right = Int 2 }) ; right=Lt { left = Int 2 ; right = Int 3 } }) ;
   expr "1 < 2 and x or y" (Or {left=And {left= (Lt { left = Int 1 ; right = Int 2 }) ; right=Ide "x" }; right=Ide "y"}) ;
 
-  (* tuples and stuff *)
-  expr "(1)" (Int 1) ;
-  expr "()" (Empty) ;
-  expr "(,)" (Tuple [Empty; Empty]);
-
   (* arrays *)
   expr "x[1]" (ArrayAccess { lhs = Ide "x" ; indices = [Int 1] }) ;
   expr "x[1].y" (Proj { object_ = ArrayAccess { lhs = Ide "x" ; indices = [Int 1] } ; field = "y" });
@@ -194,7 +189,8 @@ let test_cases = [
   stmt "if true then break; elseif true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
   stmt "when true then break; elsewhen true then break; end when;" (uncommented (WhenStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
   stmt "f(1, x=3);" (uncommented (Call { procedure=Ide "f"; pargs = [Int 1]; pnamed_args = StrMap.add "x" (Int 3) StrMap.empty } ) );
-  stmt "x := 23;" (uncommented (Assignment { target=Ide "x" ; source = Int 23 } ));
+  stmt "x := 23;" (uncommented (Assignment { target=PRefExpr (Ide "x") ; source = Int 23 } ));
+  stmt "(x,,y) := 23;" (uncommented (Assignment { target=PTuple([Some (PRefExpr (Ide "x"));None;Some (PRefExpr (Ide "y"))]) ; source = Int 23 } ));  
   stmt "while true loop break; break; end while;" (uncommented (WhileStmt { while_ = Bool true ; do_ = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = "x"; range=Some (Ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );

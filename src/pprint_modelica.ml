@@ -114,8 +114,6 @@ let rec pp_expr fmt = function
   | MArray els -> fprintf fmt "@[[%a]@]" (pp_list ~sep:"; " (pp_list ~sep:", " pp_expr)) els
   | ArrayAccess { lhs ; indices } -> fprintf fmt "@[%a[%a]@]" pp_expr lhs (pp_list ~sep:", " pp_expr) indices 
   | ExplicitClosure e -> fprintf fmt "@[function %a@]" pp_expr e
-  | Tuple es -> fprintf fmt "@[(%a)@]" (pp_list ~sep:", " pp_expr) es
-  | Empty -> fprintf fmt "@[()@]"
                      
 and pp_named_arg fmt (name,expr) =
   fprintf fmt "@[%s = %a@]" name pp_expr expr
@@ -251,9 +249,13 @@ and pp_comment_string fmt = function
 and pp_comment fmt { annotated_elem ; annotation } = 
   pp_comment_string fmt annotated_elem ;
   pp_annotation fmt annotation 
-                    
+
+and pp_pattern fmt = function
+  | PTuple ps -> fprintf fmt "(@[%a@])" (pp_list ~sep:", " (pp_option pp_pattern)) ps
+  | PRefExpr e -> pp_expr fmt e
+                         
 and pp_statement_desc fmt = function
-    Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
+    Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_pattern target pp_expr source 
   | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
                                                       
   | IfStmt c -> pp_conditional "if" pp_statements fmt c 

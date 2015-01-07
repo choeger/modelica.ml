@@ -123,8 +123,6 @@ modelica_import : import = import EOF { import }
 
 modelica_extends : extends = extends EOF { extends }
                                      
-optional_expr : e = expr { e }
-              | { Empty}                                                  
 
 expr : e = simple_expr { e }
      | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
@@ -147,10 +145,8 @@ simple_expr:
         { RootIde x}
   | x = IDENT
         { Ide(x) }
-  | LPAREN e = optional_expr RPAREN
+  | LPAREN e = expr RPAREN
         { e }
-  | LPAREN hd=optional_expr COMMA tl=separated_nonempty_list(COMMA, optional_expr) RPAREN
-        { Tuple (hd::tl) }
   | LBRACE es=array_args RBRACE
         { Array es }
   | lhs = simple_expr LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
@@ -256,12 +252,17 @@ component_reference : x = IDENT { Ide x }
                     | object_=component_reference DOT field=IDENT { Proj { object_ ; field } }
                     | lhs = component_reference LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
                                                                                         { ArrayAccess { lhs; indices } }
-lexpr : e=component_reference { e }
-      | LPAREN es=separated_list(COMMA, expr) RPAREN { Tuple es }
+lexpr : r = component_reference { PRefExpr r }
+      | LPAREN ps=patterns RPAREN { PTuple ps }
                       
+patterns : p=lexpr ps=list(preceded(COMMA, option(lexpr))) { (Some p)::ps }
+         | { [] }
+
+
 statement_body : procedure=component_reference LPAREN arguments = function_args RPAREN
                  { let (pargs, pnamed_args) = arguments in Call { procedure ; pargs; pnamed_args } }                                                                 
                | BREAK { Break }
+
                | RETURN { Return }
                | IF condition=expr THEN then_ = list(statement) else_if = list(elseif_statement) else_ = else_statements ENDIF
                     { IfStmt { condition; then_ ; else_if; else_ } }
@@ -432,7 +433,7 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                   { { commented = Composition { td_name ; sort ; type_options ; type_exp ; cns} ;  comment = {annotated_elem;annotation}}}
 
                 | type_options = typedef_prefix sort = type_sort EXTENDS td_name=IDENT modification=option(class_modification) 
-                  annotated_elem=option(STRING) composition=composition annotation=option(annotation) end_name=END_IDENT
+                  annotated_elem=option(STRING) composition=composition annotation=option(composition_annotation) end_name=END_IDENT
                   cns = option(constraining_clause) 
                   { { commented = Extension { td_name ; sort ; type_options ; type_exp=(composition,modification) ; cns} ;  
                       comment = {annotated_elem;annotation}}}
