@@ -129,12 +129,10 @@ and statement_desc = Assignment of assignment
                    | Return
                    | ForStmt of for_statement
                    | WhileStmt of while_statement
-
-and assignment = { target : pattern ; source : exp }
+                                    
+                                    
+and assignment = { target : exp ; source : exp }
                    
-and pattern = PRefExpr of exp                   
-            | PTuple of pattern option list
-
 and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : exp StrMap.t}
                    
 and 'a else_condition = { guard : exp ; elsethen : 'a }
@@ -155,14 +153,12 @@ and equations = equation list
 
 and equation = equation_desc commented 
 
-and equation_desc = SimpleEquation of simple_equation
+and equation_desc = SimpleEquation of binary_exp
                   | ForEquation of for_equation
                   | IfEquation of if_equation
                   | WhenEquation of when_equation
                   | ExpEquation of exp
 
-and simple_equation = { eq_lhs : exp ; eq_rhs : exp }
-                        
 and for_equation = equations for_loop_struct
 
 and if_equation = equations condition_struct
@@ -225,7 +221,8 @@ and exp = Pow of binary_exp
         | MArray of (exp list) list
         | ExplicitClosure of exp
         | End | Colon | Der | Initial | Assert
-                       
+        | OutputExpression of exp option list
+                                          
 and idx = { variable : string ; range : exp option }
 
 and tprojection = { class_type : texp ; type_element : string }

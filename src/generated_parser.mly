@@ -147,6 +147,10 @@ simple_expr:
         { Ide(x) }
   | LPAREN e = expr RPAREN
         { e }
+  | LPAREN RPAREN { OutputExpression [None] } 
+  | LPAREN e=expr COMMA ps=patterns RPAREN { OutputExpression ((Some e)::ps) }
+  | LPAREN COMMA ps=patterns RPAREN { OutputExpression (None::ps) }
+
   | LBRACE es=array_args RBRACE
         { Array es }
   | lhs = simple_expr LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
@@ -213,6 +217,7 @@ simple_expr:
   | DOTMINUS e = simple_expr { UDMinus e } %prec UMinus
   | DOTPLUS e = simple_expr { UDPlus e } %prec UMinus
   | NOT e = simple_expr { Not e } %prec Not
+  
 
 else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
 
@@ -252,12 +257,10 @@ component_reference : x = IDENT { Ide x }
                     | object_=component_reference DOT field=IDENT { Proj { object_ ; field } }
                     | lhs = component_reference LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
                                                                                         { ArrayAccess { lhs; indices } }
-lexpr : r = component_reference { PRefExpr r }
-      | LPAREN ps=patterns RPAREN { PTuple ps }
+lexpr : r = component_reference { r }
+      | LPAREN ps=patterns RPAREN { OutputExpression ps }
                       
-patterns : p=lexpr ps=list(preceded(COMMA, option(lexpr))) { (Some p)::ps }
-         | { [] }
-
+patterns : p=option(lexpr) ps=list(preceded(COMMA, option(lexpr))) { p::ps }
 
 statement_body : procedure=component_reference LPAREN arguments = function_args RPAREN
                  { let (pargs, pnamed_args) = arguments in Call { procedure ; pargs; pnamed_args } }                                                                 
@@ -283,7 +286,7 @@ elseif_equation : ELSEIF guard = expr THEN elsethen=list(equation) { { guard ; e
 elsewhen_equation : ELSEWHEN guard = expr THEN elsethen=list(equation) { { guard ; elsethen } }
 
 equation_body : e = simple_expr { ExpEquation e }
-              | eq_lhs = simple_expr EQ eq_rhs = expr { SimpleEquation { eq_lhs ; eq_rhs } }                                              
+              | left = simple_expr EQ right = expr { SimpleEquation { left ; right } }                                              
               | IF condition=expr THEN then_ = list(equation) else_if = list(elseif_equation) else_ = else_equations ENDIF
                    { IfEquation { condition; then_ ; else_if; else_ } } 
               | WHEN condition=expr THEN then_ = list(equation) else_if = list(elsewhen_equation) ENDWHEN

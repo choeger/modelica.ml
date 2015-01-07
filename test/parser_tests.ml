@@ -189,17 +189,19 @@ let test_cases = [
   stmt "if true then break; elseif true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
   stmt "when true then break; elsewhen true then break; end when;" (uncommented (WhenStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
   stmt "f(1, x=3);" (uncommented (Call { procedure=Ide "f"; pargs = [Int 1]; pnamed_args = StrMap.add "x" (Int 3) StrMap.empty } ) );
-  stmt "x := 23;" (uncommented (Assignment { target=PRefExpr (Ide "x") ; source = Int 23 } ));
-  stmt "(x,,y) := 23;" (uncommented (Assignment { target=PTuple([Some (PRefExpr (Ide "x"));None;Some (PRefExpr (Ide "y"))]) ; source = Int 23 } ));  
+  stmt "x := 23;" (uncommented (Assignment { target=Ide "x" ; source = Int 23 } ));
+  stmt "(,) := 23;" (uncommented (Assignment { target=OutputExpression [None; None] ; source = Int 23 } ));
+  stmt "() := 23;" (uncommented (Assignment { target=OutputExpression [None] ; source = Int 23 } ));  
+  stmt "(x,,y) := 23;" (uncommented (Assignment { target=OutputExpression([Some (Ide "x");None;Some (Ide "y")]) ; source = Int 23 } ));  
   stmt "while true loop break; break; end while;" (uncommented (WhileStmt { while_ = Bool true ; do_ = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = "x"; range=Some (Ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
 
   (* equations *)
-  eq "x = 0;" (uncommented (SimpleEquation { eq_lhs = Ide "x"; eq_rhs = Int 0 })) ;
+  eq "x = 0;" (uncommented (SimpleEquation { left = Ide "x"; right = Int 0 })) ;
 
-  eq "if true then x.y = 0; end if;" (uncommented (IfEquation { condition= Bool true; then_ = [uncommented (SimpleEquation { eq_lhs = Proj { object_ = Ide "x"; field= "y" } ;
-                                                                                                                            eq_rhs = Int 0 } )] ;
+  eq "if true then x.y = 0; end if;" (uncommented (IfEquation { condition= Bool true; then_ = [uncommented (SimpleEquation { left = Proj { object_ = Ide "x"; field= "y" } ;
+                                                                                                                            right = Int 0 } )] ;
                                                                 else_if = []; else_ = [];
                                                               })) ;
 
@@ -207,13 +209,13 @@ let test_cases = [
                                                                       condition=App { fun_=Ide "c" ;
                                                                                       args=[ArrayAccess {lhs = Ide "a" ; indices = [Ide "i"]}];
                                                                                       named_args=StrMap.empty };
-                                                                      then_ = [uncommented (SimpleEquation { eq_lhs = Proj { object_ = Proj { object_ =
+                                                                      then_ = [uncommented (SimpleEquation { left = Proj { object_ = Proj { object_ =
                                                                                                                                                 ArrayAccess { lhs= Ide "a";
                                                                                                                                                               indices=[Ide"i"] }; 
                                                                                                                                               field="p" } ;
                                                                                                                field = "r"
                                                                                                              } ;
-                                                                                               eq_rhs = Array [Int 0; Int 0; Int 0];
+                                                                                               right = Array [Int 0; Int 0; Int 0];
                                                                                              })] ;
                                                                       else_if = []; else_ = [];
                                                                    })) ;
@@ -222,11 +224,17 @@ let test_cases = [
                                                                                    body=[uncommented (
                                                                                              IfEquation {
                                                                                                  condition= Bool true;
-                                                                                                 then_ = [uncommented (SimpleEquation { eq_lhs = Ide "x" ;
-                                                                                                                                       eq_rhs = Int 0 })];
+                                                                                                 then_ = [uncommented (SimpleEquation { left = Ide "x" ;
+                                                                                                                                       right = Int 0 })];
                                                                                                                       else_if = []; else_ = []
                                                                                                                       
                                                                                                })] }));
+  eq "x = 23;" (uncommented (SimpleEquation { left=Ide "x" ; right = Int 23 } ));
+  eq "(,) = 23;" (uncommented (SimpleEquation { left=OutputExpression [None; None] ; right = Int 23 } ));
+  eq "() = 23;" (uncommented (SimpleEquation { left=OutputExpression [None] ; right = Int 23 } ));  
+  eq "(x,,y) = 23;" (uncommented (SimpleEquation { left=OutputExpression([Some (Ide "x");None;Some (Ide "y")]) ; right = Int 23 } ));  
+
+
   texpr "Modelica" (TIde "Modelica");
   texpr "Modelica.Icons" (TProj {class_type=TIde "Modelica"; type_element="Icons"});
   texpr ".x" (TRootide "x");
@@ -400,8 +408,8 @@ let test_cases = [
                                                                       cargo = { empty_behavior with
                                                                                 equations = [ uncommented (
                                                                                                   SimpleEquation {
-                                                                                                      eq_lhs=Int 1;
-                                                                                                      eq_rhs=Int 1}
+                                                                                                      left=Int 1;
+                                                                                                      right=Int 1}
                                                                                                 )]
                                                                               } ;
                                                                     } ;
