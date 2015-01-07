@@ -148,6 +148,16 @@ let test_cases = [
   expr "-2 * 3" (UMinus (Mul { left = Int 2 ; right = Int 3 }) ) ;
   expr "-2 - 3" (Minus { left = UMinus (Int 2) ; right = Int 3 }) ;
 
+  expr "-2 * 3 < 2*3" (Lt {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
+  expr "-2 * 3 > 2*3" (Gt {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
+  expr "-2 * 3 <= 2*3" (Leq {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
+  expr "-2 * 3 >= 2*3" (Geq {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
+  expr "-2 * 3 <> 2*3" (Neq {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
+  expr "-2 * 3 == 2*3" (Eq {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
+
+  expr "1 < 2 and 2 < 3" (And {left= (Lt { left = Int 1 ; right = Int 2 }) ; right=Lt { left = Int 2 ; right = Int 3 } }) ;
+  expr "1 < 2 or 2 < 3" (Or {left= (Lt { left = Int 1 ; right = Int 2 }) ; right=Lt { left = Int 2 ; right = Int 3 } }) ;
+  expr "1 < 2 and x or y" (Or {left=And {left= (Lt { left = Int 1 ; right = Int 2 }) ; right=Ide "x" }; right=Ide "y"}) ;
 
   (* tuples and stuff *)
   expr "(1)" (Int 1) ;
@@ -241,7 +251,7 @@ let test_cases = [
 
   (let extend_statement = { ext_type = TProj { class_type=
                                                  TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage" } ;
-                            ext_visibility = Public ; ext_annotation = None }
+                            ext_annotation = None }
    in
    extend "extends Modelica.Icons.InterfacesPackage" extend_statement );
 
@@ -249,10 +259,6 @@ let test_cases = [
   defs "Real p, q" [uncommented {empty_def with def_name = "p" ; def_type = TIde "Real" ;} ;
                     uncommented {empty_def with def_name = "q" ; def_type = TIde "Real" ;}
                    ] ;  
-  defs "parameter Real p" [uncommented {empty_def with def_name = "p" ; def_type = TVar { flag = Parameter ; flagged = TIde "Real" } ;}] ;
-  defs "public parameter Real p" [uncommented {empty_def with def_name = "p" ; def_type = TVar { flag = Parameter ; flagged = TIde "Real" } ;}] ;
-  defs "protected parameter Real p" [uncommented {empty_def with def_name = "p" ; def_type = TVar { flag = Parameter ; flagged = TIde "Real" } ;
-                                                                 def_options = { no_def_options with visibility = Protected } ;}] ;
 
   
   defs "parameter FluidHeatFlow.Media.Medium medium" [uncommented { empty_def with def_name = "medium" ;
@@ -296,13 +302,18 @@ let test_cases = [
 
   (let def = uncommented { empty_def with def_name = "x" ; def_type = TIde "S" } in
    typedef "class T S x; end T" (uncommented (Composition { empty_typedef with td_name = "T" ;
-                                                                               type_exp = {empty_composition with defs = [def] };
+                                                                               type_exp = {empty_composition with public = {
+                                                                                            empty_elements with
+                                                                                            defs = [def] } };
                                                                                sort = Class ;
                                                           } )));
 
   (let def = uncommented { empty_def with def_name = "x" ; def_type = TIde "S" } in
                typedef "class T \"comment\" S x; end T" { commented = Composition { empty_typedef with td_name = "T" ;
-                                                                                           type_exp = {empty_composition with defs = [def] };
+                                                                                                       type_exp = {
+                                                                                                         empty_composition with
+                                                                                                         public = { empty_elements with
+                                                                                                                    defs = [def] }};
                                                                                            sort = Class ;
                                                                       } ;
                                               comment = unannotated ( Some "comment" ) ;
@@ -352,10 +363,13 @@ let test_cases = [
   typedef "model X redeclare type T = S; end X"
           (uncommented (Composition { empty_typedef with td_name = "X" ;
                                                          type_exp = { empty_composition with
-                                                                      redeclared_types = [ uncommented (
-                                                                      Short { empty_typedef with td_name = "T" ;
-                                                                                                 type_exp = TIde "S"
-                                                                            })] ;
+                                                                      public = { empty_elements with
+                                                                                 redeclared_types = [
+                                                                                 uncommented (
+                                                                                     Short { empty_typedef with td_name = "T" ;
+                                                                                                                type_exp = TIde "S"
+                                                                                           }
+                                                                                   )] } 
                                                                     } ;
                                                          sort = Model ;
                                     } ));
@@ -363,6 +377,7 @@ let test_cases = [
   typedef "model X replaceable package T = S; end X"
           (uncommented (Composition { empty_typedef with td_name = "X" ;
                                                          type_exp = { empty_composition with
+                                                                      public = { empty_elements with
                                                                       typedefs = [ uncommented (
                                                                                        Short { empty_typedef with td_name = "T" ;
                                                                                                                   type_exp = TIde "S" ;
@@ -372,7 +387,7 @@ let test_cases = [
                                                                                                                     type_replaceable =
                                                                                                                       true
                                                                                                                   }
-                                                                                             })] ;
+                                                                                             })]} ;
                                                                     } ;
                                                          sort = Model ;
                                     } ));
@@ -419,9 +434,11 @@ let test_cases = [
           (uncommented (Extension {empty_typedef with td_name = "X" ;
                                                       sort = Class ;
                                                       type_exp = ({ empty_composition with
-                                                                    defs = [uncommented
-                                                                              {empty_def with def_name = "p" ;
-                                                                                              def_type = TIde "Real" ;}] ;
+                                                                    public = { empty_elements with 
+                                                                               defs = [uncommented
+                                                                                         {empty_def with def_name = "p" ;
+                                                                                                         def_type = TIde "Real" ;}] ;
+                                                                             }
                                                                   }, None);
                                   }));
                                   

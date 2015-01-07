@@ -49,7 +49,9 @@
 
 %left COMMA 
 %left SEMICOLON 
-%left GT LT NEQ GEQ LEQ EQ 
+%right Not
+%left AND OR
+%left GT LT NEQ GEQ LEQ EQEQ 
 %left PLUS MINUS DOTPLUS DOTMINUS     /* medium precedence */
 %right UMinus
 %left TIMES DIV DOTTIMES DOTDIV
@@ -63,8 +65,6 @@
     open Syntax
     open Syntax_fragments
     open Utils
-
-    let visibility = ref Public
 
     (* merge the two sources of a modelica-style component definition (i.e. the declaration and the component_clause *)
     let declaration_to_def def_type def_options def_constraint = function
@@ -99,7 +99,7 @@
 
 modelica_stored_definition : within = option(within_clause) toplevel_defs = list(type_definition_clause) EOF { { within; toplevel_defs } }
 
-modelica_definitions : reset_visibility defs = component_clauses EOF { defs }
+modelica_definitions : defs = component_clauses EOF { defs }
 
 modelica_expr: e = expr EOF { e }
 
@@ -181,6 +181,24 @@ simple_expr:
   | left = expr DOTPOWER right = expr
        { DPow ( {left ; right} ) } 
 
+  | left = expr LT right = expr
+       { Lt ( {left ; right} ) } 
+  | left = expr GT right = expr
+       { Gt ( {left ; right} ) } 
+  | left = expr GEQ right = expr
+       { Geq ( {left ; right} ) } 
+  | left = expr LEQ right = expr
+       { Leq ( {left ; right} ) } 
+  | left = expr NEQ right = expr
+       { Neq ( {left ; right} ) } 
+  | left = expr EQEQ right = expr
+       { Eq ( {left ; right} ) } 
+
+  | left = expr AND right = expr
+       { And ( {left ; right} ) }
+  | left = expr OR right = expr
+       { Or ( {left ; right} ) }
+
   | object_ = expr DOT field = IDENT
        { Proj { object_ ; field } }
   | object_ = expr DOT field = QIDENT
@@ -190,7 +208,8 @@ simple_expr:
   | PLUS e = expr { UPlus e } %prec UMinus
   | DOTMINUS e = expr { UDMinus e } %prec UMinus
   | DOTPLUS e = expr { UDPlus e } %prec UMinus
-    
+  | NOT e = expr { Not e } %prec Not
+
 else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
 
 index_range : IN e = expr { e }
@@ -346,14 +365,8 @@ import : IMPORT name=separated_nonempty_list(DOT, IDENT) comment = comment { { c
        | IMPORT local=IDENT EQ global=separated_nonempty_list(DOT, IDENT) comment = comment 
          { { commented = NamedImport {global;local} ; comment } } 
        | IMPORT name=separated_nonempty_list(DOT, IDENT) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
-
-reset_visibility : {visibility := Public}
                                                                                     
-visibility : PROTECTED { visibility := Protected ; Protected }
-       | PUBLIC { visibility := Public ; Public }
-       | { !visibility }
-                                                                                    
-extends : ext_visibility=visibility EXTENDS ext_type = type_expression ext_annotation=option(annotation) { { ext_type ; ext_visibility ; ext_annotation } } 
+extends : EXTENDS ext_type = type_expression ext_annotation=option(annotation) { { ext_type ; ext_annotation } } 
 
 flag (F) : F { true } | { false }
 
@@ -362,8 +375,8 @@ scope : INNER { Inner }
       | INNER OUTER { InnerOuter }
       | { Local }
           
-type_prefix : visibility = visibility final = flag(FINAL) replaceable = flag(REPLACEABLE) scope = scope                                                                  
-                { { final ; scope ; visibility ; replaceable } }
+type_prefix : final = flag(FINAL) replaceable = flag(REPLACEABLE) scope=scope                  
+                { { final ; scope ; replaceable } }
 
 array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
 
@@ -392,9 +405,9 @@ type_sort : CLASS { Class }
            | RECORD { Record } | FUNCTION { Function } | TYPE { Type } | OPERATOR { Operator } | OPERATOR RECORD { OperatorRecord } 
            | OPERATOR FUNCTION { OperatorFunction }
                      
-typedef_prefix : type_visibility = visibility type_final = flag (FINAL) type_replaceable = flag(REPLACEABLE)
+typedef_prefix : type_final = flag (FINAL) type_replaceable = flag(REPLACEABLE)
                  encapsulated = flag(ENCAPSULATED) partial=flag(PARTIAL)                
-                 { { type_visibility ; type_final ; type_replaceable ; encapsulated ; partial } }
+                 { { type_final ; type_replaceable ; encapsulated ; partial } }
                      
 
 enum_literal : commented=IDENT comment=comment { { commented ; comment } }
@@ -425,31 +438,83 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                   COMMA idents=separated_nonempty_list(COMMA, IDENT) RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = DerSpec { td_name ; sort ; type_options ; type_exp = {der_name;idents} ; cns} ;  comment } }
 
-composition : import = import SEMICOLON rest = composition { {rest with imports = import::rest.imports} }
-            | extend = extends SEMICOLON rest = composition { {rest with extensions = extend::rest.extensions } }
-            | defs = component_clause SEMICOLON rest = composition { {rest with defs = defs @ rest.defs } }
-            | REDECLARE defs = component_clause SEMICOLON rest = composition
-                { {rest with redeclared_defs = defs @ rest.redeclared_defs } }
-            | typedef = type_definition SEMICOLON rest = composition { {rest with typedefs=typedef::rest.typedefs} }
-            | REDECLARE typedef = type_definition SEMICOLON rest = composition { {rest with redeclared_types=typedef::rest.redeclared_types} }
-            | EQUATION eqs = list(equation) rest = composition
-                { {rest with cargo = { rest.cargo with equations = eqs @ rest.cargo.equations } } }
-            | INITIAL_EQUATION eqs = list(equation) rest = composition
-                { {rest with cargo = { rest.cargo with initial_equations = eqs @ rest.cargo.initial_equations } } }
-            
-            | EXTERNAL lang=STRING lhs=external_lhs ext_ident=IDENT LPAREN ext_args = separated_list(COMMA, expr) RPAREN annotation=option(annotation) SEMICOLON
-              { {empty_composition with cargo = {empty_behavior with external_ = Some { annotated_elem = {lang ; 
-                                                                                                          ext_ident; 
-                                                                                                          ext_lhs = Some lhs; 
-                                                                                                          ext_args}; 
-                                                                                        annotation}}} }
-            | EXTERNAL lang=STRING ext_ident=IDENT LPAREN ext_args = separated_list(COMMA, expr) RPAREN annotation=option(annotation) SEMICOLON
-              { {empty_composition with cargo = {empty_behavior with external_ = Some { annotated_elem = {lang ; 
-                                                                                                          ext_ident; 
-                                                                                                          ext_lhs=None; 
-                                                                                                          ext_args}; 
-                                                                                        annotation}}} }
-            | { empty_composition }
+%inline end_of_section :   PUBLIC rest = public_composition_elements { rest }
+                         | PROTECTED rest = public_composition_elements { rest }
+                         | external_ = option ( composition_external ) 
+                             { { empty_composition with cargo = { empty_behavior with external_ } } }
+
+composition : c = public_composition_elements { c }
+
+equation_section : equation=equation rest=equation_section
+                     { {rest with cargo = { rest.cargo with equations = equation::rest.cargo.equations } } }
+                 | rest = end_of_section { rest }
+
+initial_equation_section : equation=equation rest=initial_equation_section
+                             { {rest with cargo = { rest.cargo with initial_equations = equation::rest.cargo.initial_equations } } }
+                         | rest = end_of_section { rest }
+
+algorithm : stmts=list(terminated(statement,SEMICOLON)) { stmts }
+
+algorithm_section : alg=algorithm rest=algorithm_section
+                      { {rest with cargo = { rest.cargo with algorithms = alg::rest.cargo.algorithms } } }
+                  | rest = end_of_section { rest }
+
+initial_algorithm_section : alg=algorithm rest=initial_algorithm_section
+                              { {rest with cargo = { rest.cargo with initial_algorithms = alg::rest.cargo.initial_algorithms } } }
+                         | rest = end_of_section { rest }
+
+cargo_sections : EQUATION rest = equation_section
+                { rest }
+            | INITIAL_EQUATION rest = initial_equation_section
+                { rest } 
+            | ALGORITHM rest = algorithm_section
+                { rest }
+            | INITIAL_ALGORITHM rest = initial_algorithm_section
+                { rest } 
+            | external_ = option ( composition_external ) { { empty_composition with cargo = { empty_behavior with external_ } } }
+
+public_composition_elements : 
+              import = import SEMICOLON rest = public_composition_elements 
+                { {rest with imports = import::rest.imports} } 
+            | extend = extends SEMICOLON rest = public_composition_elements 
+                { {rest with public = { rest.public with extensions = extend::rest.public.extensions } } }
+            | defs = component_clause SEMICOLON rest = public_composition_elements 
+                { {rest with public = { rest.public with defs = defs @ rest.public.defs } } }
+            | REDECLARE defs = component_clause SEMICOLON rest = public_composition_elements
+                { {rest with public = { rest.public with redeclared_defs = defs @ rest.public.redeclared_defs } } }
+            | typedef = type_definition SEMICOLON rest = public_composition_elements 
+                { {rest with public = { rest.public with typedefs=typedef::rest.public.typedefs} } }
+            | REDECLARE typedef = type_definition SEMICOLON rest = public_composition_elements 
+                { {rest with public = { rest.public with redeclared_types=typedef::rest.public.redeclared_types} } }
+            | rest = cargo_sections { rest }
+            | PROTECTED rest = protected_composition_elements { rest }
+            | PUBLIC rest = public_composition_elements { rest }
+
+protected_composition_elements : 
+              import = import SEMICOLON rest = protected_composition_elements 
+                { {rest with imports = import::rest.imports} } 
+            | extend = extends SEMICOLON rest = protected_composition_elements 
+                { {rest with protected = { rest.protected with extensions = extend::rest.protected.extensions } } }
+            | defs = component_clause SEMICOLON rest = protected_composition_elements 
+                { {rest with protected = { rest.protected with defs = defs @ rest.protected.defs } } }
+            | REDECLARE defs = component_clause SEMICOLON rest = protected_composition_elements
+                { {rest with protected = { rest.protected with redeclared_defs = defs @ rest.protected.redeclared_defs } } }
+            | typedef = type_definition SEMICOLON rest = protected_composition_elements 
+                { {rest with protected = { rest.protected with typedefs=typedef::rest.protected.typedefs} } }
+            | REDECLARE typedef = type_definition SEMICOLON rest = protected_composition_elements 
+                { {rest with protected = { rest.protected with redeclared_types=typedef::rest.protected.redeclared_types} } }
+            | rest = cargo_sections { rest }
+            | PROTECTED rest = protected_composition_elements { rest }
+            | PUBLIC rest = public_composition_elements { rest }
+
+composition_external :             
+            | EXTERNAL lang=STRING lhs=external_lhs ext_ident=IDENT 
+              LPAREN ext_args = separated_list(COMMA, expr) RPAREN annotation=option(annotation) SEMICOLON
+                { { annotated_elem = {lang ; ext_ident; ext_lhs=Some lhs; ext_args}; annotation} }
+            | EXTERNAL lang=STRING ext_ident=IDENT 
+              LPAREN ext_args = separated_list(COMMA, expr) RPAREN annotation=option(annotation) SEMICOLON
+                { { annotated_elem = {lang ; ext_ident; ext_lhs=None; ext_args}; annotation} }
+
 
 external_lhs : e=component_reference EQ { e }
 

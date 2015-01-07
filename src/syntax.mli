@@ -44,7 +44,7 @@ and comment = string option annotated
                      
 and unit_ = { within : name option; toplevel_defs : typedef list }
                     
-and typedef_options = { type_visibility : visibility ; type_replaceable : bool ;
+and typedef_options = { type_replaceable : bool ;
                         type_final : bool ; partial : bool ; encapsulated : bool }
                          
 and 'a typedef_struct = { td_name : string ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options }
@@ -70,14 +70,18 @@ and behavior = {algorithms : algorithm list ;
 
 and external_def_struct = { lang : string ; ext_lhs : exp option ; ext_ident : string ; ext_args : exp list }
 and external_def = external_def_struct annotated
-  
+
+and elements = {
+  typedefs : typedef list ;
+  redeclared_types : typedef list ;
+  extensions : extend list ;
+  defs : definition list ;
+  redeclared_defs : definition list ;
+}
                    
-and composition = { typedefs : typedef list ;
-                    redeclared_types : typedef list ;
-                    imports : import list ; 
-                    extensions : extend list ;
-                    defs : definition list ;
-                    redeclared_defs : definition list ;
+and composition = { imports : import list ;
+                    public : elements ;
+                    protected : elements;
                     cargo : behavior ;
                   }
 
@@ -102,13 +106,11 @@ and import_desc = NamedImport of named_import
                 | Unnamed of name
                 | UnqualifiedImport of name
 
-and visibility = Public | Protected
-
-and extend = { ext_type : texp ; ext_visibility : visibility ; ext_annotation : modification option }
+and extend = { ext_type : texp ; ext_annotation : modification option }
 
 and scope = Inner | Outer | InnerOuter | Local
 
-and definition_options = { final : bool ; scope : scope ; visibility : visibility ; replaceable : bool }
+and definition_options = { final : bool ; scope : scope ; replaceable : bool }
 
 and definition_structure = { def_name : string ; def_type : texp ; def_constraint : constraint_ option ;
                              def_rhs : exp option ; def_if : exp option ; def_options : definition_options }

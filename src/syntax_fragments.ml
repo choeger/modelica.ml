@@ -42,19 +42,22 @@ let uncommented a = { commented = a ; comment = no_comment }
                       
 let no_modification = { types = [] ; components = [] ; modifications = [] }
 
-let no_def_options = { final = false ; replaceable = false ; scope = Local ; visibility = Public }
+let no_def_options = { final = false ; replaceable = false ; scope = Local }
                         
 let empty_def  = { def_name ="" ; def_type = TIde ""; def_options = no_def_options ; def_constraint = None ; def_rhs = None ; def_if = None }
 
-let no_type_options = { type_visibility = Public ; partial = false ; encapsulated = false ;
+let no_type_options = { partial = false ; encapsulated = false ;
                         type_final = false ; type_replaceable = false ;}
 
 let empty_typedef = { td_name = "" ; type_exp = TIde "" ; type_options = no_type_options ; cns = None ; sort = Type}
 
 let empty_behavior = { algorithms = [] ; initial_algorithms = [] ; equations = [] ; initial_equations = [] ; external_ = None }
 
-let empty_composition = { defs = [] ; imports = [] ; extensions = [] ; redeclared_defs = [] ;
-                          typedefs = [] ; redeclared_types = [] ; cargo = empty_behavior  }
+let empty_elements = { defs = [] ; extensions = [] ; redeclared_defs = [] ;
+                       typedefs = [] ; redeclared_types = [] }
+                        
+                       
+let empty_composition = { imports = [] ; public = empty_elements ; protected = empty_elements ; cargo = empty_behavior  }
                         
 exception EmptyName
 

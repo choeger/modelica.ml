@@ -143,26 +143,18 @@ let pp_def_if fmt cond =
 let pp_def_rhs fmt rhs =
   fprintf fmt "@[@ =@ %a@]" pp_expr rhs
 
-let pp_visibility fmt = function
-  | Public -> pp_print_string fmt "public"
-  | Protected -> pp_print_string fmt "protected"
-
 let pp_scope fmt = function
   | Inner -> pp_print_string fmt "inner "
   | Outer -> pp_print_string fmt "inner "
   | InnerOuter ->  pp_print_string fmt "inner outer "
   | Local -> ()
 
-let pp_redeclared_def_options fmt { final ; scope ; visibility ; replaceable } =
+let pp_def_options fmt { final ; scope ; replaceable } =
   fprintf fmt "@[%s%s%a@]"
           (if final then "final " else "")
           (if replaceable then "replaceable " else "")
           pp_scope scope
-               
-let pp_def_options fmt o =
-  fprintf fmt "@[%a@ %a@]" pp_visibility o.visibility
-          pp_redeclared_def_options o
-          
+                         
 let def_sep fmt () =
   fprintf fmt ";@."
 
@@ -193,17 +185,13 @@ let pp_typedef_sort fmt = function
   | OperatorRecord -> fprintf fmt "operator record"
   | OperatorFunction  -> fprintf fmt "operator function"
 
-let pp_redeclared_typedef_options fmt { type_visibility ; type_replaceable ; type_final ; partial ; encapsulated } =
+let pp_typedef_options fmt { type_replaceable ; type_final ; partial ; encapsulated } =
     fprintf fmt "@[%s%s%s%s@]"
           (if type_final then "final " else "")
           (if type_replaceable then "replaceable " else "")
           (if encapsulated then "encapsulated " else "")
           (if partial then "partial " else "")
-                                 
-let pp_typedef_options fmt o =
-  fprintf fmt "@[%a %a@]" pp_visibility o.type_visibility
-          pp_redeclared_typedef_options o
-          
+                                           
 let pp_element pp fmt e = fprintf fmt "%a;" pp e
           
 let pp_elements_prefixed prefix pp fmt = function
@@ -220,22 +208,13 @@ let pp_typedef_struct pp pp_constraint fmt { td_name ; sort ; type_exp ; cns ; t
 let rec pp_type_redeclaration fmt { redecl_each ; redecl_type } =
   fprintf fmt "@[redeclare@ %s%a%a@]"
           (if redecl_each then "each " else "")
-          pp_redeclared_type_def redecl_type.commented
+          (pp_typedef_struct pp_short_rhs pp_constraint) redecl_type.commented
           pp_comment redecl_type.comment
-          
-and pp_redeclared_type_def fmt { td_name ; sort ; type_exp ; cns ; type_options } =
-  fprintf fmt "@[%a%a@ %s@ =@ %a@]" pp_redeclared_typedef_options type_options
-          pp_typedef_sort sort
-          td_name
-          pp_texpr type_exp
-          
+                    
 and pp_component_redeclaration fmt { each ; def } =
   fprintf fmt "@[redeclare@ %s%a@]"
           (if each then "each " else "")
-          pp_redeclared_definition def
-
-and pp_redeclared_definition fmt { commented ; comment } =
-  fprintf fmt "@[%a%a@]" (pp_def_desc ~pp_def_options:pp_redeclared_def_options) commented pp_comment comment
+          pp_definition def
           
 and pp_mod_value fmt = function
   | Nested modification -> fprintf fmt "@[(%a)@]" pp_modification modification
@@ -323,9 +302,8 @@ and pp_import fmt {commented;comment} =
   fprintf fmt "@[%a%a@]" pp_import_desc commented pp_comment comment
                             
 and pp_extend fmt = function
-  | { ext_type ; ext_visibility ; ext_annotation } ->
-     fprintf fmt "@[%s@ extends@ %a%a@]"
-             (match ext_visibility with Public -> "public" | Protected -> "protected")
+  | { ext_type ; ext_annotation } ->
+     fprintf fmt "@[extends@ %a%a@]"
              pp_texpr ext_type pp_annotation ext_annotation
 
 and pp_constraint fmt { commented ; comment } =
@@ -345,20 +323,23 @@ and pp_definition fmt { commented ; comment } =
 
 and pp_enum_literal fmt {commented ; comment} =
   fprintf fmt "@[%s%a@]" commented pp_comment comment                                           
-          
-and pp_composition fmt { typedefs ; redeclared_types ; imports ;
-                         extensions ; defs ;
-                         redeclared_defs ; cargo ; } =
 
+and pp_elements v fmt { typedefs ; redeclared_types ; extensions ; defs ; redeclared_defs ; } =
   let pp_redeclared pp fmt x = fprintf fmt "@[redeclare@ %a@]" pp x in
 
-  fprintf fmt "@[" ;
-  pp_print_list pp_import fmt imports ;
+  fprintf fmt "@[%s@.@[" v;
   pp_print_list pp_extend fmt extensions ;
   pp_print_list (pp_element pp_typedef) fmt typedefs ;
   pp_print_list (pp_element (pp_redeclared pp_typedef)) fmt redeclared_types ;
   pp_print_list (pp_element pp_definition) fmt defs ;
   pp_print_list (pp_element (pp_redeclared pp_definition)) fmt redeclared_defs ;
+  fprintf fmt "@]@]" ; 
+          
+and pp_composition fmt { imports ; public; protected; cargo ; } =
+  fprintf fmt "@[" ;
+  pp_print_list pp_import fmt imports ;
+  pp_elements "public" fmt public ;
+  pp_elements "protected" fmt protected ;  
   pp_behavior fmt cargo ;
   fprintf fmt "@]" ;  
 
