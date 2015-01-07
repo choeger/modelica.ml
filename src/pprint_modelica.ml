@@ -74,6 +74,7 @@ let rec pp_expr fmt = function
   | End -> fprintf fmt "@[end@]"
   | Colon -> fprintf fmt "@[:@]"
   | Initial -> fprintf fmt "@[initial@]"
+  | Assert -> fprintf fmt "@[assert@]"
 
   | Pow { left; right } -> fprintf fmt "@[(%a)^(%a)@]" pp_expr left pp_expr right                  
   | DPow { left; right } -> fprintf fmt "@[(%a).^(%a)@]" pp_expr left pp_expr right                  

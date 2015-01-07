@@ -153,6 +153,7 @@ simple_expr:
   | DER { Der }
   | INITIAL { Initial }
   | COLON { Colon }
+  | ASSERT { Assert }
 
   | fun_ = expr LPAREN arguments = function_args RPAREN
         { let (args, named_args) = arguments in App { fun_ ; args; named_args } }

@@ -121,7 +121,8 @@ let test_cases = [
   expr "der" Der ;
   expr "initial" Initial ;
   expr "end" End ;
-
+  expr "assert" Assert ;
+  
   expr "a.b.c"  (Proj { object_ = Proj { object_ = (Ide "a"); field = "b"} ; field = "c" } );
   expr "a.'b'.c"  (Proj { object_ = Proj { object_ = (Ide "a"); field = "'b'"} ; field = "c" } ) ;
   expr "a/* comment */.b.c"  (Proj { object_ = Proj { object_ = (Ide "a"); field = "b"} ; field = "c" }) ;

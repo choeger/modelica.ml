@@ -219,7 +219,7 @@ and exp = Pow of binary_exp
         | Array of exp list
         | MArray of (exp list) list
         | ExplicitClosure of exp
-        | End | Colon | Empty | Der | Initial
+        | End | Colon | Empty | Der | Initial | Assert
         | Tuple of exp list
                        
 and idx = { variable : string ; range : exp option }
