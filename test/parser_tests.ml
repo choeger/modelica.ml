@@ -360,6 +360,18 @@ let test_cases = [
                                                          sort = Model ;
                                     } ));
 
+  typedef "model X replaceable package T = S; end X"
+          (uncommented (Composition { empty_typedef with td_name = "X" ;
+                                                         type_exp = { empty_composition with
+                                                                      typedefs = [ uncommented (
+                                                                                       Short { empty_typedef with td_name = "T" ;
+                                                                                                                  type_exp = TIde "S" ;
+                                                                                                                  sort = Package ;
+                                                                                             })] ;
+                                                                    } ;
+                                                         sort = Model ;
+                                    } ));
+  
   typedef "model X equation 1 = 1; end X"
           (uncommented (Composition { empty_typedef with td_name = "X" ;
                                                          type_exp = { empty_composition with

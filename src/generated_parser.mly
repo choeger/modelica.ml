@@ -362,7 +362,7 @@ scope : INNER { Inner }
       | INNER OUTER { InnerOuter }
       | { Local }
           
-type_prefix : visibility = visibility replaceable = flag(REPLACEABLE) final = flag(FINAL) scope = scope                                                                  
+type_prefix : visibility = visibility final = flag(FINAL) replaceable = flag(REPLACEABLE) scope = scope                                                                  
                 { { final ; scope ; visibility ; replaceable } }
 
 array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
