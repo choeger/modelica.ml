@@ -438,11 +438,6 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                   COMMA idents=separated_nonempty_list(COMMA, IDENT) RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = DerSpec { td_name ; sort ; type_options ; type_exp = {der_name;idents} ; cns} ;  comment } }
 
-%inline end_of_section :   PUBLIC rest = public_composition_elements { rest }
-                         | PROTECTED rest = public_composition_elements { rest }
-                         | external_ = option ( composition_external ) 
-                             { { empty_composition with cargo = { empty_behavior with external_ } } }
-
 composition : c = public_composition_elements { c }
 
 equation_section : equation=equation rest=equation_section
@@ -453,15 +448,19 @@ initial_equation_section : equation=equation rest=initial_equation_section
                              { {rest with cargo = { rest.cargo with initial_equations = equation::rest.cargo.initial_equations } } }
                          | rest = end_of_section { rest }
 
-algorithm : stmts=list(terminated(statement,SEMICOLON)) { stmts }
+algorithm : stmts=nonempty_list(terminated(statement,SEMICOLON)) { stmts }
 
-algorithm_section : alg=algorithm rest=algorithm_section
+algorithm_section : alg=algorithm rest=end_of_section
                       { {rest with cargo = { rest.cargo with algorithms = alg::rest.cargo.algorithms } } }
                   | rest = end_of_section { rest }
 
-initial_algorithm_section : alg=algorithm rest=initial_algorithm_section
+initial_algorithm_section : alg=algorithm rest=end_of_section
                               { {rest with cargo = { rest.cargo with initial_algorithms = alg::rest.cargo.initial_algorithms } } }
-                         | rest = end_of_section { rest }
+                          | rest = end_of_section { rest }
+
+%inline end_of_section :   PUBLIC rest = public_composition_elements { rest }
+                         | PROTECTED rest = public_composition_elements { rest }
+                         | rest = cargo_sections { rest }
 
 cargo_sections : EQUATION rest = equation_section
                 { rest }
