@@ -184,6 +184,7 @@ let test_cases = [
   (* statements *)
   stmt "return;" (uncommented Return) ;
   stmt "break;" (uncommented Break) ;
+  stmt "assert();" (uncommented (Call {procedure=Assert; pargs=[]; pnamed_args = StrMap.empty }));
   stmt "print(\"... testAllFunctions(..) is logged in \" + file);"
        (uncommented (Call {procedure=Ide"print" ; pargs = [
                              Plus { left=String "... testAllFunctions(..) is logged in "; right = Ide "file" }

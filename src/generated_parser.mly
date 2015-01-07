@@ -258,6 +258,7 @@ elseif_statement : ELSEIF guard = expr THEN elsethen=list(statement) { { guard ;
 elsewhen_statement : ELSEWHEN guard = expr THEN elsethen=list(statement) { { guard ; elsethen } }
                     
 component_reference : x = IDENT { Ide x }
+                    | ASSERT { Assert }
                     | DOT x = IDENT { RootIde x }                                                     
                     | object_=component_reference DOT field=IDENT { Proj { object_ ; field } }
                     | lhs = component_reference LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
