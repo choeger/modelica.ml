@@ -1,0 +1,37 @@
+OASISFormat: 0.4
+Name:        modelica.ml
+Version:     0.1
+Synopsis:    Modelica abstract syntax and parser
+Authors:     Christoph Höger <christoph.hoeger@tu-berlin.de>
+License:     BSD-3-clause
+Plugins:     META (0.4), DevFiles (0.4)
+
+Library modelica_ml
+  Path:           src
+  CompiledObject: best
+  BuildTools:     ocamlbuild
+  BuildDepends:   batteries, menhirLib, sedlex, ppx_deriving.show,
+                  compiler-libs.common
+  Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
+                  Syntax, Syntax_fragments
+  InternalModules: Generated_parser, Utils
+  
+Test "Modelica Parser Tests"
+  Command: modelica_frontend_tests
+  
+Executable modelica_frontend_tests
+  Path:       test
+  CompiledObject: best
+  Build$: flag(tests)  
+  BuildDepends: modelica_ml, oUnit
+  BuildTools: ocamlbuild
+  MainIs:     modelica_frontend_tests.ml
+
+Document "modelica.ml-api"
+  Title: API reference for modelica.ml
+  Type: ocamlbuild (0.3)
+  Install: true
+  InstallDir: $htmldir/api
+  BuildTools: ocamlbuild, ocamldoc
+  XOCamlbuildPath: ./
+  XOCamlbuildLibraries: modelica_ml

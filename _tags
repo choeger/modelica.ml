@@ -1,0 +1,40 @@
+# OASIS_START
+# DO NOT EDIT (digest: adc980ce818e3928c939abc1eeddfc1d)
+# Ignore VCS directories, you can use the same kind of rule outside
+# OASIS_START/STOP if you want to exclude directories that contains
+# useless stuff for the build process
+true: annot, bin_annot
+<**/.svn>: -traverse
+<**/.svn>: not_hygienic
+".bzr": -traverse
+".bzr": not_hygienic
+".hg": -traverse
+".hg": not_hygienic
+".git": -traverse
+".git": not_hygienic
+"_darcs": -traverse
+"_darcs": not_hygienic
+# Library modelica_ml
+"src/modelica_ml.cmxs": use_modelica_ml
+<src/*.ml{,i,y}>: pkg_batteries
+<src/*.ml{,i,y}>: pkg_compiler-libs.common
+<src/*.ml{,i,y}>: pkg_menhirLib
+<src/*.ml{,i,y}>: pkg_ppx_deriving.show
+<src/*.ml{,i,y}>: pkg_sedlex
+# Executable modelica_frontend_tests
+<test/modelica_frontend_tests.{native,byte}>: pkg_batteries
+<test/modelica_frontend_tests.{native,byte}>: pkg_compiler-libs.common
+<test/modelica_frontend_tests.{native,byte}>: pkg_menhirLib
+<test/modelica_frontend_tests.{native,byte}>: pkg_oUnit
+<test/modelica_frontend_tests.{native,byte}>: pkg_ppx_deriving.show
+<test/modelica_frontend_tests.{native,byte}>: pkg_sedlex
+<test/modelica_frontend_tests.{native,byte}>: use_modelica_ml
+<test/*.ml{,i,y}>: pkg_batteries
+<test/*.ml{,i,y}>: pkg_compiler-libs.common
+<test/*.ml{,i,y}>: pkg_menhirLib
+<test/*.ml{,i,y}>: pkg_oUnit
+<test/*.ml{,i,y}>: pkg_ppx_deriving.show
+<test/*.ml{,i,y}>: pkg_sedlex
+<test/*.ml{,i,y}>: use_modelica_ml
+# OASIS_STOP
+true: use_menhir
