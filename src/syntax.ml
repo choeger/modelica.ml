@@ -27,23 +27,27 @@
  *)
 
 (**
- * Modelica 3.x abstract syntax
+ * Modelica 3.x abstract syntax 
  *)
 open Utils
 
 type name = string list
+(** A type-name is a list of strings separated by dots, e.g. Modelica.Icons.Example *)
+
                    
-(**
- * The stored definition unit
- *)
 type 'a commented = { commented : 'a ; comment : comment }
+ (** Something that can be commented can wrapped in this record *)
                       
 and 'a annotated = { annotated_elem : 'a ; annotation : modification option; }
-
+ (** Something that can be annotated can wrapped in this record *)
+                     
 and comment = string option annotated
                      
 and unit_ = { within : name option; toplevel_defs : typedef list }
-                    
+(**
+ * The stored definition unit is the representation of a single Modelica file
+ *)
+              
 and typedef_options = { type_replaceable : bool ;
                         type_final : bool ; partial : bool ; encapsulated : bool }
                          
