@@ -27,7 +27,12 @@
  *)
 
 (** Modelica 3.x abstract syntax 
-    @author Christoph Höger <christoph.hoeger@tu-berlin.de>
+
+    This module contains an interpretation of a "usable" form of the abstract syntax 
+    of the modeling language {{: http://modelica.org}  Modelica}
+    Since Modelica only specifies the {i concrete} syntax in the specification, there
+    is a certain degree of freedom applied here.
+    @author Christoph Höger
 
  *)
 open Utils
@@ -58,7 +63,7 @@ and typedef_options = { type_replaceable : bool ;
                         encapsulated : bool }
 
 (** Typedefs share a lot of common code. 
-    This is reflected by the {[ typedef_struct ]}: {['a]} denotes the definition's distincitve payload. *)
+    This is reflected by the {! Syntax.typedef_struct }: {v 'a v} denotes the definition's distincitve payload. *)
 and 'a typedef_struct = { td_name : string ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options }
                           
 (** The definition of a new type/class etc. *)
@@ -67,8 +72,9 @@ and typedef_desc = Short of texp typedef_struct
                  | Enumeration of (enum_literal list) typedef_struct
                  | OpenEnumeration of unit typedef_struct
                  | DerSpec of der_spec typedef_struct
-                 | Extension of (composition * (modification option)) typedef_struct
+                 | Extension of extension typedef_struct
 
+and extension = composition * modification option
                                                                       
 and typedef = typedef_desc commented
 

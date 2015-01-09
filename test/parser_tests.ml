@@ -50,32 +50,52 @@ let expr_test input f =
   parse_test expr_parser
 
 let nl = mknoloc
-             
-let parser_test_case parser lprinter sprinter input expected =
+           
+let parser_test_case parser lprinter sprinter prep input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::
-       parse_test parser input (fun e -> assert_equal ~msg:"equality of parser result" ~printer:sprinter expected e ) ) ;
+       parse_test parser input (fun e -> assert_equal ~msg:"equality of parser result" ~printer:sprinter expected (prep e) ) ) ;
      ("re-parsing" >::
         parse_test parser input
                    (fun firstpass -> parse_test parser (lprinter firstpass)
-                                        (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter firstpass e) ())) ; 
+                                        (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter (prep firstpass) (prep e)) ())) ; 
   ]
 
-let import input expected = parser_test_case import_parser (import2str ~max:100) import2str input expected
+let remove_loc (l:'a loc) = { l with loc = Location.none } 
+                                             
+let erase_location = { Mapper.default_mapper with str = fun this str -> remove_loc str }
 
-let extend input expected = parser_test_case extends_parser (extend2str ~max:100) extend2str input expected
+let prep_import = erase_location.import erase_location 
+                       
+let import input expected = parser_test_case import_parser (import2str ~max:100) import2str prep_import input expected 
 
-let texpr input expected = parser_test_case texpr_parser (texpr2str ~max:100) texpr2str input expected
+let prep_extend = erase_location.extend erase_location 
+
+let extend input expected = parser_test_case extends_parser (extend2str ~max:100) extend2str prep_extend input expected
+
+let prep_texpr = erase_location.texp erase_location 
+
+let texpr input expected = parser_test_case texpr_parser (texpr2str ~max:100) texpr2str prep_texpr input expected
                                             
-let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2str input expected
+let prep_expr = erase_location.exp erase_location 
 
-let stmt input expected = parser_test_case stmt_parser (stmt2str ~max:100) stmt2str input expected
+let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2str prep_expr input expected
 
-let eq input expected = parser_test_case eq_parser (eq2str ~max:100) (eq2str ~max:20) input expected
+let prep_stmt = erase_location.statement erase_location 
 
-let defs input expected = parser_test_case defs_parser (defs2str ~max:100) (defs2str ~max:20) input expected
+let stmt input expected = parser_test_case stmt_parser (stmt2str ~max:100) stmt2str prep_stmt input expected
 
-let typedef input expected = parser_test_case td_parser (td2str ~max:100) (td2str ~max:20) input expected
+let prep_eq = erase_location.equation erase_location 
+
+let eq input expected = parser_test_case eq_parser (eq2str ~max:100) (eq2str ~max:20) prep_eq input expected
+
+let prep_defs = Mapper.map_list erase_location.def erase_location 
+
+let defs input expected = parser_test_case defs_parser (defs2str ~max:100) (defs2str ~max:20) prep_defs input expected
+
+let prep_typedef = erase_location.typedef erase_location 
+
+let typedef input expected = parser_test_case td_parser (td2str ~max:100) (td2str ~max:20) prep_typedef input expected
                                            
 let test_cases = [ 
   expr "1.234" (Real(1.234));
