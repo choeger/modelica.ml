@@ -34,7 +34,8 @@ open Syntax
 open Syntax_fragments
 open Modelica_lexer
 open Pprint_modelica
-
+open Location
+       
 let parse_test parser input f = 
   let ucs = state_from_utf8_string "test input" input in
   let next () = next_token ucs in
@@ -48,6 +49,8 @@ let parse_test parser input f =
 let expr_test input f =
   parse_test expr_parser
 
+let nl = mknoloc
+             
 let parser_test_case parser lprinter sprinter input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::
@@ -253,10 +256,10 @@ let test_cases = [
   texpr "T()" (TMod { mod_type = TIde "T" ; modification = no_modification } ) ;
   
 
-  import "import X" (uncommented (Unnamed ["X"])) ;
-  import "import Y=X" (uncommented (NamedImport {global = ["X"] ; local = "Y" }));
+  import "import X" (uncommented (Unnamed [nl "X"])) ;
+  import "import Y=X" (uncommented (NamedImport {global = [nl "X"] ; local = "Y" }));
   
-  import "import X.*" (uncommented (UnqualifiedImport ["X"]));
+  import "import X.*" (uncommented (UnqualifiedImport [nl "X"]));
 
 
   (let extend_statement = { ext_type = TProj { class_type=
@@ -436,8 +439,8 @@ let test_cases = [
                                                                   } )) ;
 
   typedef "type E = der(foo.bar, x, y)" (uncommented (DerSpec {empty_typedef with td_name="E" ;
-                                                                                  type_exp = { der_name = ["foo";"bar"];
-                                                                                               idents = ["x";"y"] }
+                                                                                  type_exp = { der_name = [nl "foo"; nl "bar"];
+                                                                                               idents = [nl "x";nl "y"] }
                                                                                       
                                                                   } )) ;
   typedef "class extends X Real p; end X"
@@ -574,11 +577,11 @@ let test_cases = [
      no_modification
    with modifications =
           [uncommented {mod_each=false;mod_final=false;
-                        mod_name=["Line"];
+                        mod_name=[nl "Line"];
                         mod_value=Some (Nested {no_modification with
                                                  modifications =
                                                    [uncommented {mod_each=false;mod_final=false;
-                                                                 mod_name=["points"];
+                                                                 mod_name=[nl "points"];
                                                                  mod_value= Some (Rebind (
                                                                                       Array [
                                                                                           Array [UMinus (Int 19); UMinus (Int 10)];
@@ -588,7 +591,7 @@ let test_cases = [
                                                                                         ]));
                                                                 };
                                                     uncommented {mod_each=false;mod_final=false;
-                                                                 mod_name=["color"];
+                                                                 mod_name=[nl "color"];
                                                                  mod_value=Some (Rebind (Array [Int 255;Int 0;Int 255]));
                                                                 }
                                                    ]})

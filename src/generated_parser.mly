@@ -74,6 +74,12 @@
     open Syntax_fragments
     open Utils
 
+    (* cannot open Location due to menhir's Error exception *)
+    type 'a loc = 'a Location.loc = {
+       txt : 'a;
+       loc : Location.t;
+    }
+
     (* merge the two sources of a modelica-style component definition (i.e. the declaration and the component_clause *)
     let declaration_to_def def_type def_options def_constraint = function
         (def_name, None, None, def_if, def_rhs, comment) -> 
@@ -90,7 +96,7 @@
       | (def_name, None, Some(modification), def_if, def_rhs, comment) -> 
            { commented = { def_name ; def_type = TMod { mod_type = def_type ; modification } ; 
                            def_options ; def_constraint ; def_rhs ; def_if ; } ;
-             comment }
+             comment }      
 %}
 
 
@@ -122,7 +128,8 @@ modelica_texpr : texpr = type_expression EOF { texpr }
 modelica_import : import = import EOF { import }
 
 modelica_extends : extends = extends EOF { extends }
-                                     
+
+ident : x=IDENT { {txt=x ; loc={loc_start=$startpos; loc_end=$endpos; loc_ghost=false } } }
 
 expr : e = simple_expr { e }
      | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
@@ -356,7 +363,7 @@ modification_arguments : REDECLARE redecl_each=flag(EACH) type_final=flag(FINAL)
                                                                             {def.commented.def_options with final; replaceable=true} };
                                             }
                          }::rest.components} } 
-                       | mod_each=flag(EACH) mod_final=flag(FINAL) mod_name = separated_nonempty_list(DOT, IDENT) 
+                       | mod_each=flag(EACH) mod_final=flag(FINAL) mod_name = separated_nonempty_list(DOT, ident) 
                          mod_value=option(modification) comment=comment 
                          rest=modification_arguments_tail
                          { let m = {commented={mod_name;mod_final;mod_each;mod_value};comment} in 
@@ -374,10 +381,10 @@ mod_component_clause : scope=scope def_type = type_expression component=declarat
                        def_constraint=option(constraining_clause)
                        { declaration_to_def def_type {no_def_options with scope} def_constraint component }
 
-import : IMPORT name=separated_nonempty_list(DOT, IDENT) comment = comment { { commented = Unnamed name ; comment } }
-       | IMPORT local=IDENT EQ global=separated_nonempty_list(DOT, IDENT) comment = comment 
+import : IMPORT name=separated_nonempty_list(DOT, ident) comment = comment { { commented = Unnamed name ; comment } }
+       | IMPORT local=IDENT EQ global=separated_nonempty_list(DOT, ident) comment = comment 
          { { commented = NamedImport {global;local} ; comment } } 
-       | IMPORT name=separated_nonempty_list(DOT, IDENT) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
+       | IMPORT name=separated_nonempty_list(DOT, ident) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
                                                                                     
 extends : EXTENDS ext_type = type_expression ext_annotation=option(annotation) { { ext_type ; ext_annotation } } 
 
@@ -447,8 +454,8 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                 | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ ENUMERATION LPAREN COLON RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = OpenEnumeration { td_name ; sort ; type_options ; type_exp = () ; cns} ;  comment } }
 
-                | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ DER LPAREN der_name=separated_nonempty_list(DOT, IDENT)
-                  COMMA idents=separated_nonempty_list(COMMA, IDENT) RPAREN comment = comment cns = option(constraining_clause) 
+                | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ DER LPAREN der_name=separated_nonempty_list(DOT, ident)
+                  COMMA idents=separated_nonempty_list(COMMA, ident) RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = DerSpec { td_name ; sort ; type_options ; type_exp = {der_name;idents} ; cns} ;  comment } }
 
 composition : c = public_composition_elements { c }
@@ -532,5 +539,5 @@ external_lhs : e=component_reference EQ { e }
 
 type_definition_clause : td=type_definition SEMICOLON { td }
 
-within_clause : WITHIN name=separated_list(DOT, IDENT) SEMICOLON { name }
+within_clause : WITHIN name=separated_list(DOT, ident) SEMICOLON { name }
 

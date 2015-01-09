@@ -60,6 +60,10 @@ and pp_complete_conditional ?else_:(else_kw=" else") pp_expr kw pp_then fmt { co
             (pp_list (pp_elseif pp_expr pp_then kw)) else_if
             else_kw
             pp_then else_
+
+let pp_str fmt {Location.txt;loc} = pp_print_string fmt txt
+            
+let pp_name = (pp_list ~sep:"." pp_str)
             
 let rec pp_expr fmt = function
     Ide(x) -> fprintf fmt "@[%s@]" x
@@ -225,7 +229,7 @@ and pp_component_modification fmt { commented = { mod_each ; mod_final ; mod_nam
   fprintf fmt "%s%s%a%a%a"
           (if mod_each then "each " else "")
           (if mod_final then "final " else "")
-          (pp_list ~sep:"." pp_print_string) mod_name
+          pp_name mod_name
           (pp_option pp_mod_value) mod_value
           pp_comment comment
 
@@ -294,9 +298,9 @@ and pp_texpr fmt = function
   | TMod { mod_type ; modification } -> fprintf fmt  "@[%a(%a)@]" pp_texpr mod_type pp_modification modification
                                            
 and pp_import_desc fmt = function
-    Unnamed name -> fprintf fmt "@[import@ %a@]" (pp_list ~sep:"." pp_print_string) name 
-  | NamedImport {global; local} -> fprintf fmt "@[import@ %s@ =@ %a@]" local (pp_list ~sep:"." pp_print_string) global
-  | UnqualifiedImport name -> fprintf fmt "@[import@ %a.*@]" (pp_list ~sep:"." pp_print_string) name 
+    Unnamed name -> fprintf fmt "@[import@ %a@]" pp_name name 
+  | NamedImport {global; local} -> fprintf fmt "@[import@ %s@ =@ %a@]" local pp_name global
+  | UnqualifiedImport name -> fprintf fmt "@[import@ %a.*@]" pp_name name 
     
 and pp_import fmt {commented;comment} =
   fprintf fmt "@[%a%a@]" pp_import_desc commented pp_comment comment
@@ -355,7 +359,7 @@ and pp_extension x fmt (composition,modification) =
   fprintf fmt "@[extends@ %s%a@ %a@ end@ %s@]" x (pp_option pp_modification) modification pp_composition composition x
 
 and pp_der_spec fmt { der_name; idents } =
-  fprintf fmt "@[= der(%a,%a)@]" (pp_list ~sep:"." pp_print_string) der_name (pp_list ~sep:", " pp_print_string) idents
+  fprintf fmt "@[= der(%a,%a)@]" pp_name der_name (pp_list ~sep:", " pp_str) idents
 
 and pp_short_rhs fmt te =
   fprintf fmt "@[=@ %a@]" pp_texpr te
@@ -413,7 +417,7 @@ and pp_behavior fmt { algorithms ; equations ; initial_algorithms ; initial_equa
 
 and pp_within fmt = function
   | None -> ()
-  | Some name -> fprintf fmt "@[within@ %a;@.@]" (pp_list ~sep:"." pp_print_string) name
+  | Some name -> fprintf fmt "@[within@ %a;@.@]" pp_name name
     
 and pp_unit fmt {within ; toplevel_defs} =
   fprintf fmt "@[%a%a@]" pp_within within (pp_list (pp_element pp_typedef)) toplevel_defs

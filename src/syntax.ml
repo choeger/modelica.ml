@@ -26,33 +26,42 @@
  *
  *)
 
-(**
- * Modelica 3.x abstract syntax 
+(** Modelica 3.x abstract syntax 
+    @author Christoph Höger <christoph.hoeger@tu-berlin.de>
+
  *)
 open Utils
+open Location
 
-type name = string list
+type str = string loc
+       
 (** A type-name is a list of strings separated by dots, e.g. Modelica.Icons.Example *)
-
-                   
-type 'a commented = { commented : 'a ; comment : comment }
+type name = str list
+                    
  (** Something that can be commented can wrapped in this record *)
+type 'a commented = { commented : 'a ; comment : comment }
                       
-and 'a annotated = { annotated_elem : 'a ; annotation : modification option; }
  (** Something that can be annotated can wrapped in this record *)
+and 'a annotated = { annotated_elem : 'a ; annotation : modification option; }
                      
+(** Comments are optionally annotated optional strings *)
 and comment = string option annotated
                      
+(** The stored definition unit is the representation of a single Modelica file *)
 and unit_ = { within : name option; toplevel_defs : typedef list }
-(**
- * The stored definition unit is the representation of a single Modelica file
- *)
               
-and typedef_options = { type_replaceable : bool ;
-                        type_final : bool ; partial : bool ; encapsulated : bool }
-                         
-and 'a typedef_struct = { td_name : string ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options }
+(** The options of a type-definition:
+    is the definition replaceable / final / partial / encapsulated ? *)
+and typedef_options = { type_replaceable : bool ; 
+                        type_final : bool ; 
+                        partial : bool ; 
+                        encapsulated : bool }
 
+(** Typedefs share a lot of common code. 
+    This is reflected by the {[ typedef_struct ]}: {['a]} denotes the definition's distincitve payload. *)
+and 'a typedef_struct = { td_name : string ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options }
+                          
+(** The definition of a new type/class etc. *)
 and typedef_desc = Short of texp typedef_struct
                  | Composition of composition typedef_struct
                  | Enumeration of (enum_literal list) typedef_struct
@@ -60,6 +69,7 @@ and typedef_desc = Short of texp typedef_struct
                  | DerSpec of der_spec typedef_struct
                  | Extension of (composition * (modification option)) typedef_struct
 
+                                                                      
 and typedef = typedef_desc commented
 
 and constraint_ = texp commented
@@ -91,7 +101,8 @@ and composition = { imports : import list ;
 
 and enum_literal = string commented
 
-and der_spec = { der_name : name ; idents : string list }
+(** Partial derivative specification, see section 12.7.2 *)
+and der_spec = { der_name : name ; idents : str list }
 
 and sort = Package | Class | Model | Block | Connector | ExpandableConnector | Record
            | Function | Type | Operator | OperatorRecord | OperatorFunction 
