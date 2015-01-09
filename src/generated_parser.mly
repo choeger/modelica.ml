@@ -96,7 +96,9 @@
       | (def_name, None, Some(modification), def_if, def_rhs, comment) -> 
            { commented = { def_name ; def_type = TMod { mod_type = def_type ; modification } ; 
                            def_options ; def_constraint ; def_rhs ; def_if ; } ;
-             comment }      
+             comment } 
+
+     let mkloc x loc_start loc_end = {txt=x ; loc={loc_start; loc_end; loc_ghost=false } }
 %}
 
 
@@ -129,7 +131,7 @@ modelica_import : import = import EOF { import }
 
 modelica_extends : extends = extends EOF { extends }
 
-ident : x=IDENT { {txt=x ; loc={loc_start=$startpos; loc_end=$endpos; loc_ghost=false } } }
+ident : x=IDENT { mkloc x $startpos $endpos }
 
 expr : e = simple_expr { e }
      | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
