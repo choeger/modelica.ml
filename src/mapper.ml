@@ -73,7 +73,9 @@ type mapper = {
 
   texp : mapper -> texp -> texp ;
   exp : mapper -> exp -> exp;
-                             
+
+  idx : mapper -> idx -> idx ;
+  
   statement : mapper -> statement -> statement;
   equation_desc : mapper -> equation_desc -> equation_desc;
   equation : mapper -> equation -> equation ;
@@ -105,7 +107,21 @@ let map_commented sub this {commented; comment} = { commented = sub this comment
                                                     comment = this.comment this comment }
 
 let map_located sub this { txt ; loc } = { txt = sub this txt ; loc = this.location this loc }
-                                                    
+
+let map_else_conditional sub this { guard ; elsethen } =
+  { guard = this.exp this guard ;
+    elsethen = sub this elsethen }
+                                           
+let map_conditional sub this { condition ; then_ ; else_if ; else_ } =
+  { condition = this.exp this condition ;
+    then_ = sub this then_ ;
+    else_if = map_list (map_else_conditional sub) this else_if ;
+    else_ = sub this else_;
+  }
+  
+let map_for_loop sub this {idx; body} = {idx= map_list this.idx this idx ;
+                                         body = sub this body }
+                                           
 (** The identity map function. Does {b no} traversal *)
 let id this x = x
                                  
@@ -199,6 +215,22 @@ module Modification = struct
                                                         components = map_list this.component_redeclaration this components ;
                                                         modifications = map_list this.component_modification this modifications }
 end
+
+module Equation_Desc = struct
+  let map this = function
+    | SimpleEquation { left ; right } -> SimpleEquation { left = this.exp this left ;
+                                                          right = this.exp this right }
+    | ForEquation loop -> ForEquation (map_for_loop (map_list this.equation) this loop)
+    | IfEquation ifeq -> IfEquation (map_conditional (map_list this.equation) this ifeq)
+    | WhenEquation when_eq -> WhenEquation (map_conditional (map_list this.equation) this when_eq)
+    | ExpEquation exp -> ExpEquation (this.exp this exp)
+end
+
+module Equation = struct
+  let map this = map_commented this.equation_desc this
+end
+         
+                         
                    
 let default_mapper = {
   unit_ = Unit.map ;
@@ -236,13 +268,14 @@ let default_mapper = {
   texp = id;
 
   comment = Comment.map;
-  annotation = id;
+  annotation = Modification.map;
   
   exp = id;
   statement = id;
-
-  equation_desc = id;
-  equation = id;
+  idx = id;
+  
+  equation_desc = Equation_Desc.map;
+  equation = Equation.map;
 
   name = Name.map ;
   identifier = id;
