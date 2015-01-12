@@ -42,7 +42,7 @@ let parse_test parser input f =
   let last () = last_token ucs in
   fun () ->
   try
-    f (parser "test" next last)
+    f (parser next last)
   with 
     SyntaxError e -> assert_failure (Printf.sprintf "Syntax Error at %s:\n%s" (show_location e) (error_message e input))
        

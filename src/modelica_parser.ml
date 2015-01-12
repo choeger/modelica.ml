@@ -29,12 +29,14 @@
 open Modelica_lexer
 open Lexing
 open Location
+
+type 'a parser = (unit -> Modelica_lexer.tokplus) -> (unit -> Modelica_lexer.tokplus option) -> 'a
        
 let get_token {token} = token 
 
-let get_start src {cursor} = cursor.loc_start
+let get_start {cursor} = cursor.loc_start
 
-let get_end src {cursor} = cursor.loc_end
+let get_end {cursor} = cursor.loc_end
 
 exception SyntaxError of cursor
                            
@@ -49,23 +51,23 @@ let guard parser next last = try parser next
                              | Generated_parser.Error -> raise ( SyntaxError ( locate (last ()) ) )
 
 (* entry points below stored definition, mainly for unit tests *)
-let texpr_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_texpr)
+let texpr_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_texpr)
 
-let expr_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_expr)
+let expr_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_expr)
 
-let stmt_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_stmt)
+let stmt_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_stmt)
 
-let eq_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_eq)
+let eq_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_eq)
 
-let import_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_import)
+let import_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_import)
 
-let extends_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_extends)
+let extends_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_extends)
 
-let defs_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_definitions)
+let defs_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_definitions)
 
-let td_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_type_definition)
+let td_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_type_definition)
 
-let unit_parser src = guard (MenhirLib.Convert.traditional2revised get_token (get_start src) (get_end src) Generated_parser.modelica_stored_definition)
+let unit_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_stored_definition)
                           
 let error_message e input =
   let lb = Lexing.from_string (input ^ "\n") in
