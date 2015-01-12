@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: adc980ce818e3928c939abc1eeddfc1d)
+# DO NOT EDIT (digest: 4f359b80b8ff8912710db79ef51ee4e9)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -29,10 +29,19 @@ true: annot, bin_annot
 <test/modelica_frontend_tests.{native,byte}>: pkg_ppx_deriving.show
 <test/modelica_frontend_tests.{native,byte}>: pkg_sedlex
 <test/modelica_frontend_tests.{native,byte}>: use_modelica_ml
+<test/*.ml{,i,y}>: pkg_oUnit
+# Executable parse_modelica
+<test/parse_modelica.{native,byte}>: pkg_ANSITerminal
+<test/parse_modelica.{native,byte}>: pkg_batteries
+<test/parse_modelica.{native,byte}>: pkg_compiler-libs.common
+<test/parse_modelica.{native,byte}>: pkg_menhirLib
+<test/parse_modelica.{native,byte}>: pkg_ppx_deriving.show
+<test/parse_modelica.{native,byte}>: pkg_sedlex
+<test/parse_modelica.{native,byte}>: use_modelica_ml
+<test/*.ml{,i,y}>: pkg_ANSITerminal
 <test/*.ml{,i,y}>: pkg_batteries
 <test/*.ml{,i,y}>: pkg_compiler-libs.common
 <test/*.ml{,i,y}>: pkg_menhirLib
-<test/*.ml{,i,y}>: pkg_oUnit
 <test/*.ml{,i,y}>: pkg_ppx_deriving.show
 <test/*.ml{,i,y}>: pkg_sedlex
 <test/*.ml{,i,y}>: use_modelica_ml
