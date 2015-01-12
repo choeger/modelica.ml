@@ -262,7 +262,70 @@ module Statement_Desc = struct
     | WhileStmt { while_ ; do_ } -> WhileStmt { while_ = this.exp this while_ ;
                                                 do_ = map_list this.statement this do_ }
 end
-                     
+
+
+module Named_Arg = struct
+  let map this { argument_name ; argument } = { argument_name = map_located this.identifier this argument_name ;
+                                                argument = this.exp this argument }
+end
+
+
+module Exp = struct
+  let map_binary this {left ; right } = {left=this.exp this left ; right = this.exp this right }
+                                          
+  let map this = function
+    | Pow b -> Pow (map_binary this b)
+    | DPow b -> DPow (map_binary this b)
+    | Mul b -> Mul (map_binary this b)
+    | DMul b -> DMul (map_binary this b)
+    | Div b -> Div (map_binary this b)
+    | DDiv b -> DDiv (map_binary this b)
+    | Plus b -> Plus (map_binary this b)
+    | DPlus b -> DPlus (map_binary this b)
+    | Minus b -> Minus (map_binary this b)
+    | DMinus b -> DMinus (map_binary this b)
+
+
+    | UMinus e -> UMinus (this.exp this e)
+    | UPlus e -> UPlus (this.exp this e)
+    | UDPlus e -> UDPlus (this.exp this e)
+    | UDMinus e -> UDMinus (this.exp this e)
+
+    | Not e -> Not (this.exp this e)
+    | And b -> And (map_binary this b)
+    | Or b -> Or (map_binary this b)
+    | Gt b -> Gt (map_binary this b)
+    | Lt b -> Lt (map_binary this b)
+    | Leq b -> Leq (map_binary this b)
+    | Geq b -> Geq (map_binary this b)
+    | Neq b -> Neq (map_binary this b)
+    | Eq b -> Eq (map_binary this b)
+
+    | If if_expression -> If (map_conditional this.exp this if_expression)
+    | ArrayAccess {lhs; indices} -> ArrayAccess { lhs = this.exp this lhs ; indices = map_list this.exp this indices }
+
+    | Range {start; end_; step} -> Range { start = this.exp this start ;
+                                           end_ = this.exp this end_ ;
+                                           step = map_option this.exp this step }
+
+    | RootIde s -> RootIde s
+    | Ide s -> Ide s
+    | Proj {object_; field} -> Proj { object_ = this.exp this object_ ; field }
+    | App { fun_; args; named_args} -> App { fun_ = this.exp this fun_ ;
+                                             args = map_list this.exp this args ;
+                                             named_args = map_list this.named_arg this named_args }
+
+    | Compr { exp ; idxs } -> Compr { exp = this.exp this exp;
+                                      idxs = map_list this.idx this idxs }
+                                
+    | Array es -> Array (map_list this.exp this es)
+    | MArray ess -> MArray (map_list (map_list this.exp) this ess)
+    | ExplicitClosure e -> ExplicitClosure (this.exp this e)                           
+    | OutputExpression eos -> OutputExpression (map_list (map_option this.exp) this eos)
+    | ( End | Colon | Der | Initial | Assert | Bool _ | Int _ | Real _ | String _) as e -> e
+
+
+end
                      
 let default_mapper = {
   unit_ = Unit.map ;
@@ -302,7 +365,7 @@ let default_mapper = {
   comment = Comment.map;
   annotation = Modification.map;
   
-  exp = id;
+  exp = Exp.map;
   statement = Statement.map;
   statement_desc = Statement_Desc.map;
   idx = Idx.map;
@@ -312,7 +375,7 @@ let default_mapper = {
 
   name = Name.map ;
   identifier = id;
-  named_arg = id;
+  named_arg = Named_Arg.map;
   comment_str = id;
   location = id;
   
