@@ -34,15 +34,17 @@ open Utils
 type cursor = Location.t
 
 open Location
-                
+
+type 'a loc = 'a Location.loc = {
+    txt : 'a;
+    loc : Location.t;
+  }
+       
 let show_location l =
   Location.print Format.str_formatter l ;
   Format.flush_str_formatter ()
                 
-type tokplus = {
-  token : token;
-  cursor : cursor ;
-}
+type tokplus = token loc
 
 type m_cursor = {
   mutable m_line : int;
@@ -155,19 +157,19 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
       pos_cnum = lexeme_start buf ; pos_fname = src }
   in
   
-  let lift token =    
-    let loc_start = match token with      
+  let lift txt =    
+    let loc_start = match txt with      
         STRING(_) | QIDENT(_) -> { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ; 
 		                   pos_cnum = s_cursor.str_start ; pos_fname = src }
       | _ -> last_loc ()
     in
-    let loc_end = match token with
+    let loc_end = match txt with
         (* the only tokens that can span multiple lines are strings and quoted identifiers *)
         STRING(_) | QIDENT(_) -> { pos_lnum = s_cursor.str_line ; pos_bol = s_cursor.str_bol ; 
 		                   pos_cnum = s_cursor.str_end ; pos_fname = src }
       | _ -> { loc_start with pos_cnum = lexeme_start buf + lexeme_length buf }
     in
-    let tok = { token ; cursor = { loc_start ; loc_end ; loc_ghost = false } } 
+    let tok = { txt ; loc = { loc_start ; loc_end ; loc_ghost = false } } 
     in m_cursor.m_last <- Some tok ; tok
   in
 
@@ -329,24 +331,24 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | _ -> failwith "no match on 'any'. This cannot happen"                                                                 
 
 
-  and merge { token=t; cursor } = match t with
+  and merge { txt=t; loc } = match t with
       END -> begin
             let { m_line ; m_bol } = m_cursor in
             match token () with
-              IF -> { token = ENDIF ; cursor = { cursor with loc_end = last_loc () } }
-            | FOR -> { token = ENDFOR ; cursor =  { cursor with loc_end = last_loc () } }
-            | WHILE -> { token = ENDWHILE ; cursor = { cursor with loc_end = last_loc () } }
-            | WHEN -> { token = ENDWHEN ; cursor = { cursor with loc_end = last_loc () } }
-            | IDENT(x) -> { token = END_IDENT x; cursor= { cursor with loc_end = last_loc () } }
-            | _ -> Sedlexing.rollback buf ; m_cursor.m_line <- m_line ; m_cursor.m_bol <- m_bol ; { token=t; cursor }
+              IF -> { txt = ENDIF ; loc = { loc with loc_end = last_loc () } }
+            | FOR -> { txt = ENDFOR ; loc =  { loc with loc_end = last_loc () } }
+            | WHILE -> { txt = ENDWHILE ; loc = { loc with loc_end = last_loc () } }
+            | WHEN -> { txt = ENDWHEN ; loc = { loc with loc_end = last_loc () } }
+            | IDENT(x) -> { txt = END_IDENT x; loc= { loc with loc_end = last_loc () } }
+            | _ -> Sedlexing.rollback buf ; m_cursor.m_line <- m_line ; m_cursor.m_bol <- m_bol ; { txt=t; loc }
           end
     | INITIAL -> begin
                  let { m_line ; m_bol } = m_cursor in
                  match token () with
-                   EQUATION -> { token = INITIAL_EQUATION ; cursor = { cursor with loc_end = last_loc () } }
-                 | ALGORITHM -> { token = INITIAL_ALGORITHM ; cursor = { cursor with loc_end = last_loc () } }
-                 | _ -> Sedlexing.rollback buf ; m_cursor.m_line <- m_line ; m_cursor.m_bol <- m_bol ; { token=t; cursor }             
+                   EQUATION -> { txt = INITIAL_EQUATION ; loc = { loc with loc_end = last_loc () } }
+                 | ALGORITHM -> { txt = INITIAL_ALGORITHM ; loc = { loc with loc_end = last_loc () } }
+                 | _ -> Sedlexing.rollback buf ; m_cursor.m_line <- m_line ; m_cursor.m_bol <- m_bol ; { txt=t; loc }             
                end
-    | _ -> { token=t; cursor }
+    | _ -> { txt=t; loc }
       
   in merge (lift (token ()))

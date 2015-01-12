@@ -26,24 +26,24 @@
  *
  *)
 
-open Modelica_lexer
 open Lexing
 open Location
+open Modelica_lexer
 
 type 'a parser = (unit -> Modelica_lexer.tokplus) -> (unit -> Modelica_lexer.tokplus option) -> 'a
        
-let get_token {token} = token 
+let get_token {txt} = txt
 
-let get_start {cursor} = cursor.loc_start
+let get_start {txt;loc} = loc.loc_start
 
-let get_end {cursor} = cursor.loc_end
-
-exception SyntaxError of cursor
+let get_end {txt;loc} = loc.loc_end
+                        
+exception SyntaxError of Location.t
                            
 open Batteries
 
 let locate = function
-    Some ( {cursor} ) ->  cursor
+    Some ( {loc} ) ->  loc
   | None -> { loc_start = dummy_pos ; loc_end = dummy_pos ; loc_ghost = true }
 
 let guard parser next last = try parser next  
