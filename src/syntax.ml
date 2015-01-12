@@ -244,7 +244,7 @@ and exp = Pow of binary_exp
         | End | Colon | Der | Initial | Assert
         | OutputExpression of exp option list
                                           
-and idx = { variable : string ; range : exp option }
+and idx = { variable : str ; range : exp option }
 
 and tprojection = { class_type : texp ; type_element : string }
 

@@ -234,10 +234,11 @@ else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
 
 index_range : IN e = expr { e }
                                                  
-index : variable = IDENT range = option(index_range) { { variable ; range } }
+index : variable = ident range = option(index_range) { { variable ; range } }
 
 array_args : es=separated_list(COMMA, expr) { es }
            | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { [Compr { exp ; idxs }] }
+
 
 function_args : e = expr COMMA fs = function_args { let (args, named_args) = fs in (e::args, named_args) }
               | e = expr { ([e], StrMap.empty) }

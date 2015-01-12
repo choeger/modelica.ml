@@ -230,7 +230,10 @@ module Equation = struct
   let map this = map_commented this.equation_desc this
 end
          
-                         
+module Idx = struct
+  let map this { variable ; range } = { variable = map_located id this variable ;
+                                        range = map_option this.exp this range  }
+end
                    
 let default_mapper = {
   unit_ = Unit.map ;

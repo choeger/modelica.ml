@@ -126,8 +126,8 @@ and pp_named_arg fmt (name,expr) =
   fprintf fmt "@[%s = %a@]" name pp_expr expr
           
 and pp_foridx fmt = function
-    { variable ; range=Some(e) } -> fprintf fmt "@[%s in %a@]" variable pp_expr e
-  | { variable ; range=None } -> fprintf fmt "@[%s@]" variable
+    { variable ; range=Some(e) } -> fprintf fmt "@[%s in %a@]" variable.txt pp_expr e
+  | { variable ; range=None } -> fprintf fmt "@[%s@]" variable.txt
 
 let pp_for_loop pp fmt { idx ; body } =
   fprintf fmt "@[for@ %a@ loop@ %a@ end for@]" (pp_list ~sep:", " pp_foridx) idx pp body

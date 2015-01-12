@@ -194,8 +194,8 @@ let test_cases = [
 
        
   (* comprehension *)
-  expr "{x for x in foo}" (Array[Compr {exp = Ide "x"; idxs = [{variable="x"; range=Some (Ide "foo")}]}]);
-  expr "{x for x}" (Array [Compr {exp = Ide "x"; idxs = [{variable="x"; range=None}]}]);
+  expr "{x for x in foo}" (Array[Compr {exp = Ide "x"; idxs = [{variable=nl "x"; range=Some (Ide "foo")}]}]);
+  expr "{x for x}" (Array [Compr {exp = Ide "x"; idxs = [{variable=nl "x"; range=None}]}]);
 
   (* statements *)
   stmt "return;" (uncommented Return) ;
@@ -215,8 +215,8 @@ let test_cases = [
   stmt "() := 23;" (uncommented (Assignment { target=OutputExpression [None] ; source = Int 23 } ));  
   stmt "(x,,y) := 23;" (uncommented (Assignment { target=OutputExpression([Some (Ide "x");None;Some (Ide "y")]) ; source = Int 23 } ));  
   stmt "while true loop break; break; end while;" (uncommented (WhileStmt { while_ = Bool true ; do_ = [uncommented Break; uncommented Break] ; } ) );
-  stmt "for x loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
-  stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = "x"; range=Some (Ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
+  stmt "for x loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
+  stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=Some (Ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
 
   (* equations *)
   eq "x = 0;" (uncommented (SimpleEquation { left = Ide "x"; right = Int 0 })) ;
@@ -241,7 +241,7 @@ let test_cases = [
                                                                       else_if = []; else_ = [];
                                                                    })) ;
 
-  eq "for i loop if true then x = 0; end if; end for;" (uncommented (ForEquation { idx= [{variable="i" ; range=None}];
+  eq "for i loop if true then x = 0; end if; end for;" (uncommented (ForEquation { idx= [{variable=nl "i" ; range=None}];
                                                                                    body=[uncommented (
                                                                                              IfEquation {
                                                                                                  condition= Bool true;
