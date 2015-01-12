@@ -76,6 +76,7 @@ type mapper = {
 
   idx : mapper -> idx -> idx ;
   
+  statement_desc : mapper -> statement_desc -> statement_desc;
   statement : mapper -> statement -> statement;
   equation_desc : mapper -> equation_desc -> equation_desc;
   equation : mapper -> equation -> equation ;
@@ -88,6 +89,7 @@ type mapper = {
   modification_value : mapper -> modification_value -> modification_value ;
   
   name : mapper -> name -> name ;
+  named_arg : mapper -> named_arg -> named_arg ;
   identifier : mapper -> string -> string;
   comment_str : mapper -> string -> string ;
   location : mapper -> Location.t -> Location.t;
@@ -234,7 +236,34 @@ module Idx = struct
   let map this { variable ; range } = { variable = map_located id this variable ;
                                         range = map_option this.exp this range  }
 end
-                   
+
+module Algorithm = struct
+  let map this = map_list this.statement this 
+end
+
+module Statement = struct
+  let map this = map_commented this.statement_desc this
+end
+
+module Statement_Desc = struct
+  let map this = function
+      Assignment { target ; source } -> Assignment { target = this.exp this target ;
+                                                     source = this.exp this source }
+
+    | Call {procedure; pargs; pnamed_args} -> Call { procedure = this.exp this procedure ;
+                                                     pargs = map_list this.exp this pargs ;
+                                                     pnamed_args = map_list this.named_arg this pnamed_args }
+                                                   
+    | IfStmt if_statement -> IfStmt (map_conditional (map_list this.statement) this if_statement) 
+    | WhenStmt when_statement -> WhenStmt (map_conditional (map_list this.statement) this when_statement) 
+    | Break -> Break
+    | Return -> Return
+    | ForStmt for_statement -> ForStmt (map_for_loop (map_list this.statement) this for_statement)
+    | WhileStmt { while_ ; do_ } -> WhileStmt { while_ = this.exp this while_ ;
+                                                do_ = map_list this.statement this do_ }
+end
+                     
+                     
 let default_mapper = {
   unit_ = Unit.map ;
   within = id;
@@ -265,7 +294,7 @@ let default_mapper = {
   
   enum_literal = id;
   
-  algorithm = id;
+  algorithm = Algorithm.map;
   external_def = id;
 
   texp = id;
@@ -274,17 +303,19 @@ let default_mapper = {
   annotation = Modification.map;
   
   exp = id;
-  statement = id;
-  idx = id;
+  statement = Statement.map;
+  statement_desc = Statement_Desc.map;
+  idx = Idx.map;
   
   equation_desc = Equation_Desc.map;
   equation = Equation.map;
 
   name = Name.map ;
   identifier = id;
+  named_arg = id;
   comment_str = id;
   location = id;
-
+  
   modification = Modification.map;
   type_redeclaration = TRD.map;
   component_redeclaration = CRD.map;

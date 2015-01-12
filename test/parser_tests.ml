@@ -152,11 +152,11 @@ let test_cases = [
   expr ".x.y" (Proj {object_ = (RootIde "x"); field = "y"}) ;
 
   (* functions *)
-  expr "f()" (App {fun_= (Ide "f"); args=[]; named_args=StrMap.empty });
-  expr "f()()" (App {fun_= App { fun_=Ide "f"; args=[]; named_args=StrMap.empty }; args=[]; named_args=StrMap.empty});
-  expr "f(1.0)" (App {fun_=Ide "f"; args=[Real 1.]; named_args=StrMap.empty }) ;
-  expr "f(x=1.0)" (App {fun_= (Ide "f"); args=[]; named_args=StrMap.add "x" (Real 1.0) StrMap.empty });
-  expr "f(1.0, x=1.0)" (App {fun_= (Ide "f"); args=[Real 1.]; named_args=StrMap.add "x" (Real 1.0) StrMap.empty });
+  expr "f()" (App {fun_= (Ide "f"); args=[]; named_args=[] });
+  expr "f()()" (App {fun_= App { fun_=Ide "f"; args=[]; named_args=[] }; args=[]; named_args=[]});
+  expr "f(1.0)" (App {fun_=Ide "f"; args=[Real 1.]; named_args=[] }) ;
+  expr "f(x=1.0)" (App {fun_= (Ide "f"); args=[]; named_args=[named "x" (Real 1.0)]});
+  expr "f(1.0, x=1.0)" (App {fun_= (Ide "f"); args=[Real 1.]; named_args=[named "x" (Real 1.0)]});
   expr "function x" (ExplicitClosure (Ide "x"));
 
   (* precedences *)
@@ -200,16 +200,16 @@ let test_cases = [
   (* statements *)
   stmt "return;" (uncommented Return) ;
   stmt "break;" (uncommented Break) ;
-  stmt "assert();" (uncommented (Call {procedure=Assert; pargs=[]; pnamed_args = StrMap.empty }));
+  stmt "assert();" (uncommented (Call {procedure=Assert; pargs=[]; pnamed_args = [] }));
   stmt "print(\"... testAllFunctions(..) is logged in \" + file);"
        (uncommented (Call {procedure=Ide"print" ; pargs = [
                              Plus { left=String "... testAllFunctions(..) is logged in "; right = Ide "file" }
-                           ]; pnamed_args = StrMap.empty }));
+                           ]; pnamed_args =  [] }));
   
   stmt "if true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
   stmt "if true then break; elseif true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
   stmt "when true then break; elsewhen true then break; end when;" (uncommented (WhenStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
-  stmt "f(1, x=3);" (uncommented (Call { procedure=Ide "f"; pargs = [Int 1]; pnamed_args = StrMap.add "x" (Int 3) StrMap.empty } ) );
+  stmt "f(1, x=3);" (uncommented (Call { procedure=Ide "f"; pargs = [Int 1]; pnamed_args = [named "x" (Int 3)]} ) );
   stmt "x := 23;" (uncommented (Assignment { target=Ide "x" ; source = Int 23 } ));
   stmt "(,) := 23;" (uncommented (Assignment { target=OutputExpression [None; None] ; source = Int 23 } ));
   stmt "() := 23;" (uncommented (Assignment { target=OutputExpression [None] ; source = Int 23 } ));  
@@ -229,7 +229,7 @@ let test_cases = [
   eq "if c(a[i]) then a[i].p.r = {0,0,0}; end if;"  (uncommented (IfEquation {
                                                                       condition=App { fun_=Ide "c" ;
                                                                                       args=[ArrayAccess {lhs = Ide "a" ; indices = [Ide "i"]}];
-                                                                                      named_args=StrMap.empty };
+                                                                                      named_args=[] };
                                                                       then_ = [uncommented (SimpleEquation { left = Proj { object_ = Proj { object_ =
                                                                                                                                                 ArrayAccess { lhs= Ide "a";
                                                                                                                                                               indices=[Ide"i"] }; 
@@ -586,7 +586,7 @@ let test_cases = [
                                                                       algorithms = [[uncommented (
                                                                                        Call {procedure=Ide "print" ;
                                                                                             pargs = [String "hello, world!"] ;
-                                                                                            pnamed_args = StrMap.empty } ) ]];
+                                                                                            pnamed_args = [] } ) ]];
                                                                     } ;
                                                           } ;
                                                sort = Function } ));

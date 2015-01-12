@@ -108,9 +108,9 @@ let rec pp_expr fmt = function
   | UDMinus e -> fprintf fmt "@[.+(%a)@]" pp_expr e
   | Not e -> fprintf fmt "@[not (%a)@]" pp_expr e
 
-  | App { fun_ ; args=[] ; named_args } -> fprintf fmt "@[%a(%a)@]" pp_expr fun_ (pp_enum ~sep:", " pp_named_arg) (StrMap.enum named_args)
-  | App { fun_ ; args ; named_args } when named_args = StrMap.empty -> fprintf fmt "@[%a(%a)@]" pp_expr fun_ (pp_list ~sep:", " pp_expr) args
-  | App { fun_ ; args; named_args } -> fprintf fmt "@[%a(%a, %a)@]" pp_expr fun_ (pp_list ~sep:", " pp_expr) args (pp_enum ~sep:", " pp_named_arg) (StrMap.enum named_args)
+  | App { fun_ ; args=[] ; named_args } -> fprintf fmt "@[%a(%a)@]" pp_expr fun_ (pp_list ~sep:", " pp_named_arg) named_args
+  | App { fun_ ; args ; named_args = [] } -> fprintf fmt "@[%a(%a)@]" pp_expr fun_ (pp_list ~sep:", " pp_expr) args
+  | App { fun_ ; args; named_args } -> fprintf fmt "@[%a(%a, %a)@]" pp_expr fun_ (pp_list ~sep:", " pp_expr) args (pp_list ~sep:", " pp_named_arg) named_args
 
   | Range { start; end_; step = None } -> fprintf fmt "@[(%a):(%a)@]" pp_expr start pp_expr end_
   | Range { start; end_; step = Some(s)  } -> fprintf fmt "@[(%a):(%a):(%a)@]" pp_expr start pp_expr s pp_expr end_
@@ -122,8 +122,8 @@ let rec pp_expr fmt = function
 
   | OutputExpression ps -> fprintf fmt "(@[%a@])" (pp_list ~sep:", " (pp_option pp_expr)) ps
 
-and pp_named_arg fmt (name,expr) =
-  fprintf fmt "@[%s = %a@]" name pp_expr expr
+and pp_named_arg fmt ({argument_name;argument}) =
+  fprintf fmt "@[%s = %a@]" argument_name.txt pp_expr argument
           
 and pp_foridx fmt = function
     { variable ; range=Some(e) } -> fprintf fmt "@[%s in %a@]" variable.txt pp_expr e

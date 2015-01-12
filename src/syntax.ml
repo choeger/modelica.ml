@@ -153,8 +153,10 @@ and statement_desc = Assignment of assignment
                                     
                                     
 and assignment = { target : exp ; source : exp }
+
+and named_arg = { argument_name : str ; argument : exp }
                    
-and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : exp StrMap.t}
+and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : named_arg list }
                    
 and 'a else_condition = { guard : exp ; elsethen : 'a }
                    
@@ -196,7 +198,7 @@ and range = { start : exp ; end_ : exp ; step : exp option }
 
 and projection = { object_ : exp ; field : string }
 
-and application = { fun_ : exp ; args : exp list ; named_args : exp StrMap.t }
+and application = { fun_ : exp ; args : exp list ; named_args : named_arg list }
 
 and comprehension = { exp : exp ; idxs : idx list }
                     

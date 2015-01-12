@@ -241,14 +241,14 @@ array_args : es=separated_list(COMMA, expr) { es }
 
 
 function_args : e = expr COMMA fs = function_args { let (args, named_args) = fs in (e::args, named_args) }
-              | e = expr { ([e], StrMap.empty) }
+              | e = expr { ([e], []) }
               | m = named_function_args { ([], m) }
-              | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { ([Compr { exp ; idxs }],StrMap.empty) }  
+              | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { ([Compr { exp ; idxs }], []) }  
                
-named_argument : x=IDENT EQ e=expr { (x,e) }
+named_argument : argument_name=ident EQ argument=expr { {argument_name ; argument } }
 
-named_function_args : args=separated_nonempty_list (COMMA, named_argument) { StrMap.of_enum (List.enum args) }
-                    | { StrMap.empty }                                                            
+named_function_args : args=separated_nonempty_list (COMMA, named_argument) { args }
+                    | { [] }                                                            
 
 annotation : ANNOTATION m=class_modification { m }
                         
