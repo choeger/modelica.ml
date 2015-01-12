@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        modelica.ml
-Version:     0.1
+Version:     0.1.1
 Synopsis:    Modelica abstract syntax and parser
 Authors:     Christoph Höger <christoph.hoeger@tu-berlin.de>
 License:     BSD-3-clause
