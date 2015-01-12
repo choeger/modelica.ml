@@ -30,6 +30,7 @@
 
 open Batteries
 open Syntax
+open Location
        
 (** A mapper record implements one "method" per syntactic category,
     using an open recursion style: each method takes as its first
@@ -39,7 +40,8 @@ type mapper = {
   unit_ : mapper -> unit_ -> unit_ ;
   within : mapper -> name option -> name option ;
   comment : mapper -> comment -> comment ;              
-
+  annotation : mapper -> modification -> modification;
+  
   typedef_options : mapper -> typedef_options -> typedef_options;
   typedef : mapper -> typedef -> typedef;
 
@@ -77,15 +79,26 @@ type mapper = {
   equation : mapper -> equation -> equation ;
 
   name : mapper -> name -> name ;
-  str : mapper -> str -> str ;
+  identifier : mapper -> string -> string;
+  comment_str : mapper -> string -> string ;
+  location : mapper -> Location.t -> Location.t;
 }  
 
+(** combine two generic mappers *)
+let (&&&) l r = fun sub this x -> l (r sub) this x
+                
 (** Lift a sub-map function to a map function over lists *)
 let map_list sub this = List.map (sub this)
 
+let map_option sub this = function
+  | None -> None
+  | Some x -> Some (sub this x)
+                                 
 let map_commented sub this {commented; comment} = { commented = sub this commented ;
                                                     comment = this.comment this comment }
-                                 
+
+let map_located sub this { txt ; loc } = { txt = sub this txt ; loc = this.location this loc }
+                                                    
 (** The identity map function. Does {b no} traversal *)
 let id this x = x
                                  
@@ -117,11 +130,11 @@ end
 module DerSpec = struct
   let map this { der_name ; idents } =
     { der_name = this.name this der_name ;
-      idents = map_list this.str this idents } 
+      idents = map_list (map_located this.identifier) this idents } 
 end
 
 module Name = struct
-  let map this = map_list this.str this
+  let map this = map_list (map_located this.identifier) this
 end
 
 module Import_Desc = struct
@@ -135,7 +148,12 @@ end
 module Import = struct
   let map this = map_commented this.import_desc this
 end
-                
+
+module Comment = struct
+  let map this { annotated_elem ; annotation } = { annotated_elem = (map_option &&& map_located) this.comment_str this annotated_elem ;
+                                                   annotation = map_option this.annotation this annotation }
+end
+                                  
 let default_mapper = {
   unit_ = Unit.map ;
   within = id;
@@ -148,7 +166,7 @@ let default_mapper = {
   redeclared_typedef = id;
   extension = id;
   
-  def = id;
+  def = map_commented id ;
   redeclared_def = id;
 
   import_desc = Import_Desc.map ;
@@ -171,8 +189,9 @@ let default_mapper = {
 
   texp = id;
 
-  comment = id;
-
+  comment = Comment.map;
+  annotation = id;
+  
   exp = id;
   statement = id;
 
@@ -180,6 +199,8 @@ let default_mapper = {
   equation = id;
 
   name = Name.map ;
-  str = id;
+  identifier = id;
+  comment_str = id;
+  location = id;
 };
 

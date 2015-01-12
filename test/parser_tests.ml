@@ -60,10 +60,8 @@ let parser_test_case parser lprinter sprinter prep input expected =
                    (fun firstpass -> parse_test parser (lprinter firstpass)
                                         (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter (prep firstpass) (prep e)) ())) ; 
   ]
-
-let remove_loc (l:'a loc) = { l with loc = Location.none } 
                                              
-let erase_location = { Mapper.default_mapper with str = fun this str -> remove_loc str }
+let erase_location = { Mapper.default_mapper with Mapper.location = (fun _ _ -> Location.none) }
 
 let prep_import = erase_location.import erase_location 
                        
