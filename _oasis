@@ -17,8 +17,8 @@ Library modelica_ml
   InternalModules: Generated_parser, Utils
   
 Test "Modelica Parser Tests"
-  Command: modelica_frontend_tests
-  
+  Command: $modelica_frontend_tests
+
 Executable modelica_frontend_tests
   Path:       test
   CompiledObject: best
