@@ -50,7 +50,7 @@ type 'a commented = { commented : 'a ; comment : comment }
 and 'a annotated = { annotated_elem : 'a ; annotation : modification option; }
                      
 (** Comments are optionally annotated optional strings *)
-and comment = string option annotated
+and comment = str option annotated
                      
 (** The stored definition unit is the representation of a single Modelica file *)
 and unit_ = { within : name option; toplevel_defs : typedef list }

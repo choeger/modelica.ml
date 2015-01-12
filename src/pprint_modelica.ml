@@ -30,6 +30,7 @@ module Enum = BatEnum
 open Format
 open Utils
 open Syntax
+open Location
 
 let rec pp_list ?(sep="") pp_element fmt = function
   | [h] -> Format.fprintf fmt "%a" pp_element h
@@ -250,7 +251,7 @@ and pp_annotation fmt = function
           
 and pp_comment_string fmt = function
   | None -> ()
-  | Some s -> fprintf fmt " \"%s\"" s 
+  | Some {txt} -> fprintf fmt " \"%s\"" txt 
           
 and pp_comment fmt { annotated_elem ; annotation } = 
   pp_comment_string fmt annotated_elem ;

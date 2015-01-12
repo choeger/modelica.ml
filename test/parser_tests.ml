@@ -320,7 +320,7 @@ let test_cases = [
                                                                            def_type = TIde "Density";
                                                                            def_rhs = Some (Real 1.225) ;
                                                           } ;
-                                              comment = unannotated ( Some "Air Density"  )}];
+                                              comment = unannotated ( Some (nl "Air Density")  )}];
   
 
   defs "Real friction_pos[:, 2]=[0; 1] \"[w,tau] positive sliding friction characteristic (w>=0)\""
@@ -328,7 +328,7 @@ let test_cases = [
                                        def_type = TArray { base_type=TIde "Real"; dims = [Colon ; Int 2] } ;
                                        def_rhs = Some (MArray [[Int 0];[Int 1]]) ;
                       } ;
-          comment = unannotated ( Some "[w,tau] positive sliding friction characteristic (w>=0)" ) 
+          comment = unannotated ( Some (nl "[w,tau] positive sliding friction characteristic (w>=0)") ) 
         }];
 
   typedef "type T = A" (uncommented (Short { empty_typedef with td_name = "T" ; type_exp = TIde "A" })) ;
@@ -349,7 +349,7 @@ let test_cases = [
                                                                                                                     defs = [def] }};
                                                                                            sort = Class ;
                                                                       } ;
-                                              comment = unannotated ( Some "comment" ) ;
+                                              comment = unannotated ( Some (nl "comment") ) ;
                                             } );
   
   typedef "partial model A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;

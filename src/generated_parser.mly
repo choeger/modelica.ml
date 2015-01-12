@@ -98,7 +98,7 @@
                            def_options ; def_constraint ; def_rhs ; def_if ; } ;
              comment } 
 
-     let mkloc x loc_start loc_end = {txt=x ; loc={loc_start; loc_end; loc_ghost=false } }
+     let mkloc x loc_start loc_end = {txt=x ; loc={Location.loc_start; Location.loc_end; Location.loc_ghost=false } }
 %}
 
 
@@ -132,6 +132,8 @@ modelica_import : import = import EOF { import }
 modelica_extends : extends = extends EOF { extends }
 
 ident : x=IDENT { mkloc x $startpos $endpos }
+
+str : x=STRING { mkloc x $startpos $endpos }
 
 expr : e = simple_expr { e }
      | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
@@ -249,7 +251,7 @@ named_function_args : args=separated_nonempty_list (COMMA, named_argument) { Str
 
 annotation : ANNOTATION m=class_modification { m }
                         
-comment : s=option(STRING) m=option(annotation) { { annotated_elem=s ; annotation=m} }
+comment : s=option(str) m=option(annotation) { { annotated_elem=s ; annotation=m} }
                         
 statement : s=statement_body comment=comment SEMICOLON { {commented=s ; comment} }
 
@@ -440,12 +442,12 @@ type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT E
                   comment=comment cns = option(constraining_clause) 
                   { { commented = Short { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
 
-                | type_options = typedef_prefix sort = type_sort td_name=IDENT annotated_elem=option(STRING) type_exp=composition 
+                | type_options = typedef_prefix sort = type_sort td_name=IDENT annotated_elem=option(str) type_exp=composition 
                   annotation=option(composition_annotation) end_name=END_IDENT cns = option(constraining_clause) 
                   { { commented = Composition { td_name ; sort ; type_options ; type_exp ; cns} ;  comment = {annotated_elem;annotation}}}
 
                 | type_options = typedef_prefix sort = type_sort EXTENDS td_name=IDENT modification=option(class_modification) 
-                  annotated_elem=option(STRING) composition=composition annotation=option(composition_annotation) end_name=END_IDENT
+                  annotated_elem=option(str) composition=composition annotation=option(composition_annotation) end_name=END_IDENT
                   cns = option(constraining_clause) 
                   { { commented = Extension { td_name ; sort ; type_options ; type_exp=(composition,modification) ; cns} ;  
                       comment = {annotated_elem;annotation}}}
