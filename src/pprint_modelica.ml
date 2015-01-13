@@ -32,6 +32,8 @@ open Utils
 open Syntax
 open Location
 
+let pp_paren pp fmt x = fprintf fmt "(%a)" pp x
+       
 let rec pp_list ?(sep="") pp_element fmt = function
   | [h] -> Format.fprintf fmt "%a" pp_element h
   | h::t ->
@@ -161,7 +163,7 @@ let pp_def_options fmt { final ; scope ; replaceable } =
           pp_scope scope
                          
 let def_sep fmt () =
-  fprintf fmt ";@."
+  fprintf fmt ";@ "
 
 let pp_variability fmt = function
   | Constant -> fprintf fmt "constant"
@@ -197,11 +199,11 @@ let pp_typedef_options fmt { type_replaceable ; type_final ; partial ; encapsula
           (if encapsulated then "encapsulated " else "")
           (if partial then "partial " else "")
                                            
-let pp_element pp fmt e = fprintf fmt "%a;" pp e
+let pp_element pp fmt e = fprintf fmt "%a;@ " pp e
           
 let pp_elements_prefixed prefix pp fmt = function
     [] -> ()
-  | es -> fprintf fmt "@[%s@.@[%a@]@.@]" prefix (pp_print_list pp) es
+  | es -> fprintf fmt "@[%s@ @[%a@]@ @]" prefix (pp_print_list pp) es
                   
 let pp_typedef_struct pp pp_constraint fmt { td_name ; sort ; type_exp ; cns ; type_options } =
   fprintf fmt "@[%a%a@ %s@ %a%a@]" pp_typedef_options type_options
@@ -251,7 +253,7 @@ and pp_annotation fmt = function
           
 and pp_comment_string fmt = function
   | None -> ()
-  | Some {txt} -> fprintf fmt " \"%s\"" txt 
+  | Some {txt} -> fprintf fmt " \"%s\"" (String.escaped txt)
           
 and pp_comment fmt { annotated_elem ; annotation } = 
   pp_comment_string fmt annotated_elem ;
@@ -332,17 +334,17 @@ and pp_enum_literal fmt {commented ; comment} =
 and pp_elements v fmt { typedefs ; redeclared_types ; extensions ; defs ; redeclared_defs ; } =
   let pp_redeclared pp fmt x = fprintf fmt "@[redeclare@ %a@]" pp x in
 
-  fprintf fmt "@[%s@.@[" v;
-  pp_print_list pp_extend fmt extensions ;
+  fprintf fmt "%s@ @[<v2>" v;
+  pp_print_list (pp_element pp_extend) fmt extensions ;
   pp_print_list (pp_element pp_typedef) fmt typedefs ;
   pp_print_list (pp_element (pp_redeclared pp_typedef)) fmt redeclared_types ;
   pp_print_list (pp_element pp_definition) fmt defs ;
   pp_print_list (pp_element (pp_redeclared pp_definition)) fmt redeclared_defs ;
-  fprintf fmt "@]@]" ; 
+  fprintf fmt "@]" ; 
           
 and pp_composition fmt { imports ; public; protected; cargo ; } =
-  fprintf fmt "@[" ;
-  pp_print_list pp_import fmt imports ;
+  fprintf fmt "@[<v 2>" ;
+  pp_print_list (pp_element pp_import) fmt imports ;
   pp_elements "public" fmt public ;
   pp_elements "protected" fmt protected ;  
   pp_behavior fmt cargo ;
@@ -352,7 +354,7 @@ and pp_extension_def fmt { td_name ; sort ; type_exp=(composition,modification) 
   fprintf fmt "@[%a%a@ extends@ %s%a@ %a%a@]" pp_typedef_options type_options
           pp_typedef_sort sort
           td_name
-          (pp_option pp_modification) modification
+          (pp_option (pp_paren pp_modification)) modification
           (pp_composition_rhs td_name comment) composition
           (pp_option pp_constraint) cns
 
@@ -376,7 +378,7 @@ and pp_comp_annotation fmt cmt = match cmt.annotation with
   | None -> ()
           
 and pp_composition_rhs x cmt fmt c =
-  fprintf fmt "@[%a%a%a@ end %s@]" pp_comment_string cmt.annotated_elem pp_composition c pp_comp_annotation cmt x 
+  fprintf fmt "@[%a@ %a@ %a@]@ end %s" pp_comment_string cmt.annotated_elem pp_composition c pp_comp_annotation cmt x 
           
 and pp_typedef fmt = function
   | {commented=OpenEnumeration tds ; comment} -> pp_typedef_struct pp_open_enum_rhs pp_constraint fmt tds ;
@@ -388,8 +390,7 @@ and pp_typedef fmt = function
   | {commented=Short tds ; comment} -> pp_typedef_struct pp_short_rhs pp_constraint fmt tds ;
                                        pp_comment fmt comment
                                                   
-  | {commented=Extension tds ; comment} -> pp_extension_def fmt tds comment ;
-                                           pp_comment fmt { comment with annotated_elem = None }
+  | {commented=Extension tds ; comment} -> pp_extension_def fmt tds comment
                                                       
   | {commented=Composition tds; comment} -> pp_typedef_struct (pp_composition_rhs tds.td_name comment) pp_constraint fmt tds ;
                                                        
@@ -418,7 +419,7 @@ and pp_behavior fmt { algorithms ; equations ; initial_algorithms ; initial_equa
 
 and pp_within fmt = function
   | None -> ()
-  | Some name -> fprintf fmt "@[within@ %a;@.@]" pp_name name
+  | Some name -> fprintf fmt "@[within@ %a;@ @]" pp_name name
     
 and pp_unit fmt {within ; toplevel_defs} =
   fprintf fmt "@[%a%a@]" pp_within within (pp_list (pp_element pp_typedef)) toplevel_defs
@@ -465,5 +466,6 @@ let texpr2str ?max:(n=8) te =
 
 let unit2str ?max:(n=8) u = 
   pp_set_max_boxes str_formatter n ;
+  pp_set_max_indent str_formatter (max_int - 1) ;
   (pp_unit str_formatter u) ;
   flush_str_formatter ()
