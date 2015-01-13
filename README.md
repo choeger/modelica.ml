@@ -18,6 +18,10 @@ already be useful for someone, so I am publishing it.
 
 Soon to come ...
 
+## API Documentation
+
+Version 0.1.1: http://choeger.github.io/apidoc/modelica_ml-0.1.1/
+
 ## Building
 
 This is a package built with oasis, so the following sequence should build it:
