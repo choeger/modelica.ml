@@ -13,7 +13,7 @@ Library modelica_ml
   BuildDepends:   batteries, menhirLib, sedlex, ppx_deriving.show,
                   compiler-libs.common
   Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
-                  Syntax, Syntax_fragments, Mapper
+                  Syntax, Syntax_fragments, Mapper, FileSystem
   InternalModules: Generated_parser, Utils
   
 Test "Modelica Parser Tests"
@@ -33,6 +33,13 @@ Executable parse_modelica
   BuildDepends: modelica_ml, ANSITerminal
   BuildTools: ocamlbuild
   MainIs:     parse_modelica.ml
+
+Executable parse_modelica_pkg
+  Path:    test
+  CompiledObject: best
+  BuildDepends: modelica_ml
+  BuildTools: ocamlbuild
+  MainIs:     parse_package.ml
 
 Document "modelica.ml-api"
   Title: API reference for modelica.ml
