@@ -194,8 +194,16 @@ module Modification = struct
                                                         modifications = map_list this.component_modification this modifications }
 end
 
-(*
 module Equation_Desc = struct
+  type sort = equation_desc
+                
+  let fold this = function
+    | SimpleEquation {left; right} -> this.fold_exp this left %> this.fold_exp this right
+    | ForEquation loop -> fold_for_loop (fold_list this.fold_equation) this loop
+    | IfEquation ifeq -> fold_conditional (fold_list this.fold_equation) this ifeq
+    | WhenEquation when_eq -> fold_conditional (fold_list this.fold_equation) this when_eq
+    | ExpEquation exp -> this.fold_exp this exp
+      
   let map this = function
     | SimpleEquation { left ; right } -> SimpleEquation { left = this.exp this left ;
                                                           right = this.exp this right }
@@ -206,23 +214,57 @@ module Equation_Desc = struct
 end
 
 module Equation = struct
+  type sort = equation
+  let fold this = fold_commented this.fold_equation_desc this
   let map this = map_commented this.equation_desc this
 end
-         
+
 module Idx = struct
-  let map this { variable ; range } = { variable = map_located id this variable ;
+  type sort = idx
+
+  let fold this { variable ; range } = fold_located this.fold_identifier this variable %>
+                                         fold_option this.fold_exp this range
+                
+  let map this { variable ; range } = { variable = map_located this.identifier this variable ;
                                         range = map_option this.exp this range  }
 end
 
 module Algorithm = struct
+  type sort = statement list
+
+  let fold this = fold_list this.fold_statement this
+  
   let map this = map_list this.statement this 
 end
 
 module Statement = struct
+  type sort = statement
+
+  let fold this = fold_commented this.fold_statement_desc this
+                
   let map this = map_commented this.statement_desc this
 end
 
 module Statement_Desc = struct
+  type sort = statement_desc
+
+  let fold this = function
+      Assignment { target ; source } ->  this.fold_exp this target %>
+                                           this.fold_exp this source
+
+    | Call {procedure; pargs; pnamed_args} -> this.fold_exp this procedure %>
+                                                fold_list this.fold_exp this pargs %>
+                                                  fold_list this.fold_named_arg this pnamed_args
+                                                   
+    | IfStmt if_statement -> fold_conditional (fold_list this.fold_statement) this if_statement                                              
+    | WhenStmt when_statement -> fold_conditional (fold_list this.fold_statement) this when_statement
+    | Break -> fun a -> a
+    | Return -> fun a -> a
+    | ForStmt for_statement -> fold_for_loop (fold_list this.fold_statement) this for_statement
+                                             
+    | WhileStmt { while_ ; do_ } -> this.fold_exp this while_ %>
+                                      fold_list this.fold_statement this do_ 
+  
   let map this = function
       Assignment { target ; source } -> Assignment { target = this.exp this target ;
                                                      source = this.exp this source }
@@ -240,13 +282,17 @@ module Statement_Desc = struct
                                                 do_ = map_list this.statement this do_ }
 end
 
-
 module Named_Arg = struct
+  type sort = named_arg
+
+  let fold this {argument_name ; argument} = fold_located this.fold_identifier this argument_name %>
+                                               this.fold_exp this argument
+                
   let map this { argument_name ; argument } = { argument_name = map_located this.identifier this argument_name ;
                                                 argument = this.exp this argument }
 end
 
-
+(*        
 module Exp = struct
   let map_binary this {left ; right } = {left=this.exp this left ; right = this.exp this right }
                                           

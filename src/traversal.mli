@@ -57,3 +57,15 @@ module CMOD_Struct : TRAVERSAL with type sort = component_modification_struct
 module CMOD_Value : TRAVERSAL with type sort = modification_value
                        
 module Modification : TRAVERSAL with type sort = modification
+
+module Equation_Desc : TRAVERSAL with type sort = equation_desc               
+
+module Equation : TRAVERSAL with type sort = equation
+
+module Idx : TRAVERSAL with type sort = idx
+
+module Algorithm : TRAVERSAL with type sort = statement list
+
+module Statement : TRAVERSAL with type sort = statement
+
+module Statement_Desc : TRAVERSAL with type sort = statement_desc

@@ -94,4 +94,10 @@ val fold_list : ('sort, 'a) fold_method -> ('sort list, 'a) fold_method
 
 val fold_option : ('sort, 'a) fold_method -> ('sort option, 'a) fold_method                                                           
 (** Lift an element fold method over an optional elements *)
-                                                            
+
+val fold_for_loop : ('sort, 'a) fold_method -> ('sort for_loop_struct, 'a) fold_method                                                           
+(** Lift an element fold method over a loop structure containing this element as body *)
+
+val fold_conditional : ('sort, 'a) fold_method -> ('sort condition_struct, 'a) fold_method                                                           
+(** Lift an element fold method over a conditional structure containing this element as body *)
+

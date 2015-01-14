@@ -26,6 +26,7 @@
  *
  *)
 
+open Batteries
 open Syntax
 
 type ('s, 'a) fold_method = ('a folder) -> 's -> 'a -> 'a
@@ -92,3 +93,14 @@ let rec fold_list f this l a = match l with
 let rec folds a = function
     [] -> a
   | tl::hd -> folds (tl a) hd
+
+let fold_for_loop f this {idx;body} = fold_list this.fold_idx this idx %> f this body
+
+let fold_else_conditional f this { guard ; elsethen } =
+  this.fold_exp this guard %> f this elsethen
+                                                                            
+let fold_conditional f this { condition ; then_ ; else_if ; else_ } =
+  this.fold_exp this condition %>
+    f this then_ %>
+      fold_list (fold_else_conditional f) this else_if %>
+        f this else_
