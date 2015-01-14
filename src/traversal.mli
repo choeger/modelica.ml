@@ -45,6 +45,8 @@ module DerSpec : TRAVERSAL with type sort = der_spec
 
 module Import : TRAVERSAL with type sort = import
 
+module Imports : TRAVERSAL with type sort = import list
+                                             
 module Comment : TRAVERSAL with type sort = comment
 
 module Name : TRAVERSAL with type sort = name                   
@@ -78,3 +80,5 @@ module Statement_Desc : TRAVERSAL with type sort = statement_desc
 module Named_Arg : TRAVERSAL with type sort = named_arg
 
 module Exp : TRAVERSAL with type sort = exp
+
+module Elements : TRAVERSAL with type sort = elements

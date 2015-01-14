@@ -52,6 +52,7 @@ and 'a folder = {
   fold_imports : (import list,'a) fold_method;
   fold_public : (elements,'a) fold_method;
   fold_protected : (elements,'a) fold_method;
+  fold_extends : (extend, 'a) fold_method; 
   fold_cargo : (behavior,'a) fold_method;
   fold_constraint_ : (constraint_,'a) fold_method;
   fold_der_spec : (der_spec,'a) fold_method;

@@ -122,6 +122,14 @@ module Import = struct
   let fold this = fold_commented this.fold_import_desc this
 end
 
+module Imports = struct 
+  type sort = import list
+  
+  let map this = map_list this.map_import this
+
+  let fold this = fold_list this.fold_import this
+end
+                  
 module Comment = struct
   type sort = comment
   
@@ -414,7 +422,26 @@ module Exp = struct
 
 
 end
-                              
+
+module Elements = struct
+  type sort = elements
+
+  let fold this { typedefs ; redeclared_types ; extensions ; defs ; redeclared_defs ; } =
+    fold_list this.fold_typedef this typedefs %>
+      fold_list this.fold_redeclared_typedef this redeclared_types %>
+        fold_list this.fold_extends this extensions %>
+          fold_list this.fold_def this defs %>
+            fold_list this.fold_redeclared_def this redeclared_defs
+                     
+  let map this { typedefs ; redeclared_types ; extensions ; defs ; redeclared_defs ; } =
+    let typedefs = map_list this.map_typedef this typedefs in
+    let redeclared_types = map_list this.map_redeclared_typedef this redeclared_types in
+    let extensions = map_list this.map_extend this extensions in
+    let defs = map_list this.map_def this defs in
+    let redeclared_defs = map_list this.map_redeclared_def this redeclared_defs in
+    { typedefs ; redeclared_types ; extensions ; defs ; redeclared_defs ; }
+end
+               
 let default_folder = {
   fold_unit_ = Unit.fold ;
   fold_within = fold_id;
@@ -423,15 +450,16 @@ let default_folder = {
   fold_typedef_options = fold_id;
   fold_typedef = TD.fold;
   fold_composition = fold_id;
-  fold_redeclared_typedef = fold_id;
+  fold_redeclared_typedef = TD.fold;
   fold_extension = fold_id;
   fold_def = fold_id;
   fold_redeclared_def = fold_id;
-  fold_import = fold_id;
-  fold_import_desc = fold_id;
-  fold_imports = fold_id;
-  fold_public = fold_id;
-  fold_protected = fold_id;
+  fold_import = Import.fold;
+  fold_import_desc = Import_Desc.fold;
+  fold_imports = Imports.fold;
+  fold_public = Elements.fold;
+  fold_protected = Elements.fold;
+  fold_extends = fold_id;
   fold_cargo = fold_id;
   fold_constraint_ = fold_id;
   fold_der_spec = fold_id;
@@ -439,20 +467,22 @@ let default_folder = {
   fold_algorithm = fold_id;
   fold_external_def = fold_id;
   fold_texp = fold_id;
-  fold_exp = fold_id;
-  fold_idx = fold_id;
-  fold_statement_desc = fold_id;
-  fold_statement = fold_id;
-  fold_equation_desc = fold_id;
-  fold_equation = fold_id;
-  fold_modification = fold_id;
-  fold_type_redeclaration = fold_id;
-  fold_component_redeclaration = fold_id;
-  fold_component_modification = fold_id;
-  fold_component_modification_struct = fold_id;
-  fold_modification_value = fold_id;
-  fold_name = fold_id;
-  fold_named_arg = fold_id;
+  fold_exp = Exp.fold;
+  fold_idx = Idx.fold;
+  
+  fold_statement_desc = Statement_Desc.fold;
+  fold_statement = Statement.fold;
+  fold_equation_desc = Equation_Desc.fold;
+  fold_equation = Equation.fold;
+  
+  fold_modification = Modification.fold;
+  fold_type_redeclaration = TRD.fold;
+  fold_component_redeclaration = CRD.fold;
+  fold_component_modification = CMOD.fold;
+  fold_component_modification_struct = CMOD_Struct.fold;
+  fold_modification_value = CMOD_Value.fold;
+  fold_name = Name.fold;
+  fold_named_arg = Named_Arg.fold;
   fold_identifier = fold_id;
   fold_comment_str = fold_id;
   fold_location = fold_id;
