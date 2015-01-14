@@ -292,10 +292,60 @@ module Named_Arg = struct
                                                 argument = this.exp this argument }
 end
 
-(*        
 module Exp = struct
+  type sort = exp
+
   let map_binary this {left ; right } = {left=this.exp this left ; right = this.exp this right }
-                                          
+  let fold_binary this {left; right } = this.fold_exp this left %> this.fold_exp this right
+
+  let fold this = function
+    | Pow b -> fold_binary this b
+    | DPow b -> fold_binary this b
+    | Mul b -> fold_binary this b
+    | DMul b -> fold_binary this b
+    | Plus b -> fold_binary this b
+    | DPlus b -> fold_binary this b
+    | Div b -> fold_binary this b
+    | DDiv b -> fold_binary this b
+    | Minus b -> fold_binary this b
+    | DMinus b -> fold_binary this b
+    | And b -> fold_binary this b
+    | Or b -> fold_binary this b
+    | Gt b -> fold_binary this b
+    | Lt b -> fold_binary this b
+    | Leq b -> fold_binary this b
+    | Geq b -> fold_binary this b
+    | Neq b -> fold_binary this b
+    | Eq b -> fold_binary this b
+
+    | UMinus e -> this.fold_exp this e
+    | UPlus e -> this.fold_exp this e
+    | UDPlus e -> this.fold_exp this e
+    | UDMinus e -> this.fold_exp this e
+    | Not e -> this.fold_exp this e
+
+    | If if_expression -> fold_conditional this.fold_exp this if_expression
+    | ArrayAccess {lhs; indices} -> this.fold_exp this lhs %> fold_list this.fold_exp this indices
+
+    | Range {start; end_; step} -> this.fold_exp this start %>
+                                     this.fold_exp this end_ %>
+                                       fold_option this.fold_exp this step
+
+    | Ide s -> this.fold_identifier this s
+    | Proj {object_; field} -> this.fold_exp this object_ 
+    | App { fun_; args; named_args} -> this.fold_exp this fun_ %>
+                                         fold_list this.fold_exp this args %>
+                                           fold_list this.fold_named_arg this named_args
+
+    | Compr { exp ; idxs } -> this.fold_exp this exp %>
+                                fold_list this.fold_idx this idxs
+                                
+    | Array es -> fold_list this.fold_exp this es
+    | MArray ess -> fold_list (fold_list this.fold_exp) this ess
+    | ExplicitClosure e -> this.fold_exp this e                           
+    | OutputExpression eos -> fold_list (fold_option this.fold_exp) this eos
+    | ( End | Colon | Der | Initial | Assert | Bool _ | Int _ | Real _ | String _ | RootIde _) -> fun a -> a
+                             
   let map this = function
     | Pow b -> Pow (map_binary this b)
     | DPow b -> DPow (map_binary this b)
@@ -307,7 +357,6 @@ module Exp = struct
     | DPlus b -> DPlus (map_binary this b)
     | Minus b -> Minus (map_binary this b)
     | DMinus b -> DMinus (map_binary this b)
-
 
     | UMinus e -> UMinus (this.exp this e)
     | UPlus e -> UPlus (this.exp this e)
@@ -349,9 +398,7 @@ module Exp = struct
 
 
 end
- *)
-              
-                
+                              
 let default_folder = {
   fold_unit_ = Unit.fold ;
   fold_within = fold_id;

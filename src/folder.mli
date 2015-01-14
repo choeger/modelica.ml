@@ -31,6 +31,9 @@
 open Syntax
 
 type ('s, 'a) fold_method = ('a folder) -> 's -> 'a -> 'a
+(** A fold-method works by open recursion on a folder record.
+    It takes the to-be-folded sort and a value as input and yields
+    a new value *)
                                                          
 and 'a folder = {
   fold_unit_ : (unit_,'a) fold_method;

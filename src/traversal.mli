@@ -69,3 +69,7 @@ module Algorithm : TRAVERSAL with type sort = statement list
 module Statement : TRAVERSAL with type sort = statement
 
 module Statement_Desc : TRAVERSAL with type sort = statement_desc
+
+module Named_Arg : TRAVERSAL with type sort = named_arg
+
+module Exp : TRAVERSAL with type sort = exp
