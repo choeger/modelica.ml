@@ -441,7 +441,24 @@ module Elements = struct
     let redeclared_defs = map_list this.map_redeclared_def this redeclared_defs in
     { typedefs ; redeclared_types ; extensions ; defs ; redeclared_defs ; }
 end
-               
+
+module Composition = struct
+  type sort = composition
+
+  let fold this { imports ; public ; protected ; cargo } =
+    this.fold_imports this imports %>
+      this.fold_public this public %>
+        this.fold_protected this public %>
+          this.fold_cargo this cargo 
+
+  let map this { imports ; public ; protected ; cargo } =
+    let imports = this.map_imports this imports in
+    let public = this.map_public this public in
+    let protected = this.map_protected this protected in
+    let cargo = this.map_cargo this cargo in
+    { imports ; public ; protected ; cargo }
+end
+                          
 let default_folder = {
   fold_unit_ = Unit.fold ;
   fold_within = fold_id;

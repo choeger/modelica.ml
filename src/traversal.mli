@@ -82,3 +82,5 @@ module Named_Arg : TRAVERSAL with type sort = named_arg
 module Exp : TRAVERSAL with type sort = exp
 
 module Elements : TRAVERSAL with type sort = elements
+
+module Composition : TRAVERSAL with type sort = composition
