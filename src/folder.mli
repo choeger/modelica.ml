@@ -91,3 +91,7 @@ val fold_located : ('sort, 'a) fold_method -> ('sort Location.loc, 'a) fold_meth
 
 val fold_list : ('sort, 'a) fold_method -> ('sort list, 'a) fold_method
 (** Lift an element fold method over a list of elements *)
+
+val fold_option : ('sort, 'a) fold_method -> ('sort option, 'a) fold_method                                                           
+(** Lift an element fold method over an optional elements *)
+                                                            

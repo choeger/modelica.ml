@@ -80,7 +80,11 @@ let fold_commented f this {commented; comment} a = let a' = f this commented a i
 
 let fold_located f this {Location.txt;Location.loc} a = let a' = f this txt a in
                                                         this.fold_location this loc a'
-                                                                     
+
+let fold_option f this o a = match o with
+    Some x -> f this x a
+  | None -> a
+              
 let rec fold_list f this l a = match l with
     [] -> a
   | hd::tl -> f this hd (fold_list f this tl a)

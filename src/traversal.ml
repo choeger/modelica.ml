@@ -26,6 +26,7 @@
  *
  *)
 
+open Batteries
 open Syntax
 
 open Mapper
@@ -61,15 +62,259 @@ module Unit = struct
                                               toplevel_defs = map_list this.typedef this toplevel_defs }
 end
 
+module TD = struct
+  type sort = typedef
+  
+  let map_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
+    let type_options = this.typedef_options this type_options in
+    let type_exp = sub this type_exp in
+    let cns = Option.map (this.constraint_ this) cns in
+    { td_name ; sort ; type_exp ; cns ; type_options }
+
+  let map_desc this = function
+      Short tds -> Short (map_tds this.texp this tds)
+    | Composition tds -> Composition (map_tds this.composition this tds)
+    | Extension tds -> Extension (map_tds this.extension this tds)
+    | Enumeration tds -> Enumeration (map_tds (map_list this.enum_literal) this tds)
+    | OpenEnumeration tds -> OpenEnumeration (map_tds id this tds)       
+    | DerSpec tds -> DerSpec (map_tds this.der_spec this tds)
+                                                         
+  let map = map_commented map_desc
+
+  let fold_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
+    (sub this type_exp) %>
+      (fold_option this.fold_constraint_ this cns) %>
+      (this.fold_typedef_options this type_options)
+                          
+  let fold_desc this = function
+      Short tds -> fold_tds this.fold_texp this tds
+    | Composition tds -> fold_tds this.fold_composition this tds
+    | Extension tds -> fold_tds this.fold_extension this tds
+    | Enumeration tds -> fold_tds (fold_list this.fold_enum_literal) this tds
+    | OpenEnumeration tds -> fold_tds fold_id this tds
+    | DerSpec tds -> fold_tds this.fold_der_spec this tds
+                          
+  let fold = fold_commented fold_desc
+                          
+end
+
+module Import = struct 
+  type sort = import
+  
+  let map this = map_commented this.import_desc this
+
+  let fold this = fold_commented this.fold_import_desc this
+end
+
+module Comment = struct
+  type sort = comment
+  
+  let fold this { annotated_elem ; annotation } =
+    fold_option (fold_located this.fold_comment_str) this annotated_elem %>
+      fold_option this.fold_annotation this annotation 
+  
+  let map this { annotated_elem ; annotation } = { annotated_elem = (map_option &&& map_located) this.comment_str this annotated_elem ;
+                                                   annotation = map_option this.annotation this annotation }
+end
+
+module Name = struct
+  type sort = name
+
+  let fold this = fold_list (fold_located this.fold_identifier) this
+                
+  let map this = map_list (map_located this.identifier) this
+end
+
+module TRD = struct
+  type sort = type_redeclaration
+
+  let fold this { redecl_each ; redecl_type } = fold_commented (TD.fold_tds this.fold_texp) this redecl_type
+                
+  let map this { redecl_each ; redecl_type } =
+    { redecl_each ; redecl_type = map_commented (TD.map_tds this.texp) this redecl_type }
+end
+
+module CRD = struct
+  type sort = component_redeclaration 
+
+  let fold this { each ; def } = this.fold_def this def
+                
+  let map this { each ; def } =
+    { each ; def = this.def this def }
+end
+
+module CMOD = struct
+  type sort = component_modification
+  
+  let fold this = fold_commented this.fold_component_modification_struct this 
+  
+  let map this = (map_commented this.component_modification_struct) this
+end
+               
+module CMOD_Struct = struct
+  type sort = component_modification_struct
+
+  let fold this { mod_each ; mod_final ; mod_name ;
+                  mod_value ; } =
+    this.fold_name this mod_name %>
+      fold_option this.fold_modification_value this mod_value 
+
+  let map this { mod_each ; mod_final ; mod_name ;
+                 mod_value ; } = {mod_each ; mod_final ;
+                                  mod_name = this.name this mod_name ;                                  
+                                  mod_value = map_option this.modification_value this mod_value }
+end
+
+module CMOD_Value = struct
+  type sort = modification_value
+
+  let fold this = function
+      Nested modification -> this.fold_modification this modification
+    | Rebind exp -> this.fold_exp this exp
+    | NestedRebind { nested ; new_value } -> this.fold_modification this nested %> this.fold_exp this new_value
+                
+  let map this = function
+      Nested modification -> Nested (this.modification this modification)
+    | Rebind exp -> Rebind (this.exp this exp)
+    | NestedRebind { nested ; new_value } -> NestedRebind { nested = this.modification this nested ;
+                                                            new_value = this.exp this new_value
+                                                          }
+end
+                       
+module Modification = struct
+  type sort = modification
+
+  let fold this {types ; components; modifications } =
+    fold_list this.fold_type_redeclaration this types %>
+      fold_list this.fold_component_redeclaration this components %>
+        fold_list this.fold_component_modification this modifications
+                
+  let map this {types ; components; modifications } = { types = map_list this.type_redeclaration this types ;
+                                                        components = map_list this.component_redeclaration this components ;
+                                                        modifications = map_list this.component_modification this modifications }
+end
+
+(*
+module Equation_Desc = struct
+  let map this = function
+    | SimpleEquation { left ; right } -> SimpleEquation { left = this.exp this left ;
+                                                          right = this.exp this right }
+    | ForEquation loop -> ForEquation (map_for_loop (map_list this.equation) this loop)
+    | IfEquation ifeq -> IfEquation (map_conditional (map_list this.equation) this ifeq)
+    | WhenEquation when_eq -> WhenEquation (map_conditional (map_list this.equation) this when_eq)
+    | ExpEquation exp -> ExpEquation (this.exp this exp)
+end
+
+module Equation = struct
+  let map this = map_commented this.equation_desc this
+end
+         
+module Idx = struct
+  let map this { variable ; range } = { variable = map_located id this variable ;
+                                        range = map_option this.exp this range  }
+end
+
+module Algorithm = struct
+  let map this = map_list this.statement this 
+end
+
+module Statement = struct
+  let map this = map_commented this.statement_desc this
+end
+
+module Statement_Desc = struct
+  let map this = function
+      Assignment { target ; source } -> Assignment { target = this.exp this target ;
+                                                     source = this.exp this source }
+
+    | Call {procedure; pargs; pnamed_args} -> Call { procedure = this.exp this procedure ;
+                                                     pargs = map_list this.exp this pargs ;
+                                                     pnamed_args = map_list this.named_arg this pnamed_args }
+                                                   
+    | IfStmt if_statement -> IfStmt (map_conditional (map_list this.statement) this if_statement) 
+    | WhenStmt when_statement -> WhenStmt (map_conditional (map_list this.statement) this when_statement) 
+    | Break -> Break
+    | Return -> Return
+    | ForStmt for_statement -> ForStmt (map_for_loop (map_list this.statement) this for_statement)
+    | WhileStmt { while_ ; do_ } -> WhileStmt { while_ = this.exp this while_ ;
+                                                do_ = map_list this.statement this do_ }
+end
+
+
+module Named_Arg = struct
+  let map this { argument_name ; argument } = { argument_name = map_located this.identifier this argument_name ;
+                                                argument = this.exp this argument }
+end
+
+
+module Exp = struct
+  let map_binary this {left ; right } = {left=this.exp this left ; right = this.exp this right }
+                                          
+  let map this = function
+    | Pow b -> Pow (map_binary this b)
+    | DPow b -> DPow (map_binary this b)
+    | Mul b -> Mul (map_binary this b)
+    | DMul b -> DMul (map_binary this b)
+    | Div b -> Div (map_binary this b)
+    | DDiv b -> DDiv (map_binary this b)
+    | Plus b -> Plus (map_binary this b)
+    | DPlus b -> DPlus (map_binary this b)
+    | Minus b -> Minus (map_binary this b)
+    | DMinus b -> DMinus (map_binary this b)
+
+
+    | UMinus e -> UMinus (this.exp this e)
+    | UPlus e -> UPlus (this.exp this e)
+    | UDPlus e -> UDPlus (this.exp this e)
+    | UDMinus e -> UDMinus (this.exp this e)
+
+    | Not e -> Not (this.exp this e)
+    | And b -> And (map_binary this b)
+    | Or b -> Or (map_binary this b)
+    | Gt b -> Gt (map_binary this b)
+    | Lt b -> Lt (map_binary this b)
+    | Leq b -> Leq (map_binary this b)
+    | Geq b -> Geq (map_binary this b)
+    | Neq b -> Neq (map_binary this b)
+    | Eq b -> Eq (map_binary this b)
+
+    | If if_expression -> If (map_conditional this.exp this if_expression)
+    | ArrayAccess {lhs; indices} -> ArrayAccess { lhs = this.exp this lhs ; indices = map_list this.exp this indices }
+
+    | Range {start; end_; step} -> Range { start = this.exp this start ;
+                                           end_ = this.exp this end_ ;
+                                           step = map_option this.exp this step }
+
+    | RootIde s -> RootIde s
+    | Ide s -> Ide s
+    | Proj {object_; field} -> Proj { object_ = this.exp this object_ ; field }
+    | App { fun_; args; named_args} -> App { fun_ = this.exp this fun_ ;
+                                             args = map_list this.exp this args ;
+                                             named_args = map_list this.named_arg this named_args }
+
+    | Compr { exp ; idxs } -> Compr { exp = this.exp this exp;
+                                      idxs = map_list this.idx this idxs }
+                                
+    | Array es -> Array (map_list this.exp this es)
+    | MArray ess -> MArray (map_list (map_list this.exp) this ess)
+    | ExplicitClosure e -> ExplicitClosure (this.exp this e)                           
+    | OutputExpression eos -> OutputExpression (map_list (map_option this.exp) this eos)
+    | ( End | Colon | Der | Initial | Assert | Bool _ | Int _ | Real _ | String _) as e -> e
+
+
+end
+ *)
+              
+                
 let default_folder = {
   fold_unit_ = Unit.fold ;
   fold_within = fold_id;
   fold_comment = fold_id;
   fold_annotation = fold_id;
   fold_typedef_options = fold_id;
-  fold_typedef = fold_id;
+  fold_typedef = TD.fold;
   fold_composition = fold_id;
-  fold_redeclared_typedef = fold_id;
+  fold_redeclared_typedef = TD.fold;
   fold_extension = fold_id;
   fold_def = fold_id;
   fold_redeclared_def = fold_id;
