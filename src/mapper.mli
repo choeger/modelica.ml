@@ -28,11 +28,12 @@
 
 (** {2 A generic Syntax mapper inspired by OCaml's Ast_mapper } *)
 
-open Batteries
 open Syntax
-open Location
 
 type 'sort map_method = mapper -> 'sort -> 'sort
+(** A map method takes one value of the to-be-mapped
+    syntactic sort and yields another one (or the same). 
+*)
                                              
 and mapper = {
   map_unit_ : mapper -> unit_ -> unit_ ;
@@ -92,35 +93,31 @@ and mapper = {
   map_comment_str : mapper -> string -> string ;
   map_location : mapper -> Location.t -> Location.t;
 }  
+(** A mapper record implements one "method" per syntactic category,
+    using an open recursion style: each method takes as its first
+    argument the mapper to be applied to children in the syntax
+    tree. *)
+               
+val map_id : 'sort map_method
+(** Dummy map method, returns the input *)
 
-let (&&&) l r = fun sub this x -> l (r sub) this x
-                
-(** Lift a sub-map function to a map function over lists *)
-let map_list sub this = List.map (sub this)
+val map_commented : 'sort map_method -> 'sort commented map_method
+(** Lift an element map method over a commented element *)
 
-let map_option sub this = function
-  | None -> None
-  | Some x -> Some (sub this x)
-                                 
-let map_commented sub this {commented; comment} = { commented = sub this commented ;
-                                                    comment = this.map_comment this comment }
+val map_located : 'sort map_method -> 'sort Location.loc map_method
+(** Lift an element map method over a located element *)
 
-let map_located sub this { txt ; loc } = { txt = sub this txt ; loc = this.map_location this loc }
+val map_list : 'sort map_method -> 'sort list map_method
+(** Lift an element map method over a list of elements *)
 
-let map_else_conditional sub this { guard ; elsethen } =
-  { guard = this.map_exp this guard ;
-    elsethen = sub this elsethen }
-                                           
-let map_conditional sub this { condition ; then_ ; else_if ; else_ } =
-  { condition = this.map_exp this condition ;
-    then_ = sub this then_ ;
-    else_if = map_list (map_else_conditional sub) this else_if ;
-    else_ = sub this else_;
-  }
-  
-let map_for_loop sub this {idx; body} = {idx= map_list this.map_idx this idx ;
-                                         body = sub this body }
-                                           
-(** The identity map function. Does {b no} traversal *)
-let map_id this x = x
+val map_option : 'sort map_method -> 'sort option map_method                                                           
+(** Lift an element map method over an optional elements *)
 
+val map_for_loop : 'sort map_method -> 'sort for_loop_struct map_method                                                           
+(** Lift an element map method over a loop structure containing this element as body *)
+
+val map_conditional : 'sort map_method -> 'sort condition_struct map_method                                                           
+(** Lift an element map method over a conditional structure containing this element as body *)
+               
+val (&&&) : ('b map_method -> 'c map_method) -> ('a map_method -> 'b map_method) -> 'a map_method -> 'c map_method
+(** combine two generic mappers *)

@@ -28,13 +28,16 @@
 
 open Syntax
 
+val default_folder : 'a Folder.folder
+
+val default_mapper : Mapper.mapper
+       
 module type TRAVERSAL = sig
     type sort
 
     val fold : (sort, 'a) Folder.fold_method
     val map : sort Mapper.map_method
   end
-
                           
 module Unit : TRAVERSAL with type sort = unit_
 
@@ -46,6 +49,8 @@ module Comment : TRAVERSAL with type sort = comment
 
 module Name : TRAVERSAL with type sort = name                   
 
+module TD : TRAVERSAL with type sort = typedef
+                                           
 module TRD : TRAVERSAL with type sort = type_redeclaration
 
 module CRD : TRAVERSAL with type sort = component_redeclaration 

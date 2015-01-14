@@ -48,8 +48,8 @@ module DerSpec = struct
                                           fold_list (fold_located this.fold_identifier) this idents a'
 
   let map this { der_name ; idents } =
-    { der_name = this.name this der_name ;
-      idents = map_list (map_located this.identifier) this idents } 
+    { der_name = this.map_name this der_name ;
+      idents = map_list (map_located this.map_identifier) this idents } 
 end
                     
 module Unit = struct
@@ -58,26 +58,26 @@ module Unit = struct
   let fold this { within; toplevel_defs; } a = let a' = this.fold_within this within a in
                                                fold_list this.fold_typedef this toplevel_defs a'
                                                
-  let map this { within; toplevel_defs; } = { within = this.within this within ;
-                                              toplevel_defs = map_list this.typedef this toplevel_defs }
+  let map this { within; toplevel_defs; } = { within = this.map_within this within ;
+                                              toplevel_defs = map_list this.map_typedef this toplevel_defs }
 end
 
 module TD = struct
   type sort = typedef
   
   let map_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
-    let type_options = this.typedef_options this type_options in
+    let type_options = this.map_typedef_options this type_options in
     let type_exp = sub this type_exp in
-    let cns = Option.map (this.constraint_ this) cns in
+    let cns = Option.map (this.map_constraint_ this) cns in
     { td_name ; sort ; type_exp ; cns ; type_options }
 
   let map_desc this = function
-      Short tds -> Short (map_tds this.texp this tds)
-    | Composition tds -> Composition (map_tds this.composition this tds)
-    | Extension tds -> Extension (map_tds this.extension this tds)
-    | Enumeration tds -> Enumeration (map_tds (map_list this.enum_literal) this tds)
-    | OpenEnumeration tds -> OpenEnumeration (map_tds id this tds)       
-    | DerSpec tds -> DerSpec (map_tds this.der_spec this tds)
+      Short tds -> Short (map_tds this.map_texp this tds)
+    | Composition tds -> Composition (map_tds this.map_composition this tds)
+    | Extension tds -> Extension (map_tds this.map_extension this tds)
+    | Enumeration tds -> Enumeration (map_tds (map_list this.map_enum_literal) this tds)
+    | OpenEnumeration tds -> OpenEnumeration (map_tds map_id this tds)       
+    | DerSpec tds -> DerSpec (map_tds this.map_der_spec this tds)
                                                          
   let map = map_commented map_desc
 
@@ -94,14 +94,30 @@ module TD = struct
     | OpenEnumeration tds -> fold_tds fold_id this tds
     | DerSpec tds -> fold_tds this.fold_der_spec this tds
                           
-  let fold = fold_commented fold_desc
+  let fold this = fold_commented fold_desc this
                           
 end
 
+module Import_Desc = struct
+  type sort = import_desc
+
+  let fold this = function
+      NamedImport { global ; local } -> this.fold_name this global 
+    | Unnamed name -> this.fold_name this name
+    | UnqualifiedImport name -> this.fold_name this name
+                
+  let map this = function
+      NamedImport { global ; local } -> NamedImport { global = this.map_name this global ; local }
+    | Unnamed name -> Unnamed (this.map_name this name)
+    | UnqualifiedImport name -> UnqualifiedImport (this.map_name this name)
+
+end
+
+              
 module Import = struct 
   type sort = import
   
-  let map this = map_commented this.import_desc this
+  let map this = map_commented this.map_import_desc this
 
   let fold this = fold_commented this.fold_import_desc this
 end
@@ -113,8 +129,8 @@ module Comment = struct
     fold_option (fold_located this.fold_comment_str) this annotated_elem %>
       fold_option this.fold_annotation this annotation 
   
-  let map this { annotated_elem ; annotation } = { annotated_elem = (map_option &&& map_located) this.comment_str this annotated_elem ;
-                                                   annotation = map_option this.annotation this annotation }
+  let map this { annotated_elem ; annotation } = { annotated_elem = (map_option &&& map_located) this.map_comment_str this annotated_elem ;
+                                                   annotation = map_option this.map_annotation this annotation }
 end
 
 module Name = struct
@@ -122,7 +138,7 @@ module Name = struct
 
   let fold this = fold_list (fold_located this.fold_identifier) this
                 
-  let map this = map_list (map_located this.identifier) this
+  let map this = map_list (map_located this.map_identifier) this
 end
 
 module TRD = struct
@@ -131,7 +147,7 @@ module TRD = struct
   let fold this { redecl_each ; redecl_type } = fold_commented (TD.fold_tds this.fold_texp) this redecl_type
                 
   let map this { redecl_each ; redecl_type } =
-    { redecl_each ; redecl_type = map_commented (TD.map_tds this.texp) this redecl_type }
+    { redecl_each ; redecl_type = map_commented (TD.map_tds this.map_texp) this redecl_type }
 end
 
 module CRD = struct
@@ -140,7 +156,7 @@ module CRD = struct
   let fold this { each ; def } = this.fold_def this def
                 
   let map this { each ; def } =
-    { each ; def = this.def this def }
+    { each ; def = this.map_def this def }
 end
 
 module CMOD = struct
@@ -148,7 +164,7 @@ module CMOD = struct
   
   let fold this = fold_commented this.fold_component_modification_struct this 
   
-  let map this = (map_commented this.component_modification_struct) this
+  let map this = (map_commented this.map_component_modification_struct) this
 end
                
 module CMOD_Struct = struct
@@ -161,8 +177,8 @@ module CMOD_Struct = struct
 
   let map this { mod_each ; mod_final ; mod_name ;
                  mod_value ; } = {mod_each ; mod_final ;
-                                  mod_name = this.name this mod_name ;                                  
-                                  mod_value = map_option this.modification_value this mod_value }
+                                  mod_name = this.map_name this mod_name ;                                  
+                                  mod_value = map_option this.map_modification_value this mod_value }
 end
 
 module CMOD_Value = struct
@@ -174,10 +190,10 @@ module CMOD_Value = struct
     | NestedRebind { nested ; new_value } -> this.fold_modification this nested %> this.fold_exp this new_value
                 
   let map this = function
-      Nested modification -> Nested (this.modification this modification)
-    | Rebind exp -> Rebind (this.exp this exp)
-    | NestedRebind { nested ; new_value } -> NestedRebind { nested = this.modification this nested ;
-                                                            new_value = this.exp this new_value
+      Nested modification -> Nested (this.map_modification this modification)
+    | Rebind exp -> Rebind (this.map_exp this exp)
+    | NestedRebind { nested ; new_value } -> NestedRebind { nested = this.map_modification this nested ;
+                                                            new_value = this.map_exp this new_value
                                                           }
 end
                        
@@ -189,9 +205,9 @@ module Modification = struct
       fold_list this.fold_component_redeclaration this components %>
         fold_list this.fold_component_modification this modifications
                 
-  let map this {types ; components; modifications } = { types = map_list this.type_redeclaration this types ;
-                                                        components = map_list this.component_redeclaration this components ;
-                                                        modifications = map_list this.component_modification this modifications }
+  let map this {types ; components; modifications } = { types = map_list this.map_type_redeclaration this types ;
+                                                        components = map_list this.map_component_redeclaration this components ;
+                                                        modifications = map_list this.map_component_modification this modifications }
 end
 
 module Equation_Desc = struct
@@ -205,18 +221,18 @@ module Equation_Desc = struct
     | ExpEquation exp -> this.fold_exp this exp
       
   let map this = function
-    | SimpleEquation { left ; right } -> SimpleEquation { left = this.exp this left ;
-                                                          right = this.exp this right }
-    | ForEquation loop -> ForEquation (map_for_loop (map_list this.equation) this loop)
-    | IfEquation ifeq -> IfEquation (map_conditional (map_list this.equation) this ifeq)
-    | WhenEquation when_eq -> WhenEquation (map_conditional (map_list this.equation) this when_eq)
-    | ExpEquation exp -> ExpEquation (this.exp this exp)
+    | SimpleEquation { left ; right } -> SimpleEquation { left = this.map_exp this left ;
+                                                          right = this.map_exp this right }
+    | ForEquation loop -> ForEquation (map_for_loop (map_list this.map_equation) this loop)
+    | IfEquation ifeq -> IfEquation (map_conditional (map_list this.map_equation) this ifeq)
+    | WhenEquation when_eq -> WhenEquation (map_conditional (map_list this.map_equation) this when_eq)
+    | ExpEquation exp -> ExpEquation (this.map_exp this exp)
 end
 
 module Equation = struct
   type sort = equation
   let fold this = fold_commented this.fold_equation_desc this
-  let map this = map_commented this.equation_desc this
+  let map this = map_commented this.map_equation_desc this
 end
 
 module Idx = struct
@@ -225,8 +241,8 @@ module Idx = struct
   let fold this { variable ; range } = fold_located this.fold_identifier this variable %>
                                          fold_option this.fold_exp this range
                 
-  let map this { variable ; range } = { variable = map_located this.identifier this variable ;
-                                        range = map_option this.exp this range  }
+  let map this { variable ; range } = { variable = map_located this.map_identifier this variable ;
+                                        range = map_option this.map_exp this range  }
 end
 
 module Algorithm = struct
@@ -234,7 +250,7 @@ module Algorithm = struct
 
   let fold this = fold_list this.fold_statement this
   
-  let map this = map_list this.statement this 
+  let map this = map_list this.map_statement this 
 end
 
 module Statement = struct
@@ -242,7 +258,7 @@ module Statement = struct
 
   let fold this = fold_commented this.fold_statement_desc this
                 
-  let map this = map_commented this.statement_desc this
+  let map this = map_commented this.map_statement_desc this
 end
 
 module Statement_Desc = struct
@@ -266,20 +282,20 @@ module Statement_Desc = struct
                                       fold_list this.fold_statement this do_ 
   
   let map this = function
-      Assignment { target ; source } -> Assignment { target = this.exp this target ;
-                                                     source = this.exp this source }
+      Assignment { target ; source } -> Assignment { target = this.map_exp this target ;
+                                                     source = this.map_exp this source }
 
-    | Call {procedure; pargs; pnamed_args} -> Call { procedure = this.exp this procedure ;
-                                                     pargs = map_list this.exp this pargs ;
-                                                     pnamed_args = map_list this.named_arg this pnamed_args }
+    | Call {procedure; pargs; pnamed_args} -> Call { procedure = this.map_exp this procedure ;
+                                                     pargs = map_list this.map_exp this pargs ;
+                                                     pnamed_args = map_list this.map_named_arg this pnamed_args }
                                                    
-    | IfStmt if_statement -> IfStmt (map_conditional (map_list this.statement) this if_statement) 
-    | WhenStmt when_statement -> WhenStmt (map_conditional (map_list this.statement) this when_statement) 
+    | IfStmt if_statement -> IfStmt (map_conditional (map_list this.map_statement) this if_statement) 
+    | WhenStmt when_statement -> WhenStmt (map_conditional (map_list this.map_statement) this when_statement) 
     | Break -> Break
     | Return -> Return
-    | ForStmt for_statement -> ForStmt (map_for_loop (map_list this.statement) this for_statement)
-    | WhileStmt { while_ ; do_ } -> WhileStmt { while_ = this.exp this while_ ;
-                                                do_ = map_list this.statement this do_ }
+    | ForStmt for_statement -> ForStmt (map_for_loop (map_list this.map_statement) this for_statement)
+    | WhileStmt { while_ ; do_ } -> WhileStmt { while_ = this.map_exp this while_ ;
+                                                do_ = map_list this.map_statement this do_ }
 end
 
 module Named_Arg = struct
@@ -288,14 +304,14 @@ module Named_Arg = struct
   let fold this {argument_name ; argument} = fold_located this.fold_identifier this argument_name %>
                                                this.fold_exp this argument
                 
-  let map this { argument_name ; argument } = { argument_name = map_located this.identifier this argument_name ;
-                                                argument = this.exp this argument }
+  let map this { argument_name ; argument } = { argument_name = map_located this.map_identifier this argument_name ;
+                                                argument = this.map_exp this argument }
 end
 
 module Exp = struct
   type sort = exp
 
-  let map_binary this {left ; right } = {left=this.exp this left ; right = this.exp this right }
+  let map_binary this {left ; right } = {left=this.map_exp this left ; right = this.map_exp this right }
   let fold_binary this {left; right } = this.fold_exp this left %> this.fold_exp this right
 
   let fold this = function
@@ -358,12 +374,12 @@ module Exp = struct
     | Minus b -> Minus (map_binary this b)
     | DMinus b -> DMinus (map_binary this b)
 
-    | UMinus e -> UMinus (this.exp this e)
-    | UPlus e -> UPlus (this.exp this e)
-    | UDPlus e -> UDPlus (this.exp this e)
-    | UDMinus e -> UDMinus (this.exp this e)
+    | UMinus e -> UMinus (this.map_exp this e)
+    | UPlus e -> UPlus (this.map_exp this e)
+    | UDPlus e -> UDPlus (this.map_exp this e)
+    | UDMinus e -> UDMinus (this.map_exp this e)
 
-    | Not e -> Not (this.exp this e)
+    | Not e -> Not (this.map_exp this e)
     | And b -> And (map_binary this b)
     | Or b -> Or (map_binary this b)
     | Gt b -> Gt (map_binary this b)
@@ -373,27 +389,27 @@ module Exp = struct
     | Neq b -> Neq (map_binary this b)
     | Eq b -> Eq (map_binary this b)
 
-    | If if_expression -> If (map_conditional this.exp this if_expression)
-    | ArrayAccess {lhs; indices} -> ArrayAccess { lhs = this.exp this lhs ; indices = map_list this.exp this indices }
+    | If if_expression -> If (map_conditional this.map_exp this if_expression)
+    | ArrayAccess {lhs; indices} -> ArrayAccess { lhs = this.map_exp this lhs ; indices = map_list this.map_exp this indices }
 
-    | Range {start; end_; step} -> Range { start = this.exp this start ;
-                                           end_ = this.exp this end_ ;
-                                           step = map_option this.exp this step }
+    | Range {start; end_; step} -> Range { start = this.map_exp this start ;
+                                           end_ = this.map_exp this end_ ;
+                                           step = map_option this.map_exp this step }
 
     | RootIde s -> RootIde s
     | Ide s -> Ide s
-    | Proj {object_; field} -> Proj { object_ = this.exp this object_ ; field }
-    | App { fun_; args; named_args} -> App { fun_ = this.exp this fun_ ;
-                                             args = map_list this.exp this args ;
-                                             named_args = map_list this.named_arg this named_args }
+    | Proj {object_; field} -> Proj { object_ = this.map_exp this object_ ; field }
+    | App { fun_; args; named_args} -> App { fun_ = this.map_exp this fun_ ;
+                                             args = map_list this.map_exp this args ;
+                                             named_args = map_list this.map_named_arg this named_args }
 
-    | Compr { exp ; idxs } -> Compr { exp = this.exp this exp;
-                                      idxs = map_list this.idx this idxs }
+    | Compr { exp ; idxs } -> Compr { exp = this.map_exp this exp;
+                                      idxs = map_list this.map_idx this idxs }
                                 
-    | Array es -> Array (map_list this.exp this es)
-    | MArray ess -> MArray (map_list (map_list this.exp) this ess)
-    | ExplicitClosure e -> ExplicitClosure (this.exp this e)                           
-    | OutputExpression eos -> OutputExpression (map_list (map_option this.exp) this eos)
+    | Array es -> Array (map_list this.map_exp this es)
+    | MArray ess -> MArray (map_list (map_list this.map_exp) this ess)
+    | ExplicitClosure e -> ExplicitClosure (this.map_exp this e)                           
+    | OutputExpression eos -> OutputExpression (map_list (map_option this.map_exp) this eos)
     | ( End | Colon | Der | Initial | Assert | Bool _ | Int _ | Real _ | String _) as e -> e
 
 
@@ -407,7 +423,7 @@ let default_folder = {
   fold_typedef_options = fold_id;
   fold_typedef = TD.fold;
   fold_composition = fold_id;
-  fold_redeclared_typedef = TD.fold;
+  fold_redeclared_typedef = fold_id;
   fold_extension = fold_id;
   fold_def = fold_id;
   fold_redeclared_def = fold_id;
@@ -441,3 +457,64 @@ let default_folder = {
   fold_comment_str = fold_id;
   fold_location = fold_id;
 }
+                                                      
+let default_mapper = {
+  map_unit_ = Unit.map ;
+  map_within = map_id;
+
+  map_typedef_options = map_id;
+  map_typedef = TD.map;
+
+  map_composition = map_id;
+
+  map_redeclared_typedef = map_id;
+  map_extension = map_id;
+  
+  map_def = map_commented map_id ;
+  map_redeclared_def = map_id;
+
+  map_import_desc = Import_Desc.map ;
+  map_import = Import.map;
+  map_extend = map_id;
+  
+  map_imports = map_id;
+  map_public = map_id;
+  map_protected = map_id;
+  map_cargo = map_id;
+
+  map_constraint_ = map_id;
+
+  map_der_spec = DerSpec.map;
+  
+  map_enum_literal = map_id;
+  
+  map_algorithm = Algorithm.map;
+  map_external_def = map_id;
+
+  map_texp = map_id;
+
+  map_comment = Comment.map;
+  map_annotation = Modification.map;
+  
+  map_exp = Exp.map;
+  map_statement = Statement.map;
+  map_statement_desc = Statement_Desc.map;
+  map_idx = Idx.map;
+  
+  map_equation_desc = Equation_Desc.map;
+  map_equation = Equation.map;
+
+  map_name = Name.map ;
+  map_identifier = map_id;
+  map_named_arg = Named_Arg.map;
+  map_comment_str = map_id;
+  map_location = map_id;
+  
+  map_modification = Modification.map;
+  map_type_redeclaration = TRD.map;
+  map_component_redeclaration = CRD.map;
+  map_component_modification = CMOD.map;
+  map_component_modification_struct = CMOD_Struct.map;
+  map_modification_value = CMOD_Value.map;
+}
+
