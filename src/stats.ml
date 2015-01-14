@@ -26,19 +26,21 @@
  *
  *)
 
-open Sys
-open FileSystem
-open Pprint_modelica
-open Stats
-       
-let stats u =
-  let {def_count; type_count} = generate_stats u in
-  Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
-       
-let _ =
-  Format.pp_set_margin Format.str_formatter (140);
-  match (scan [] argv.(1)) with
-    Some pkg ->  begin match merge pkg with Some u -> stats u ;(*Printf.printf "%s\n" (unit2str ~max:(max_int - 1) u);*) 0 | None -> 1 end
-  | None -> Printf.eprintf "'%s' does not seem to be a Modelica package.\n" argv.(1) ; 1
-              
-                  
+open Traversal
+
+type source_statistics = {
+  def_count : int;
+  type_count : int;
+}
+
+let count_definition _ _ ({def_count} as s) = {s with def_count = def_count + 1}
+
+let count_typedef this def  ({type_count} as s) =
+  TD.fold this def {s with type_count = type_count + 1}
+                           
+let counter = { default_folder with
+                fold_def = count_definition ;
+                fold_typedef = count_typedef ;
+              }
+
+let generate_stats u = counter.fold_unit_ counter u {def_count=0;type_count=0}
