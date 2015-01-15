@@ -32,6 +32,7 @@ open Pprint_modelica
 open Stats
 open Syntax
 open Class_deps
+open Utils
 open Batteries
        
 let stats u =
@@ -49,13 +50,20 @@ let from2str from =
   List.print ~first:"{" ~sep:"|" ~last:"}" write_name o from ; IO.close_out o
                                                         
 let print_dep { local_name ; from; element } =
-  Printf.printf "  '%s' from %s\n" local_name (from2str from) 
+  match element with
+    [] -> Printf.printf "  '%s' from %s\n" local_name (from2str from)
+  | es -> Printf.printf "  '%s (.%s)' from %s\n" local_name (name2str es) (from2str from)
                                                       
 let print_def {global_name;dependencies} = Printf.printf "%d dependencies in %s\n" (List.length dependencies) (name2str global_name) ;
                                            List.iter print_dep dependencies 
-                                                           
+
+let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrSet.singleton start}]
+
+let name = function
+    Short tds -> tds.td_name | Composition tds -> tds.td_name | Enumeration tds -> tds.td_name | OpenEnumeration tds -> tds.td_name | DerSpec tds -> tds.td_name | Extension tds -> tds.td_name
+                                                     
 let deps u = match u.toplevel_defs with
-    d::_ -> let ldefs = Class_deps.scan_dependencies d in
+    d::_ -> let ldefs = Class_deps.scan_dependencies (global_scope (name d.commented)) d in
             List.iter print_def ldefs
   | _ -> ()
                 

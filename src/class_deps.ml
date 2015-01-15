@@ -67,10 +67,15 @@ type scanner_result = {
   scope : scope;
 }
 
+let builtin = function
+  | "String" | "Real" | "Boolean" | "Integer" -> true
+  | _ -> false
+                        
 (** Compute a dependency from a type-expression *)
 let rec dependency es scope = function
-  | TIde x -> let from = find x scope in {local_name = x ; from ; element=es}
-  | TRootide x -> {from = [x :: es] ; local_name=x ; element = []}
+  | TIde x when builtin x -> None
+  | TIde x -> let from = find x scope in Some {local_name = x ; from ; element=es}
+  | TRootide x -> Some {from = [x :: es] ; local_name=x ; element = []}
   | TProj {class_type; type_element} -> dependency (type_element::es) scope class_type
   | TArray {base_type} -> dependency es scope base_type
   | TMod {mod_type} -> dependency es scope mod_type (* TODO: redeclarations might cause additional dependencies, covered by folder ? - Test *)
@@ -79,7 +84,7 @@ let rec dependency es scope = function
   | TCau {flagged} -> dependency es scope flagged
 
 let local_deps scope c =                                    
-  let fold_dependencies this texp deps = (dependency [] scope texp)::deps in
+  let fold_dependencies this texp deps = match (dependency [] scope texp) with Some d when (List.mem d deps) -> deps | Some d -> d::deps | None -> deps in
   let dependency_collector = { default_folder with fold_texp = fold_dependencies ;
                                                    fold_typedef = Folder.fold_id ;
                                                    fold_redeclared_typedef = Folder.fold_id;
@@ -125,9 +130,9 @@ let scan this td {found;scope} = match td with
                      end
   | _ -> TD_Desc.fold this td {found;scope}
 
-
-let scan_dependencies typedef =
+                      
+let scan_dependencies scope typedef =
   let scanner = { default_folder with fold_typedef_desc = scan } in
-  let { found } = scanner.fold_typedef scanner typedef { found = []; scope = []} in
+  let { found } = scanner.fold_typedef scanner typedef { found = []; scope} in
   found
                                                                  

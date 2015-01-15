@@ -42,4 +42,12 @@ type lexical_typedef = {
   dependencies : dependency list;
 }
 
-val scan_dependencies : typedef -> lexical_typedef list
+type scope_entry = {
+  scope_name : global_name ;
+  scope_tainted: bool;
+  scope_entries :  StrSet.t;
+}
+
+type scope = scope_entry list
+
+val scan_dependencies : scope -> typedef -> lexical_typedef list
