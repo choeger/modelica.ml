@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: c5220e95ff8129c4ccaf9dabbb688ce0)
+# DO NOT EDIT (digest: b309defd991b562d618b0fbcfede81cd)
 Modelica_parser
 Modelica_lexer
 Pprint_modelica
@@ -9,6 +9,8 @@ Mapper
 Folder
 FileSystem
 Traversal
+Stats
+Class_deps
 Generated_parser
 Utils
 # OASIS_STOP

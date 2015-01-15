@@ -52,7 +52,9 @@ module Comment : TRAVERSAL with type sort = comment
 module Name : TRAVERSAL with type sort = name                   
 
 module TD : TRAVERSAL with type sort = typedef
-                                           
+
+module TD_Desc : TRAVERSAL with type sort = typedef_desc
+         
 module TRD : TRAVERSAL with type sort = type_redeclaration
 
 module CRD : TRAVERSAL with type sort = component_redeclaration 

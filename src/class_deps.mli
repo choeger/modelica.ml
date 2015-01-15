@@ -26,26 +26,20 @@
  *
  *)
 
-type token =
- GT | LT | NEQ | GEQ | LEQ | EQ | EQEQ | LPAREN | RPAREN | LBRACKET | RBRACKET | LBRACE | RBRACE | SEMICOLON | COMMA | DOT | COLON | COLONEQ
- | INT of int
- | FLOAT of float
- | IDENT of string
- | QIDENT of string
- | STRING of string
- | DOTPOWER | POWER | PLUS | MINUS | TIMES | DIV | DOTPLUS | DOTMINUS | DOTTIMES | DOTDIV
- | EOF
- | ALGORITHM | DISCRETE | FALSE | LOOP | PURE | AND | EACH | FINAL | MODEL | RECORD | ANNOTATION | ELSE
- | FLOW | NOT | REDECLARE | ASSERT | ELSEIF | FOR | OPERATOR | REPLACEABLE | BLOCK | ELSEWHEN | FUNCTION | OR | RETURN
- | BREAK | ENCAPSULATED | IF | OUTER | STREAM | CLASS | END | IMPORT | OUTPUT | THEN | CONNECT | ENUMERATION | IMPURE
- | PACKAGE | TRUE | CONNECTOR | EQUATION | IN | PARAMETER | TYPE | CONSTANT | EXPANDABLE | INITIAL | PARTIAL | WHEN
- | CONSTRAINEDBY | EXTENDS | INNER | PROTECTED | WHILE | DER | EXTERNAL | INPUT | PUBLIC | WITHIN
- | ENDWHEN | ENDIF | ENDFOR | ENDWHILE | END_IDENT of string | INITIAL_EQUATION | INITIAL_ALGORITHM
-                                [@@deriving show]
-                                
-open Batteries
+open Utils
+open Syntax
 
-module StrMap = Map.Make(String)
-module StrSet = Set.Make(String)
-                        
-module List = List
+type global_name = string list
+
+type dependency = {
+  local_name : string;
+  from : global_name list;
+  element : string list;
+}
+                   
+type lexical_typedef = {
+  global_name : global_name;
+  dependencies : dependency list;
+}
+
+val scan_dependencies : typedef -> lexical_typedef list

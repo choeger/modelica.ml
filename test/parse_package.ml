@@ -30,15 +30,39 @@ open Sys
 open FileSystem
 open Pprint_modelica
 open Stats
+open Syntax
+open Class_deps
+open Batteries
        
 let stats u =
   let {def_count; type_count} = generate_stats u in
   Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
-       
+
+let write_name o = List.print ~sep:"." IO.nwrite o
+                
+let name2str name =
+  let o = IO.output_string () in
+  write_name o name ; IO.close_out o
+
+let from2str from =
+  let o = IO.output_string () in
+  List.print ~first:"{" ~sep:"|" ~last:"}" write_name o from ; IO.close_out o
+                                                        
+let print_dep { local_name ; from; element } =
+  Printf.printf "  '%s' from %s\n" local_name (from2str from) 
+                                                      
+let print_def {global_name;dependencies} = Printf.printf "%d dependencies in %s\n" (List.length dependencies) (name2str global_name) ;
+                                           List.iter print_dep dependencies 
+                                                           
+let deps u = match u.toplevel_defs with
+    d::_ -> let ldefs = Class_deps.scan_dependencies d in
+            List.iter print_def ldefs
+  | _ -> ()
+                
 let _ =
   Format.pp_set_margin Format.str_formatter (140);
   match (scan [] argv.(1)) with
-    Some pkg ->  begin match merge pkg with Some u -> stats u ;(*Printf.printf "%s\n" (unit2str ~max:(max_int - 1) u);*) 0 | None -> 1 end
+    Some pkg ->  begin match merge pkg with Some u -> stats u ; deps u; (*Printf.printf "%s\n" (unit2str ~max:(max_int - 1) u);*) 0 | None -> 1 end
   | None -> Printf.eprintf "'%s' does not seem to be a Modelica package.\n" argv.(1) ; 1
               
                   

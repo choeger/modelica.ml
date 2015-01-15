@@ -62,39 +62,44 @@ module Unit = struct
                                               toplevel_defs = map_list this.map_typedef this toplevel_defs }
 end
 
-module TD = struct
-  type sort = typedef
-  
-  let map_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
-    let type_options = this.map_typedef_options this type_options in
-    let type_exp = sub this type_exp in
-    let cns = Option.map (this.map_constraint this) cns in
-    { td_name ; sort ; type_exp ; cns ; type_options }
-
-  let map_desc this = function
-      Short tds -> Short (map_tds this.map_texp this tds)
-    | Composition tds -> Composition (map_tds this.map_composition this tds)
-    | Extension tds -> Extension (map_tds this.map_extension this tds)
-    | Enumeration tds -> Enumeration (map_tds (map_list this.map_enum_literal) this tds)
-    | OpenEnumeration tds -> OpenEnumeration (map_tds map_id this tds)       
-    | DerSpec tds -> DerSpec (map_tds this.map_der_spec this tds)
-                                                         
-  let map = map_commented map_desc
-
+module TD_Desc = struct
+  type sort = typedef_desc
+                
   let fold_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
     (sub this type_exp) %>
       (fold_option this.fold_constraint this cns) %>
       (this.fold_typedef_options this type_options)
                           
-  let fold_desc this = function
+  let fold this = function
       Short tds -> fold_tds this.fold_texp this tds
     | Composition tds -> fold_tds this.fold_composition this tds
     | Extension tds -> fold_tds this.fold_extension this tds
     | Enumeration tds -> fold_tds (fold_list this.fold_enum_literal) this tds
     | OpenEnumeration tds -> fold_tds fold_id this tds
     | DerSpec tds -> fold_tds this.fold_der_spec this tds
+
+  let map_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
+    let type_options = this.map_typedef_options this type_options in
+    let type_exp = sub this type_exp in
+    let cns = Option.map (this.map_constraint this) cns in
+    { td_name ; sort ; type_exp ; cns ; type_options }
+
+  let map this = function
+      Short tds -> Short (map_tds this.map_texp this tds)
+    | Composition tds -> Composition (map_tds this.map_composition this tds)
+    | Extension tds -> Extension (map_tds this.map_extension this tds)
+    | Enumeration tds -> Enumeration (map_tds (map_list this.map_enum_literal) this tds)
+    | OpenEnumeration tds -> OpenEnumeration (map_tds map_id this tds)       
+    | DerSpec tds -> DerSpec (map_tds this.map_der_spec this tds)
+end
+                              
+module TD = struct
+  type sort = typedef
+                                                           
+  let map this = map_commented this.map_typedef_desc this 
+
                           
-  let fold this = fold_commented fold_desc this
+  let fold this = fold_commented this.fold_typedef_desc this
                           
 end
 
@@ -152,10 +157,10 @@ end
 module TRD = struct
   type sort = type_redeclaration
 
-  let fold this { redecl_each ; redecl_type } = fold_commented (TD.fold_tds this.fold_texp) this redecl_type
+  let fold this { redecl_each ; redecl_type } = fold_commented (TD_Desc.fold_tds this.fold_texp) this redecl_type
                 
   let map this { redecl_each ; redecl_type } =
-    { redecl_each ; redecl_type = map_commented (TD.map_tds this.map_texp) this redecl_type }
+    { redecl_each ; redecl_type = map_commented (TD_Desc.map_tds this.map_texp) this redecl_type }
 end
 
 module CRD = struct
@@ -448,7 +453,7 @@ module Composition = struct
   let fold this { imports ; public ; protected ; cargo } =
     this.fold_imports this imports %>
       this.fold_public this public %>
-        this.fold_protected this public %>
+        this.fold_protected this protected %>
           this.fold_cargo this cargo 
 
   let map this { imports ; public ; protected ; cargo } =
@@ -507,6 +512,7 @@ let default_folder = {
   fold_annotation = fold_id;
   fold_typedef_options = fold_id;
   fold_typedef = TD.fold;
+  fold_typedef_desc = TD_Desc.fold;
   fold_composition = Composition.fold;
   fold_redeclared_typedef = TD.fold;
   fold_extension = Extension.fold;
@@ -554,6 +560,7 @@ let default_mapper = {
 
   map_typedef_options = map_id;
   map_typedef = TD.map;
+  map_typedef_desc = TD_Desc.map;
 
   map_composition = map_id;
 

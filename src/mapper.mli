@@ -43,6 +43,7 @@ and mapper = {
   
   map_typedef_options : mapper -> typedef_options -> typedef_options;
   map_typedef : mapper -> typedef -> typedef;
+  map_typedef_desc : typedef_desc map_method;
 
   map_composition : mapper -> composition -> composition;
 

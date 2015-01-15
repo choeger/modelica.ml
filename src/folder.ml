@@ -38,6 +38,7 @@ and 'a folder = {
   fold_annotation : (modification,'a) fold_method;
   fold_typedef_options : (typedef_options,'a) fold_method;
   fold_typedef : (typedef,'a) fold_method;
+  fold_typedef_desc : (typedef_desc,'a) fold_method;
   fold_composition : (composition,'a) fold_method;
   fold_redeclared_typedef : (typedef,'a) fold_method;
   fold_extension : (extension,'a) fold_method;
