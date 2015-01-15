@@ -84,3 +84,6 @@ module Exp : TRAVERSAL with type sort = exp
 module Elements : TRAVERSAL with type sort = elements
 
 module Composition : TRAVERSAL with type sort = composition
+
+module Extension : TRAVERSAL with type sort = extension
+

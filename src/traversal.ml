@@ -458,6 +458,17 @@ module Composition = struct
     let cargo = this.map_cargo this cargo in
     { imports ; public ; protected ; cargo }
 end
+
+module Extension = struct
+  type sort = extension
+
+  let fold this (cmp, m) = this.fold_composition this cmp %>
+                             fold_option this.fold_modification this m
+
+  let map this (cmp, m) = (this.map_composition this cmp , map_option this.map_modification this m)
+                                 
+end
+                       
                           
 let default_folder = {
   fold_unit_ = Unit.fold ;
@@ -468,7 +479,7 @@ let default_folder = {
   fold_typedef = TD.fold;
   fold_composition = Composition.fold;
   fold_redeclared_typedef = TD.fold;
-  fold_extension = fold_id;
+  fold_extension = Extension.fold;
   fold_def = fold_id;
   fold_redeclared_def = fold_id;
   fold_import = Import.fold;
