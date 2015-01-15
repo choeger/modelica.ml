@@ -33,7 +33,7 @@ open Mapper
 open Folder
 
 type ('s, 'a) fold_method = ('a folder) -> 's -> 'a -> 'a
-       
+                                                         
 module type TRAVERSAL = sig
     type sort
 
@@ -68,7 +68,7 @@ module TD = struct
   let map_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
     let type_options = this.map_typedef_options this type_options in
     let type_exp = sub this type_exp in
-    let cns = Option.map (this.map_constraint_ this) cns in
+    let cns = Option.map (this.map_constraint this) cns in
     { td_name ; sort ; type_exp ; cns ; type_options }
 
   let map_desc this = function
@@ -83,7 +83,7 @@ module TD = struct
 
   let fold_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
     (sub this type_exp) %>
-      (fold_option this.fold_constraint_ this cns) %>
+      (fold_option this.fold_constraint this cns) %>
       (this.fold_typedef_options this type_options)
                           
   let fold_desc this = function
@@ -468,8 +468,38 @@ module Extension = struct
   let map this (cmp, m) = (this.map_composition this cmp , map_option this.map_modification this m)
                                  
 end
-                       
-                          
+
+module Definition = struct
+  type sort = definition
+                         
+  let fold this = fold_commented this.fold_definition_structure this
+
+  let map this = map_commented this.map_definition_structure this
+end
+
+module Definition_Structure = struct
+  type sort = definition_structure
+                         
+  let fold this { def_name ; def_type ; def_constraint ;
+                  def_rhs ; def_if ; def_options } =
+    this.fold_texp this def_type %>
+      fold_option this.fold_constraint this def_constraint %>
+        fold_option this.fold_exp this def_rhs %>
+          fold_option this.fold_exp this def_if %>
+            this.fold_definition_options this def_options
+
+  let map this { def_name ; def_type ; def_constraint ;
+                 def_rhs ; def_if ; def_options } =
+    let def_type = this.map_texp this def_type in
+    let def_constraint = map_option this.map_constraint this def_constraint in
+    let def_rhs = map_option this.map_exp this def_rhs in
+    let def_if = map_option this.map_exp this def_if in
+    let def_options = this.map_definition_options this def_options in
+    { def_name ; def_type ; def_constraint ;
+                 def_rhs ; def_if ; def_options }                                              
+                               
+end
+                      
 let default_folder = {
   fold_unit_ = Unit.fold ;
   fold_within = fold_id;
@@ -480,8 +510,10 @@ let default_folder = {
   fold_composition = Composition.fold;
   fold_redeclared_typedef = TD.fold;
   fold_extension = Extension.fold;
-  fold_def = fold_id;
-  fold_redeclared_def = fold_id;
+  fold_def = Definition.fold;
+  fold_redeclared_def = Definition.fold;
+  fold_definition_structure = Definition_Structure.fold;
+  fold_definition_options = fold_id;
   fold_import = Import.fold;
   fold_import_desc = Import_Desc.fold;
   fold_imports = Imports.fold;
@@ -489,7 +521,7 @@ let default_folder = {
   fold_protected = Elements.fold;
   fold_extends = fold_id;
   fold_cargo = fold_id;
-  fold_constraint_ = fold_id;
+  fold_constraint = fold_id;
   fold_der_spec = fold_id;
   fold_enum_literal = fold_id;
   fold_algorithm = fold_id;
@@ -530,6 +562,8 @@ let default_mapper = {
   
   map_def = map_commented map_id ;
   map_redeclared_def = map_id;
+  map_definition_structure = map_id;
+  map_definition_options = map_id;
 
   map_import_desc = Import_Desc.map ;
   map_import = Import.map;
@@ -540,7 +574,7 @@ let default_mapper = {
   map_protected = map_id;
   map_cargo = map_id;
 
-  map_constraint_ = map_id;
+  map_constraint = map_id;
 
   map_der_spec = DerSpec.map;
   

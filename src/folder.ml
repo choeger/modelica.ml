@@ -28,7 +28,7 @@
 
 open Batteries
 open Syntax
-
+       
 type ('s, 'a) fold_method = ('a folder) -> 's -> 'a -> 'a
 
 and 'a folder = {
@@ -42,6 +42,8 @@ and 'a folder = {
   fold_redeclared_typedef : (typedef,'a) fold_method;
   fold_extension : (extension,'a) fold_method;
   fold_def : (definition,'a) fold_method;
+  fold_definition_structure : (definition_structure, 'a) fold_method;
+  fold_definition_options : (definition_options, 'a) fold_method;
   fold_redeclared_def : (definition,'a) fold_method;
   fold_import : (import,'a) fold_method;
   fold_import_desc : (import_desc,'a) fold_method;
@@ -50,7 +52,7 @@ and 'a folder = {
   fold_protected : (elements,'a) fold_method;
   fold_extends : (extend, 'a) fold_method; 
   fold_cargo : (behavior,'a) fold_method;
-  fold_constraint_ : (constraint_,'a) fold_method;
+  fold_constraint : (constraint_,'a) fold_method;
   fold_der_spec : (der_spec,'a) fold_method;
   fold_enum_literal : (enum_literal,'a) fold_method;
   fold_algorithm : (algorithm,'a) fold_method;
@@ -74,7 +76,7 @@ and 'a folder = {
   fold_comment_str : (string,'a) fold_method;
   fold_location : (Location.t,'a) fold_method;                              
  }  
-
+                  
 let fold_id folder s a = a
 
 let fold_commented f this {commented; comment} a = let a' = f this commented a in

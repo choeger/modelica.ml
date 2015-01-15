@@ -31,7 +31,7 @@ open Syntax
 val default_folder : 'a Folder.folder
 
 val default_mapper : Mapper.mapper
-       
+                       
 module type TRAVERSAL = sig
     type sort
 

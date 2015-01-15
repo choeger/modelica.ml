@@ -50,6 +50,8 @@ and mapper = {
   map_extension : mapper -> extension -> extension ;
   
   map_def : mapper -> definition -> definition ;
+  map_definition_options : definition_options map_method;
+  map_definition_structure : definition_structure map_method;
   map_redeclared_def : mapper -> definition -> definition ;
 
   map_import : mapper -> import -> import ;
@@ -61,7 +63,7 @@ and mapper = {
   map_protected : mapper -> elements -> elements ;
   map_cargo : mapper -> behavior -> behavior ;
 
-  map_constraint_ : mapper -> constraint_ -> constraint_ ;
+  map_constraint : mapper -> constraint_ -> constraint_ ;
 
   map_der_spec : mapper -> der_spec -> der_spec;
   
