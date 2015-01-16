@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 23f8e4ecb375bcaec7f988b1837a3130)
+# DO NOT EDIT (digest: 51d4f83ef370cb53d5fa0bdb21d7109e)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -19,6 +19,7 @@ true: annot, bin_annot
 <src/*.ml{,i,y}>: pkg_batteries
 <src/*.ml{,i,y}>: pkg_compiler-libs.common
 <src/*.ml{,i,y}>: pkg_menhirLib
+<src/*.ml{,i,y}>: pkg_ocamlgraph
 <src/*.ml{,i,y}>: pkg_ppx_deriving.show
 <src/*.ml{,i,y}>: pkg_sedlex
 # Executable modelica_frontend_tests
@@ -26,6 +27,7 @@ true: annot, bin_annot
 <test/modelica_frontend_tests.{native,byte}>: pkg_compiler-libs.common
 <test/modelica_frontend_tests.{native,byte}>: pkg_menhirLib
 <test/modelica_frontend_tests.{native,byte}>: pkg_oUnit
+<test/modelica_frontend_tests.{native,byte}>: pkg_ocamlgraph
 <test/modelica_frontend_tests.{native,byte}>: pkg_ppx_deriving.show
 <test/modelica_frontend_tests.{native,byte}>: pkg_sedlex
 <test/modelica_frontend_tests.{native,byte}>: use_modelica_ml
@@ -35,6 +37,7 @@ true: annot, bin_annot
 <test/parse_modelica.{native,byte}>: pkg_batteries
 <test/parse_modelica.{native,byte}>: pkg_compiler-libs.common
 <test/parse_modelica.{native,byte}>: pkg_menhirLib
+<test/parse_modelica.{native,byte}>: pkg_ocamlgraph
 <test/parse_modelica.{native,byte}>: pkg_ppx_deriving.show
 <test/parse_modelica.{native,byte}>: pkg_sedlex
 <test/parse_modelica.{native,byte}>: use_modelica_ml
@@ -43,12 +46,14 @@ true: annot, bin_annot
 <test/parse_package.{native,byte}>: pkg_batteries
 <test/parse_package.{native,byte}>: pkg_compiler-libs.common
 <test/parse_package.{native,byte}>: pkg_menhirLib
+<test/parse_package.{native,byte}>: pkg_ocamlgraph
 <test/parse_package.{native,byte}>: pkg_ppx_deriving.show
 <test/parse_package.{native,byte}>: pkg_sedlex
 <test/parse_package.{native,byte}>: use_modelica_ml
 <test/*.ml{,i,y}>: pkg_batteries
 <test/*.ml{,i,y}>: pkg_compiler-libs.common
 <test/*.ml{,i,y}>: pkg_menhirLib
+<test/*.ml{,i,y}>: pkg_ocamlgraph
 <test/*.ml{,i,y}>: pkg_ppx_deriving.show
 <test/*.ml{,i,y}>: pkg_sedlex
 <test/*.ml{,i,y}>: use_modelica_ml

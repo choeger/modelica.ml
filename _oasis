@@ -11,7 +11,7 @@ Library modelica_ml
   CompiledObject: best
   BuildTools:     ocamlbuild
   BuildDepends:   batteries, menhirLib, sedlex, ppx_deriving.show,
-                  compiler-libs.common
+                  compiler-libs.common, ocamlgraph
   Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
                   Syntax, Syntax_fragments, Mapper, Folder, FileSystem, Traversal,
                   Stats, Class_deps

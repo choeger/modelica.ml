@@ -49,3 +49,8 @@ module StrMap = Map.Make(String)
 module StrSet = Set.Make(String)
                         
 module List = List
+
+
+let unloc {Location.txt} = txt
+
+let lunloc xs = List.map unloc xs

@@ -95,8 +95,9 @@ let rec fold_all f x = function
     l::r -> let x' = List.fold_left f x l in
             fold_all f x' r
   | [] -> x
-                                   
-let local_scope scope name {public;protected} =
+
+(* create the local scope of a composition, taking into account local definitions and imports *)            
+let local_scope scope name {imports;public;protected} =
   (* name of the actual scope *)
   let scope_name = match scope with [] -> [name] | {scope_name}::_ -> name::scope_name in
   let scope_tainted = public.extensions != [] || protected.extensions != [] in
@@ -104,25 +105,33 @@ let local_scope scope name {public;protected} =
   let name = function
       Short tds -> tds.td_name | Composition tds -> tds.td_name | Enumeration tds -> tds.td_name | OpenEnumeration tds -> tds.td_name | DerSpec tds -> tds.td_name | Extension tds -> tds.td_name in
 
+  (* every import introduces a scope-entry, the unqualified import taints the respective entry *)
+  let imported_names scope import = match import.commented with
+      NamedImport {global;local} -> {scope_name=lunloc global; scope_tainted=false; scope_entries=StrSet.singleton local}::scope
+    | Unnamed [] -> (* cannot happen, make ocamlc happy *) scope                                                                    
+    | Unnamed name -> let local::global = List.rev (lunloc name) in {scope_name=global; scope_tainted=false; scope_entries=StrSet.singleton local}::scope
+    | UnqualifiedImport name -> {scope_name=lunloc name; scope_tainted=true; scope_entries=StrSet.empty}::scope
+  in
+  
   let scope_entries =
     let add_entry x td = StrSet.add (name td.commented) x in
     fold_all add_entry StrSet.empty [public.typedefs; public.redeclared_types; protected.typedefs; protected.redeclared_types] (*TODO: do we need to check protected?*)
   in
-  {scope_name; scope_tainted; scope_entries}
+  {scope_name; scope_tainted; scope_entries}::(List.fold_left imported_names scope imports)
 
     
     
 let scan this td {found;scope} = match td with
   | Composition tds -> begin
                        (* local extensions to the scope *)
-                       let local_scope = local_scope scope tds.td_name tds.type_exp in
+                       let (local_scope::rest) = local_scope scope tds.td_name tds.type_exp in
                        
                        (* dependencies of the local type definitions *)
-                       let dependencies = local_deps (local_scope::scope) tds.type_exp in
+                       let dependencies = local_deps (local_scope::rest) tds.type_exp in
 
                        (* scan dependencies of lexical children *)
                        let {found=found'} =
-                         Composition.fold this tds.type_exp {scope=local_scope::scope; found}
+                         Composition.fold this tds.type_exp {scope=local_scope::rest; found}
                        in
 
                        (* forget about the local scope and name again, remember lexical defs *)
@@ -136,3 +145,8 @@ let scan_dependencies scope typedef =
   let { found } = scanner.fold_typedef scanner typedef { found = []; scope} in
   found
                                                                  
+
+
+                       
+
+                                      
