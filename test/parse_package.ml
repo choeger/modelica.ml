@@ -57,6 +57,8 @@ let print_dep { local_name ; from; element } =
 let print_def {global_name;dependencies} = Printf.printf "%d dependencies in %s\n" (List.length dependencies) (name2str global_name) ;
                                            List.iter print_dep dependencies 
 
+let print_name global_name = Printf.printf "%s\n" (name2str global_name)
+                                                     
 let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrSet.singleton start}]
 
 let name = function
@@ -64,7 +66,8 @@ let name = function
                                                      
 let deps u = match u.toplevel_defs with
     d::_ -> let ldefs = Class_deps.scan_dependencies (global_scope (name d.commented)) d in
-            List.iter print_def ldefs
+            List.iter print_def ldefs ;
+            List.iter print_name (topological_order ldefs)
   | _ -> ()
                 
 let _ =

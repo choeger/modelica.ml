@@ -51,3 +51,5 @@ type scope_entry = {
 type scope = scope_entry list
 
 val scan_dependencies : scope -> typedef -> lexical_typedef list
+
+val topological_order : lexical_typedef list -> global_name list

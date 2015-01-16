@@ -26,6 +26,7 @@
  *
  *)
 
+open Batteries
 open Utils
 open Syntax
 open Traversal
@@ -146,6 +147,43 @@ let scan_dependencies scope typedef =
   found
                                                                  
 
+module GlobalName = struct
+         
+  type t = global_name
+
+  let compare a b = List.compare String.compare a b
+
+  let hash = Hashtbl.hash
+  let equal = List.eq String.equal
+  let default = []
+end
+
+module LexicalDepGraph = Graph.Persistent.Digraph.Concrete(GlobalName)
+
+module Sort = Graph.Topological.Make(LexicalDepGraph)
+                                                  
+let topological_order deps =
+  let add_dependency_edge source g dest =    
+    LexicalDepGraph.add_edge g source dest
+  in
+
+  let add_dependency_edges source g {from} =    
+    List.fold_left (add_dependency_edge source) g from
+  in
+
+  let rec add_downwards_dependency g = function
+      [] -> g
+    | name :: rest -> LexicalDepGraph.add_edge (add_downwards_dependency g rest) rest (name::rest)
+  in
+  
+  let add_to_graph g { global_name ; dependencies } =
+    let g' = add_downwards_dependency g global_name in
+    List.fold_left (add_dependency_edges global_name) g' dependencies
+  in    
+  
+  let g = List.fold_left add_to_graph LexicalDepGraph.empty deps in
+  
+  Sort.fold List.cons g []
 
                        
 
