@@ -45,6 +45,9 @@ let write_label o = function
     Path name -> write_name o name
   | Superclass name -> write_name o ("Σ"::name)
 
+let write_source o {source_label; required_elements} = 
+  write_label o source_label ; IO.nwrite o "(" ; write_name o required_elements ; IO.nwrite o ")"
+                                                                                          
 let name2str name =
   let o = IO.output_string () in
   write_name o name ; IO.close_out o
@@ -55,12 +58,10 @@ let label2str name =
 
 let from2str from =
   let o = IO.output_string () in
-  List.print ~first:"{" ~sep:"|" ~last:"}" write_label o from ; IO.close_out o
+  List.print ~first:"{" ~sep:"|" ~last:"}" write_source o from ; IO.close_out o
                                                         
-let print_dep { local_name ; from; element } =
-  match element with
-    [] -> Printf.printf "  '%s' from %s\n" local_name (from2str from)
-  | es -> Printf.printf "  '%s (.%s)' from %s\n" local_name (name2str es) (from2str from)
+let print_dep { local_name ; from } =
+    Printf.printf "  '%s' from %s\n" local_name (from2str from)
                                                       
 let print_def {kontext_label;dependencies} = Printf.printf "%d dependencies in %s\n" (List.length dependencies) (label2str kontext_label) ;
                                              List.iter print_dep dependencies 
@@ -69,7 +70,7 @@ let print_name global_name = Printf.printf "    %s\n" (name2str global_name)
 
 let print_label label = Printf.printf "    %s\n" (label2str label)
 
-let print_group labels = Printf.printf "group:\n" ; List.iter print_label labels ; Printf.printf "end;\n"
+let print_group labels = Printf.printf "group of size %d:\n" (List.length labels) ; List.iter print_label labels ; Printf.printf "end;\n"
                                            
 let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrMap.singleton start start}]
 

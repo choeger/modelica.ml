@@ -34,10 +34,14 @@ open Traversal
 type kontext_label = Path of string list
                    | Superclass of string list
 
+type dependency_source = {
+  source_label : kontext_label;
+  required_elements : string list;
+}
+                                          
 type dependency = {
   local_name : string;
-  from : kontext_label list;
-  element : string list;
+  from : dependency_source list;
 }
 
 type lexical_typedef = {
@@ -55,13 +59,13 @@ type scope = scope_entry list
                                   
 
 (** Find all possible global names of a given identifier in the given scope *)
-let rec find x = function
+let rec find x required_elements = function
     (* when x is in the scope, tainted does not matter, it shadows all entries above *)
-    {scope_entries; scope_name}::rest when StrMap.mem x scope_entries -> [Path ((StrMap.find x scope_entries)::scope_name)]
+    {scope_entries; scope_name}::rest when StrMap.mem x scope_entries -> [{source_label = Path ((StrMap.find x scope_entries)::scope_name) ; required_elements}]
   (* when the scope is not tainted, use "normal" lexical scoping *)
-  | {scope_tainted=false}::rest -> find x rest
+  | {scope_tainted=false}::rest -> find x required_elements rest
   (* when the scope is tainted, we have to consider it *)
-  | {scope_tainted=true; scope_name}::rest -> (Superclass (scope_name))::(find x rest)
+  | {scope_tainted=true; scope_name}::rest -> {source_label = Superclass scope_name ; required_elements = x::required_elements} ::(find x required_elements rest)
   | [] -> []
                          
 type scanner_result = {
@@ -76,8 +80,8 @@ let builtin = function
 (** Compute a dependency from a type-expression *)
 let rec dependency es scope = function
   | TIde x when builtin x -> None
-  | TIde x -> let from = find x scope in Some {local_name = x ; from ; element=es}
-  | TRootide x -> Some {from = [Path(x :: es)] ; local_name=x ; element = []}
+  | TIde x -> let from = find x es scope in Some {local_name = x ; from }
+  | TRootide x -> Some {from = [{source_label = Path(x :: es); required_elements = []}] ; local_name=x}
   | TProj {class_type; type_element} -> dependency (type_element::es) scope class_type
   | TArray {base_type} -> dependency es scope base_type
   | TMod {mod_type} -> dependency es scope mod_type (* TODO: redeclarations might cause additional dependencies, covered by folder ? - Test *)
@@ -159,29 +163,28 @@ let scan this td {found;scope} = match td with
 
                        (* create an artificial dependency: superclasses have to be resolved before the 
                           whole class can be resolved *)
-                       let superclasses = Superclass local_scope.scope_name in
-                       let inheritance = { local_name="Σ" ; from = [superclasses] ; element = [] } in
+                       let superclass_label = Superclass local_scope.scope_name in
+                       let superclasses = { source_label = superclass_label ; required_elements = []} in
+                       let inheritance = { local_name="Σ" ; from = [superclasses] } in
 
                        let component_def = {kontext_label=Path local_scope.scope_name; dependencies=inheritance::dependencies} in
-                       let inheritance_def = {kontext_label=superclasses; dependencies=superclass_dependencies} in
+                       let inheritance_def = {kontext_label=superclass_label; dependencies=superclass_dependencies} in
                        
                        (* forget about the local scope and name again, remember lexical defs *)
                        {found=component_def::inheritance_def::found'; scope}
                      end
   | _ -> TD_Desc.fold this td {found;scope}
 
-                      
-let scan_dependencies scope typedef =
-  let scanner = { default_folder with fold_typedef_desc = scan } in
-  let { found } = scanner.fold_typedef scanner typedef { found = []; scope} in
-  found
-                                                                 
-
+                          
 module KontextLabel = struct
          
   type t = kontext_label
 
-  let compare = function Path(a) -> function Path(b) -> List.compare String.compare a b
+  (* create a string list from a label *)
+  let pp = function Path(a) -> a
+                  | Superclass a -> "Σ"::a
+             
+  let compare a b = List.compare String.compare (pp a) (pp b)                                                                                              
 
   let hash = Hashtbl.hash
   let equal a b = a = b
@@ -191,10 +194,29 @@ end
 module LexicalDepGraph = Graph.Persistent.Digraph.Concrete(KontextLabel)
 
 module Scc = Graph.Components.Make(LexicalDepGraph)
+
+module LabelMap = Map.Make(KontextLabel)
+
+module LabelSet = Set.Make(KontextLabel)
+
+let rec refine_dependency_source defs = function
+    { source_label = Path(p); required_elements = x::xs } when LabelSet.mem (Path(x::p)) defs ->
+    refine_dependency_source defs { source_label = Path(x::p) ; required_elements = xs } 
+  | d -> d 
+
+let refine_dependency defs {local_name; from} = {local_name; from=List.map (refine_dependency_source defs) from}
                                                   
+let scan_dependencies scope typedef =
+  let scanner = { default_folder with fold_typedef_desc = scan } in
+  let { found } = scanner.fold_typedef scanner typedef { found = []; scope} in
+  let add = fun s d -> LabelSet.add d.kontext_label s in
+  let set = List.fold_left add LabelSet.empty found in
+  let refine d = {d with dependencies = List.map (refine_dependency set) d.dependencies} in
+  List.map refine found
+    
 let topological_order deps =
-  let add_dependency_edge source g dest =    
-    LexicalDepGraph.add_edge g source dest
+  let add_dependency_edge source g dest = 
+    LexicalDepGraph.add_edge g source dest.source_label
   in
 
   let add_dependency_edges source g {from} =    
@@ -213,6 +235,8 @@ let topological_order deps =
   
   let g = List.fold_left add_to_graph LexicalDepGraph.empty deps in
 
+  Printf.printf "Got %d vertices and %d edges in the dependency graph\n" (LexicalDepGraph.nb_vertex g) (LexicalDepGraph.nb_edges g) ;
+    
   Scc.scc_list g
   
   
