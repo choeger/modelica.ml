@@ -48,7 +48,7 @@ type lexical_typedef = {
 type scope_entry = {
   scope_name : string list ;
   scope_tainted: bool;
-  scope_entries :  StrSet.t;
+  scope_entries :  string StrMap.t;
 }
 
 type scope = scope_entry list
@@ -57,7 +57,7 @@ type scope = scope_entry list
 (** Find all possible global names of a given identifier in the given scope *)
 let rec find x = function
     (* when x is in the scope, tainted does not matter, it shadows all entries above *)
-    {scope_entries; scope_name}::rest when StrSet.mem x scope_entries -> [Path (x::scope_name)]
+    {scope_entries; scope_name}::rest when StrMap.mem x scope_entries -> [Path ((StrMap.find x scope_entries)::scope_name)]
   (* when the scope is not tainted, use "normal" lexical scoping *)
   | {scope_tainted=false}::rest -> find x rest
   (* when the scope is tainted, we have to consider it *)
@@ -120,15 +120,20 @@ let local_scope scope name {imports;public;protected} =
 
   (* every import introduces a scope-entry, the unqualified import taints the respective entry *)
   let imported_names scope import = match import.commented with
-      NamedImport {global;local} -> {scope_name=lunloc global; scope_tainted=false; scope_entries=StrSet.singleton local}::scope
-    | Unnamed [] -> (* cannot happen, make ocamlc happy *) scope                                                                    
-    | Unnamed name -> let local::global = List.rev (lunloc name) in {scope_name=global; scope_tainted=false; scope_entries=StrSet.singleton local}::scope
-    | UnqualifiedImport name -> {scope_name=lunloc name; scope_tainted=true; scope_entries=StrSet.empty}::scope
+
+    | NamedImport {global=[]; _} | Unnamed [] -> (* cannot happen, make ocamlc happy *) scope                                                                    
+
+    (* in the case of a renaming import, pick up the substitution *)
+    | NamedImport {global;local} -> let locals::global = List.rev (lunloc global) in
+                                    {scope_name=global; scope_tainted=false; scope_entries=StrMap.singleton local locals}::scope
+
+    | Unnamed name -> let local::global = List.rev (lunloc name) in {scope_name=global; scope_tainted=false; scope_entries=StrMap.singleton local local}::scope
+    | UnqualifiedImport name -> {scope_name=lunloc name; scope_tainted=true; scope_entries=StrMap.empty}::scope
   in
   
   let scope_entries =
-    let add_entry x td = StrSet.add (name td.commented) x in
-    fold_all add_entry StrSet.empty [public.typedefs; public.redeclared_types; protected.typedefs; protected.redeclared_types] (*TODO: do we need to check protected?*)
+    let add_entry x td = let n = name td.commented in StrMap.add n n x in
+    fold_all add_entry StrMap.empty [public.typedefs; public.redeclared_types; protected.typedefs; protected.redeclared_types] (*TODO: do we need to check protected?*)
   in
   {scope_name; scope_tainted; scope_entries}::(List.fold_left imported_names scope imports)
 

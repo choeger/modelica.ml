@@ -71,7 +71,7 @@ let print_label label = Printf.printf "    %s\n" (label2str label)
 
 let print_group labels = Printf.printf "group:\n" ; List.iter print_label labels ; Printf.printf "end;\n"
                                            
-let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrSet.singleton start}]
+let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrMap.singleton start start}]
 
 let name = function
     Short tds -> tds.td_name | Composition tds -> tds.td_name | Enumeration tds -> tds.td_name | OpenEnumeration tds -> tds.td_name | DerSpec tds -> tds.td_name | Extension tds -> tds.td_name

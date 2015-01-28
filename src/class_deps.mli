@@ -46,7 +46,7 @@ type lexical_typedef = {
 type scope_entry = {
   scope_name : string list ;
   scope_tainted: bool;
-  scope_entries :  StrSet.t;
+  scope_entries :  string StrMap.t;
 }
 
 type scope = scope_entry list
