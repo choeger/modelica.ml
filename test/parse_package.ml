@@ -40,25 +40,37 @@ let stats u =
   Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
 
 let write_name o = List.print ~sep:"." IO.nwrite o
-                
+
+let write_label o = function
+    Path name -> write_name o name
+  | Superclass name -> write_name o ("Σ"::name)
+
 let name2str name =
   let o = IO.output_string () in
   write_name o name ; IO.close_out o
 
+let label2str name =
+  let o = IO.output_string () in
+  write_label o name ; IO.close_out o
+
 let from2str from =
   let o = IO.output_string () in
-  List.print ~first:"{" ~sep:"|" ~last:"}" write_name o from ; IO.close_out o
+  List.print ~first:"{" ~sep:"|" ~last:"}" write_label o from ; IO.close_out o
                                                         
 let print_dep { local_name ; from; element } =
   match element with
     [] -> Printf.printf "  '%s' from %s\n" local_name (from2str from)
   | es -> Printf.printf "  '%s (.%s)' from %s\n" local_name (name2str es) (from2str from)
                                                       
-let print_def {global_name;dependencies} = Printf.printf "%d dependencies in %s\n" (List.length dependencies) (name2str global_name) ;
-                                           List.iter print_dep dependencies 
+let print_def {kontext_label;dependencies} = Printf.printf "%d dependencies in %s\n" (List.length dependencies) (label2str kontext_label) ;
+                                             List.iter print_dep dependencies 
 
-let print_name global_name = Printf.printf "%s\n" (name2str global_name)
-                                                     
+let print_name global_name = Printf.printf "    %s\n" (name2str global_name)
+
+let print_label label = Printf.printf "    %s\n" (label2str label)
+
+let print_group labels = Printf.printf "group:\n" ; List.iter print_label labels ; Printf.printf "end;\n"
+                                           
 let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrSet.singleton start}]
 
 let name = function
@@ -67,7 +79,7 @@ let name = function
 let deps u = match u.toplevel_defs with
     d::_ -> let ldefs = Class_deps.scan_dependencies (global_scope (name d.commented)) d in
             List.iter print_def ldefs ;
-            List.iter print_name (topological_order ldefs)
+            List.iter print_group (topological_order ldefs)
   | _ -> ()
                 
 let _ =

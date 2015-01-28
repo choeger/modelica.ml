@@ -29,21 +29,22 @@
 open Utils
 open Syntax
 
-type global_name = string list
+type kontext_label = Path of string list
+                   | Superclass of string list
 
 type dependency = {
   local_name : string;
-  from : global_name list;
+  from : kontext_label list;
   element : string list;
 }
                    
 type lexical_typedef = {
-  global_name : global_name;
+  kontext_label : kontext_label;
   dependencies : dependency list;
 }
 
 type scope_entry = {
-  scope_name : global_name ;
+  scope_name : string list ;
   scope_tainted: bool;
   scope_entries :  StrSet.t;
 }
@@ -52,4 +53,4 @@ type scope = scope_entry list
 
 val scan_dependencies : scope -> typedef -> lexical_typedef list
 
-val topological_order : lexical_typedef list -> global_name list
+val topological_order : lexical_typedef list -> kontext_label list list
