@@ -89,3 +89,4 @@ module Composition : TRAVERSAL with type sort = composition
 
 module Extension : TRAVERSAL with type sort = extension
 
+module Extend : TRAVERSAL with type sort = extend

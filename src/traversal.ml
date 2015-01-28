@@ -504,7 +504,20 @@ module Definition_Structure = struct
                  def_rhs ; def_if ; def_options }                                              
                                
 end
-                      
+
+module Extend = struct
+  type sort = extend
+
+  let fold this {ext_type; ext_annotation} = this.fold_texp this ext_type %>
+                                               fold_option this.fold_annotation this ext_annotation
+
+  let map this {ext_type; ext_annotation} =
+    let ext_type = this.map_texp this ext_type in
+    let ext_annotation = map_option this.map_annotation this ext_annotation in
+    {ext_type; ext_annotation}
+end
+                                  
+                                
 let default_folder = {
   fold_unit_ = Unit.fold ;
   fold_within = fold_id;
@@ -525,7 +538,7 @@ let default_folder = {
   fold_imports = Imports.fold;
   fold_public = Elements.fold;
   fold_protected = Elements.fold;
-  fold_extends = fold_id;
+  fold_extends = Extend.fold;
   fold_cargo = fold_id;
   fold_constraint = fold_id;
   fold_der_spec = fold_id;
