@@ -175,7 +175,20 @@ let scan this td {found;scope} = match td with
                      end
   | _ -> TD_Desc.fold this td {found;scope}
 
+
+let rec prefix a = function
+    [] -> List.is_empty a
+  | x::xs -> match a with
+               [] -> true
+             | y::ys when y = x -> prefix ys xs 
+             | y::_ -> false
+                         
+let lexically_below p = function
+    Superclass(r) | Path r -> prefix r p
                           
+let lexically_smaller = function
+    Superclass(r) | Path r -> lexically_below r
+                      
 module KontextLabel = struct
          
   type t = kontext_label
@@ -213,7 +226,35 @@ let scan_dependencies scope typedef =
   let set = List.fold_left add LabelSet.empty found in
   let refine d = {d with dependencies = List.map (refine_dependency set) d.dependencies} in
   List.map refine found
-    
+
+let subgraph vs g =
+  let add_succ pred succ g = if LabelSet.mem succ vs then LexicalDepGraph.add_edge g pred succ else g in
+  let retain v g = LexicalDepGraph.fold_succ (add_succ v) g v g in
+  LabelSet.fold retain vs g 
+
+let cut_superclass_deps g group =
+  (* try to cut all dependencies to a superclass if that dependency is lexically smaller than (i.e. "inside") the inheriting class *)
+  let is_superclass = function Superclass _ -> true | _ -> false in
+  
+  let sigmas = LabelSet.of_list (List.filter is_superclass group) in
+  let length_orig = List.length group in
+  if LabelSet.is_empty sigmas then [group] else    
+     let vs = LabelSet.of_list group in
+     let g' = subgraph vs g in
+     let delete_incoming sigma incoming g = if (lexically_smaller incoming sigma) then
+                                              LexicalDepGraph.remove_edge g incoming sigma
+                                            else g in
+     let delete_back_deps sigma g = LexicalDepGraph.fold_pred (delete_incoming sigma) g sigma g in
+     let cutted = LabelSet.fold delete_back_deps sigmas g' in
+
+     let ret = Scc.scc_list cutted in
+     Printf.printf "Split a group of %d vertices into %d sub-groups\n" length_orig (List.length ret) ; ret
+
+let prep_scc g = function
+    [] -> []
+  | x::[] -> [x::[]]
+  | x::xs -> cut_superclass_deps g (x::xs)
+                  
 let topological_order deps =
   let add_dependency_edge source g dest = 
     LexicalDepGraph.add_edge g source dest.source_label
@@ -236,8 +277,8 @@ let topological_order deps =
   let g = List.fold_left add_to_graph LexicalDepGraph.empty deps in
 
   Printf.printf "Got %d vertices and %d edges in the dependency graph\n" (LexicalDepGraph.nb_vertex g) (LexicalDepGraph.nb_edges g) ;
-    
-  Scc.scc_list g
+  
+  List.flatten (List.map (prep_scc g) (Scc.scc_list g))
   
   
 
