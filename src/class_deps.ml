@@ -74,7 +74,7 @@ type scanner_result = {
 }
 
 let builtin = function
-  | "String" | "Real" | "Boolean" | "Integer" -> true
+  | "ExternalObject" | "String" | "Real" | "Boolean" | "Integer" -> true
   | _ -> false
                         
 (** Compute a dependency from a type-expression *)
@@ -140,16 +140,23 @@ let local_scope scope name {imports;public;protected} =
     fold_all add_entry StrMap.empty [public.typedefs; public.redeclared_types; protected.typedefs; protected.redeclared_types] (*TODO: do we need to check protected?*)
   in
   {scope_name; scope_tainted; scope_entries}::(List.fold_left imported_names scope imports)
-
-    
-    
+        
 let scan this td {found;scope} = match td with
+  | Enumeration tds -> begin
+                       (* enumerations do not depend on other types *)
+                       let kontext_label = match scope with
+                           parent::_ -> Path (tds.td_name::parent.scope_name)
+                         | _ -> Path [tds.td_name]
+                       in
+                       let typedef = {kontext_label; dependencies=[]} in
+                       {found = typedef::found; scope}                     
+                     end
   | Short tds -> begin
                  let kontext_label = match scope with
                      parent::_ -> Path (tds.td_name::parent.scope_name)
                    | _ -> Path [tds.td_name]
                  in
-                 
+
                  (* scan dependencies of the rhs *)
                  let rhs = tds.type_exp in
                  let f = (dependency_collector scope) in
@@ -263,7 +270,7 @@ let cut_superclass_deps g group =
 
      let ret = Scc.scc_list cutted in
      Printf.printf "Split a group of %d vertices into %d sub-groups\n" length_orig (List.length ret) ; ret
-
+                                                                                                         
 let prep_scc g = function
     [] -> []
   | x::[] -> [x::[]]
