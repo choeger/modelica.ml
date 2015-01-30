@@ -144,6 +144,19 @@ let local_scope scope name {imports;public;protected} =
     
     
 let scan this td {found;scope} = match td with
+  | Short tds -> begin
+                 let kontext_label = match scope with
+                     parent::_ -> Path (tds.td_name::parent.scope_name)
+                   | _ -> Path [tds.td_name]
+                 in
+                 
+                 (* scan dependencies of the rhs *)
+                 let rhs = tds.type_exp in
+                 let f = (dependency_collector scope) in
+                 let dependencies = f.fold_texp f rhs [] in
+                 let typedef = {kontext_label; dependencies} in
+                 {found = typedef::found; scope}
+               end
   | Composition tds -> begin
                        let body = tds.type_exp in
                        
@@ -181,13 +194,13 @@ let rec prefix a = function
   | x::xs -> match a with
                [] -> true
              | y::ys when y = x -> prefix ys xs 
-             | y::_ -> false
-                         
+             | y::_ -> false                         
+               
 let lexically_below p = function
-    Superclass(r) | Path r -> prefix r p
+    Superclass(r) | Path r -> prefix (List.rev r) p
                           
 let lexically_smaller = function
-    Superclass(r) | Path r -> lexically_below r
+    Superclass(r) | Path r -> lexically_below (List.rev r)
                       
 module KontextLabel = struct
          
@@ -229,8 +242,8 @@ let scan_dependencies scope typedef =
 
 let subgraph vs g =
   let add_succ pred succ g = if LabelSet.mem succ vs then LexicalDepGraph.add_edge g pred succ else g in
-  let retain v g = LexicalDepGraph.fold_succ (add_succ v) g v g in
-  LabelSet.fold retain vs g 
+  let retain v g' = LexicalDepGraph.fold_succ (add_succ v) g v g' in
+  LabelSet.fold retain vs LexicalDepGraph.empty
 
 let cut_superclass_deps g group =
   (* try to cut all dependencies to a superclass if that dependency is lexically smaller than (i.e. "inside") the inheriting class *)
@@ -241,6 +254,7 @@ let cut_superclass_deps g group =
   if LabelSet.is_empty sigmas then [group] else    
      let vs = LabelSet.of_list group in
      let g' = subgraph vs g in
+     Printf.printf "Got %d vertices and %d edges in the scc sub-graph\n" (LexicalDepGraph.nb_vertex g') (LexicalDepGraph.nb_edges g') ;
      let delete_incoming sigma incoming g = if (lexically_smaller incoming sigma) then
                                               LexicalDepGraph.remove_edge g incoming sigma
                                             else g in
