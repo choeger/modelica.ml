@@ -32,6 +32,7 @@ open Pprint_modelica
 open Stats
 open Syntax
 open Class_deps
+open ClassLang
 open Utils
 open Batteries
        
@@ -82,11 +83,15 @@ let deps u = match u.toplevel_defs with
             List.iter print_def ldefs ;
             List.iter print_group (topological_order ldefs)
   | _ -> ()
-                
+
+let translate u = 
+  let class_ = translate_topdefs u.toplevel_defs in
+  Printf.printf "Translation to class language successful\n"
+           
 let _ =
   Format.pp_set_margin Format.str_formatter (140);
   match (scan [] argv.(1)) with
-    Some pkg ->  begin match merge pkg with Some u -> stats u ; deps u; (*Printf.printf "%s\n" (unit2str ~max:(max_int - 1) u);*) 0 | None -> 1 end
+    Some pkg ->  begin match merge pkg with Some u -> stats u ; deps u; translate u; (*Printf.printf "%s\n" (unit2str ~max:(max_int - 1) u);*) 0 | None -> 1 end
   | None -> Printf.eprintf "'%s' does not seem to be a Modelica package.\n" argv.(1) ; 1
               
                   

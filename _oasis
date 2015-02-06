@@ -14,7 +14,7 @@ Library modelica_ml
                   compiler-libs.common, ocamlgraph
   Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
                   Syntax, Syntax_fragments, Mapper, Folder, FileSystem, Traversal,
-                  Stats, Class_deps
+                  Stats, Class_deps, ClassLang
   InternalModules: Generated_parser, Utils
   
 Test "Modelica Parser Tests"
