@@ -291,9 +291,8 @@ and pp_equations fmt eqs = (pp_list pp_equation) fmt eqs
 
                       
 and pp_texpr fmt = function
-  | TIde x -> fprintf fmt "@[%s@]" x
-  | TProj { class_type; type_element } -> fprintf fmt "@[%a.%s@]" pp_texpr class_type type_element
-  | TRootide x -> fprintf fmt "@[.%s@]" x
+  | TName xs -> fprintf fmt "@[%a@]" (pp_list ~sep:"." pp_str) xs
+  | TRootName xs -> fprintf fmt "@[.%a@]" (pp_list ~sep:"." pp_str) xs
   | TVar { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_variability flag pp_texpr flagged
   | TCon { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_connectivity flag pp_texpr flagged
   | TCau { flag ; flagged } -> fprintf fmt "@[%a@ %a@]" pp_causality flag pp_texpr flagged

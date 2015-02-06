@@ -516,8 +516,39 @@ module Extend = struct
     let ext_annotation = map_option this.map_annotation this ext_annotation in
     {ext_type; ext_annotation}
 end
-                                  
-                                
+
+module TExp = struct
+    type sort = texp
+    let fold this = function
+      | TName xs -> fold_list (fold_located this.fold_identifier) this xs
+      | TRootName xs -> fold_list (fold_located this.fold_identifier) this xs
+      | TArray {base_type; dims } -> (this.fold_texp this base_type) %> (fold_list this.fold_exp this dims)
+      | TCon {flagged} | TCau {flagged} | TVar {flagged} -> this.fold_texp this flagged
+      | TMod { mod_type; modification } -> this.fold_texp this mod_type %>
+                                             this.fold_modification this modification 
+         
+    let map this = function
+      | TName xs -> TName (map_list (map_located this.map_identifier) this xs)
+      | TRootName xs -> TRootName (map_list (map_located this.map_identifier) this xs)
+      | TArray {base_type; dims } -> let base_type = this.map_texp this base_type in
+                                     let dims = map_list this.map_exp this dims in
+                                     TArray { base_type; dims }
+      | TCon {flag; flagged} -> TCon {flag ; flagged = this.map_texp this flagged}
+      | TCau {flag; flagged} -> TCau {flag ; flagged = this.map_texp this flagged}
+      | TVar {flag; flagged} -> TVar {flag ; flagged = this.map_texp this flagged}
+      | TMod { mod_type; modification } -> let mod_type = this.map_texp this mod_type in
+                                           let modification = this.map_modification this modification in
+                                           TMod { mod_type; modification }
+  end
+
+module Constraint = struct
+    type sort = constraint_
+
+    let fold this = fold_commented this.fold_texp this
+
+    let map this = map_commented this.map_texp this
+  end
+                
 let default_folder = {
   fold_unit_ = Unit.fold ;
   fold_within = fold_id;
@@ -540,12 +571,12 @@ let default_folder = {
   fold_protected = Elements.fold;
   fold_extends = Extend.fold;
   fold_cargo = fold_id;
-  fold_constraint = fold_id;
+  fold_constraint = Constraint.fold;
   fold_der_spec = fold_id;
   fold_enum_literal = fold_id;
   fold_algorithm = fold_id;
   fold_external_def = fold_id;
-  fold_texp = fold_id;
+  fold_texp = TExp.fold;
   fold_exp = Exp.fold;
   fold_idx = Idx.fold;
   
@@ -575,26 +606,26 @@ let default_mapper = {
   map_typedef = TD.map;
   map_typedef_desc = TD_Desc.map;
 
-  map_composition = map_id;
+  map_composition = Composition.map;
 
-  map_redeclared_typedef = map_id;
-  map_extension = map_id;
+  map_redeclared_typedef = TD.map;
+  map_extension = Extension.map;
   
-  map_def = map_commented map_id ;
-  map_redeclared_def = map_id;
-  map_definition_structure = map_id;
+  map_def = Definition.map ;
+  map_redeclared_def = Definition.map;
+  map_definition_structure = Definition_Structure.map;
   map_definition_options = map_id;
 
   map_import_desc = Import_Desc.map ;
   map_import = Import.map;
-  map_extend = map_id;
+  map_extend = Extend.map;
   
   map_imports = map_id;
-  map_public = map_id;
-  map_protected = map_id;
+  map_public = Elements.map;
+  map_protected = Elements.map;
   map_cargo = map_id;
 
-  map_constraint = map_id;
+  map_constraint = Constraint.map ;
 
   map_der_spec = DerSpec.map;
   
@@ -603,7 +634,7 @@ let default_mapper = {
   map_algorithm = Algorithm.map;
   map_external_def = map_id;
 
-  map_texp = map_id;
+  map_texp = TExp.map;
 
   map_comment = Comment.map;
   map_annotation = Modification.map;

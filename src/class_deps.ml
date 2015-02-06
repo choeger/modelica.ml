@@ -79,10 +79,11 @@ let builtin = function
                         
 (** Compute a dependency from a type-expression *)
 let rec dependency es scope = function
-  | TIde x when builtin x -> None
-  | TIde x -> let from = find x es scope in Some {local_name = x ; from }
-  | TRootide x -> Some {from = [{source_label = Path(x :: es); required_elements = []}] ; local_name=x}
-  | TProj {class_type; type_element} -> dependency (type_element::es) scope class_type
+  | TName [x] when builtin x.txt -> None
+  | TName [x] -> let from = find x.txt es scope in Some {local_name = x.txt ; from }
+  | TRootName [x]-> Some {from = [{source_label = Path(x.txt :: es); required_elements = []}] ; local_name=x.txt}
+  | TName(t::base) -> dependency (t.txt::es) scope (TName base)
+  | TRootName(t::base) -> dependency (t.txt::es) scope (TRootName base)
   | TArray {base_type} -> dependency es scope base_type
   | TMod {mod_type} -> dependency es scope mod_type (* TODO: redeclarations might cause additional dependencies, covered by folder ? - Test *)
   | TVar {flagged} -> dependency es scope flagged

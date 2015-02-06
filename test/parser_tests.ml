@@ -256,22 +256,22 @@ let test_cases = [
   eq "(x,,y) = 23;" (uncommented (SimpleEquation { left=OutputExpression([Some (Ide "x");None;Some (Ide "y")]) ; right = Int 23 } ));  
 
 
-  texpr "Modelica" (TIde "Modelica");
-  texpr "Modelica.Icons" (TProj {class_type=TIde "Modelica"; type_element="Icons"});
-  texpr ".x" (TRootide "x");
-  texpr ".x.y" (TProj { class_type=TRootide "x"; type_element= "y" });
-  texpr "Modelica.Icons.InterfacesPackage" (TProj  { class_type=TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage"});
-  texpr "input Real" (TCau {flag = Input ; flagged = TIde "Real" });
-  texpr "constant Real" (TVar {flag = Constant ; flagged = TIde "Real" });
-  texpr "flow Real" (TCon {flag = Flow ; flagged = TIde "Real" });
+  texpr "Modelica" (type_name ["Modelica"]);
+  texpr "Modelica.Icons" (type_name ["Modelica";"Icons"]);
+  texpr ".x" (root_type ["x"]);
+  texpr ".x.y" (root_type ["x";"y"]);
+  texpr "Modelica.Icons.InterfacesPackage" (type_name ["Modelica";"Icons";"InterfacesPackage"]);
+  texpr "input Real" (TCau {flag = Input ; flagged = type_name ["Real"] });
+  texpr "constant Real" (TVar {flag = Constant ; flagged = type_name ["Real"] });
+  texpr "flow Real" (TCon {flag = Flow ; flagged = type_name ["Real"] });
   texpr "output parameter discrete stream Real" (TCau { flag = Output ; flagged = TVar { flag = Parameter ;
                                                                                          flagged =
                                                                                            TVar { flag = Discrete ;
                                                                                                   flagged =
                                                                                                     TCon { flag = Stream ;
-                                                                                                           flagged = TIde "Real" } } } } ) ;
-  texpr "Real[2,3]" (TArray {base_type = TIde "Real"; dims = [Int 2 ; Int 3]} ) ;
-  texpr "T()" (TMod { mod_type = TIde "T" ; modification = no_modification } ) ;
+                                                                                                           flagged = type_name ["Real"] } } } } ) ;
+  texpr "Real[2,3]" (TArray {base_type = type_name ["Real"]; dims = [Int 2 ; Int 3]} ) ;
+  texpr "T()" (TMod { mod_type = type_name ["T"] ; modification = no_modification } ) ;
   
 
   import "import X" (uncommented (Unnamed [nl "X"])) ;
@@ -280,15 +280,14 @@ let test_cases = [
   import "import X.*" (uncommented (UnqualifiedImport [nl "X"]));
 
 
-  (let extend_statement = { ext_type = TProj { class_type=
-                                                 TProj { class_type= TIde "Modelica"; type_element="Icons"}; type_element="InterfacesPackage" } ;
+  (let extend_statement = { ext_type = (type_name ["Modelica";"Icons";"InterfacesPackage"]) ;
                             ext_annotation = None }
    in
    extend "extends Modelica.Icons.InterfacesPackage" extend_statement );
 
-  defs "Real p" [uncommented {empty_def with def_name = "p" ; def_type = TIde "Real" ;}] ;
-  defs "Real p, q" [uncommented {empty_def with def_name = "p" ; def_type = TIde "Real" ;} ;
-                    uncommented {empty_def with def_name = "q" ; def_type = TIde "Real" ;}
+  defs "Real p" [uncommented {empty_def with def_name = "p" ; def_type = type_name ["Real"] ;}] ;
+  defs "Real p, q" [uncommented {empty_def with def_name = "p" ; def_type = type_name ["Real"] ;} ;
+                    uncommented {empty_def with def_name = "q" ; def_type = type_name ["Real"] ;}
                    ] ;  
 
   
@@ -302,20 +301,20 @@ let test_cases = [
                                                                   }];
                                                                                    
   defs "Medium medium := Medium()" [uncommented { empty_def with def_name = "medium" ;
-                                                                 def_type = TIde "Medium" ;
+                                                                 def_type = type_name ["Medium"] ;
                                                                  def_rhs = Some ( App ( empty_app (Ide "Medium") ) ) ;
                                                 }] ;
 
   
   defs "replaceable T t constrainedby S" [uncommented { empty_def with def_name = "t" ;
-                                                                       def_type = TIde "T" ;
-                                                                       def_constraint = Some (uncommented ( TIde "S" )) ;
+                                                                       def_type = type_name ["T"] ;
+                                                                       def_constraint = Some (uncommented ( type_name ["S"])) ;
                                                                        def_options = { no_def_options with replaceable = true } ;
                                                       }] ;
 
 
   defs "Density rho=1.225 \"Air Density\"" [{ commented = { empty_def with def_name = "rho";
-                                                                           def_type = TIde "Density";
+                                                                           def_type = type_name ["Density"];
                                                                            def_rhs = Some (Real 1.225) ;
                                                           } ;
                                               comment = unannotated ( Some (nl "Air Density")  )}];
@@ -323,15 +322,15 @@ let test_cases = [
 
   defs "Real friction_pos[:, 2]=[0; 1] \"[w,tau] positive sliding friction characteristic (w>=0)\""
        [{ commented = { empty_def with def_name = "friction_pos";
-                                       def_type = TArray { base_type=TIde "Real"; dims = [Colon ; Int 2] } ;
+                                       def_type = TArray { base_type=type_name ["Real"]; dims = [Colon ; Int 2] } ;
                                        def_rhs = Some (MArray [[Int 0];[Int 1]]) ;
                       } ;
           comment = unannotated ( Some (nl "[w,tau] positive sliding friction characteristic (w>=0)") ) 
         }];
 
-  typedef "type T = A" (uncommented (Short { empty_typedef with td_name = "T" ; type_exp = TIde "A" })) ;
+  typedef "type T = A" (uncommented (Short { empty_typedef with td_name = "T" ; type_exp = type_name ["A"] })) ;
 
-  (let def = uncommented { empty_def with def_name = "x" ; def_type = TIde "S" } in
+  (let def = uncommented { empty_def with def_name = "x" ; def_type = type_name ["S"] } in
    typedef "class T S x; end T" (uncommented (Composition { empty_typedef with td_name = "T" ;
                                                                                type_exp = {empty_composition with public = {
                                                                                             empty_elements with
@@ -339,7 +338,7 @@ let test_cases = [
                                                                                sort = Class ;
                                                           } )));
 
-  (let def = uncommented { empty_def with def_name = "x" ; def_type = TIde "S" } in
+  (let def = uncommented { empty_def with def_name = "x" ; def_type = type_name ["S"] } in
                typedef "class T \"comment\" S x; end T" { commented = Composition { empty_typedef with td_name = "T" ;
                                                                                                        type_exp = {
                                                                                                          empty_composition with
@@ -398,7 +397,7 @@ let test_cases = [
                                                                                  redeclared_types = [
                                                                                  uncommented (
                                                                                      Short { empty_typedef with td_name = "T" ;
-                                                                                                                type_exp = TIde "S"
+                                                                                                                type_exp = type_name ["S"]
                                                                                            }
                                                                                    )] } 
                                                                     } ;
@@ -411,7 +410,7 @@ let test_cases = [
                                                                       public = { empty_elements with
                                                                       typedefs = [ uncommented (
                                                                                        Short { empty_typedef with td_name = "T" ;
-                                                                                                                  type_exp = TIde "S" ;
+                                                                                                                  type_exp = type_name ["S"] ;
                                                                                                                   sort = Package ;
                                                                                                                   type_options = {
                                                                                                                     no_type_options with
@@ -468,7 +467,7 @@ let test_cases = [
                                                                     public = { empty_elements with 
                                                                                defs = [uncommented
                                                                                          {empty_def with def_name = "p" ;
-                                                                                                         def_type = TIde "Real" ;}] ;
+                                                                                                         def_type = type_name ["Real"] ;}] ;
                                                                              }
                                                                   }, None);
                                   }));
@@ -511,14 +510,14 @@ let test_cases = [
   typedef "type A = B(redeclare type C = D)"
           (uncommented (Short { empty_typedef with
                                 td_name = "A" ;
-                                type_exp = TMod { mod_type=TIde "B" ;
+                                type_exp = TMod { mod_type=type_name ["B"] ;
                                                   modification = { no_modification with
                                                                    types = [{ redecl_each = false ;
                                                                               redecl_type =
                                                                                 uncommented ({
                                                                                               empty_typedef with
                                                                                               td_name = "C" ;
-                                                                                              type_exp = TIde "D"
+                                                                                              type_exp = type_name ["D"]
                                                                                             })
                                                                             }]}
                                                 }
@@ -527,14 +526,14 @@ let test_cases = [
   typedef "type A = B(replaceable type C = D)"
           (uncommented (Short { empty_typedef with
                                 td_name = "A" ;
-                                type_exp = TMod { mod_type=TIde "B" ;
+                                type_exp = TMod { mod_type=type_name ["B"] ;
                                                   modification = {
                                                     no_modification with
                                                     types = [{ redecl_each = false ;
                                                                redecl_type =
                                                                  uncommented { empty_typedef with
                                                                                td_name = "C" ;
-                                                                               type_exp = TIde "D" ;
+                                                                               type_exp = type_name ["D"] ;
                                                                                type_options = {
                                                                                  no_type_options with
                                                                                  type_replaceable = true;
@@ -547,14 +546,14 @@ let test_cases = [
   typedef "type A = B(redeclare C c)"
           (uncommented (Short { empty_typedef with
                                 td_name = "A" ;
-                                type_exp = TMod { mod_type=TIde "B" ;
+                                type_exp = TMod { mod_type=type_name ["B"] ;
                                                   modification = { no_modification with
                                                                    components = [{ each = false ;
                                                                                    def = 
                                                                                      uncommented ({
                                                                                               empty_def with
                                                                                               def_name = "c" ;
-                                                                                              def_type = TIde "C"
+                                                                                              def_type = type_name ["C"]
                                                                                             })
                                                                             }]}
                                                 }
@@ -563,14 +562,14 @@ let test_cases = [
   typedef "type A = B(replaceable C c)"
           (uncommented (Short { empty_typedef with
                                 td_name = "A" ;
-                                type_exp = TMod { mod_type=TIde "B" ;
+                                type_exp = TMod { mod_type=type_name ["B"] ;
                                                   modification = { no_modification with
                                                                    components = [{ each = false ;
                                                                                    def = 
                                                                                      uncommented ({
                                                                                               empty_def with
                                                                                               def_name = "c" ;
-                                                                                              def_type = TIde "C";
+                                                                                              def_type = type_name ["C"];
                                                                                               def_options = { no_def_options with
                                                                                                               replaceable=true }
                                                                                             })

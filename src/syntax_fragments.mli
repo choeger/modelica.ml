@@ -79,5 +79,8 @@ val name : string list -> exp
 
 val type_name : string list -> texp
 (** Create a type-name from the list of its elements 
-    @raise EmptyName in case of the empty list
+*)
+
+val root_type : string list -> texp
+(** Create a root-type-name from the list of its elements 
 *)

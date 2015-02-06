@@ -46,7 +46,7 @@ let no_modification = { types = [] ; components = [] ; modifications = [] }
 
 let no_def_options = { final = false ; replaceable = false ; scope = Local }
                         
-let empty_def  = { def_name ="" ; def_type = TIde ""; def_options = no_def_options ; def_constraint = None ; def_rhs = None ; def_if = None }
+let empty_def  = { def_name ="" ; def_type = TName []; def_options = no_def_options ; def_constraint = None ; def_rhs = None ; def_if = None }
 
 let no_type_options = { partial = false ; encapsulated = false ;
                         type_final = false ; type_replaceable = false ;}
@@ -71,12 +71,7 @@ let name = function
   | [] -> raise EmptyName
   | x::r -> name_ (Ide x) r
                          
-let rec type_name_ class_type = function
-  | [] -> class_type
-  | type_element::r -> type_name_ (TProj { class_type ; type_element}) r
+let type_name xs = TName (List.map Location.mknoloc xs)
 
-let type_name = function
-  | [] -> raise EmptyName
-  | x::r -> type_name_ (TIde x) r
-
+let root_type xs = TRootName (List.map Location.mknoloc xs)
                        

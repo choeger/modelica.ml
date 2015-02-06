@@ -254,9 +254,8 @@ and array_type = { base_type : texp ; dims : exp list }
 
 and mod_type = { mod_type : texp ; modification : modification }
                    
-and texp = TIde of string
-         | TRootide of string
-         | TProj of tprojection
+and texp = TName of name
+         | TRootName of name
          | TArray of array_type
          | TMod of mod_type
          | TVar of variability flagged_type

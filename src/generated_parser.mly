@@ -315,9 +315,9 @@ connectivity : FLOW { Flow }
 causality : INPUT { Input }                      
           | OUTPUT { Output } 
                   
-type_expression : x = IDENT { TIde x }
-                | DOT x = IDENT { TRootide x } 
-                | class_type=type_expression DOT type_element = IDENT { TProj {class_type; type_element} } %prec type_proj
+type_expression : 
+                | x = separated_nonempty_list(DOT, ident) { TName x } 
+                | DOT x = separated_nonempty_list(DOT, ident) { TRootName x } 
                 | flag=variability flagged=type_expression { TVar { flag ; flagged } } %prec type_var
                 | flag=causality flagged=type_expression { TCau { flag ; flagged } } %prec type_caus
                 | flag=connectivity flagged=type_expression { TCon { flag ; flagged } } %prec type_conn
