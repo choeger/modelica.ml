@@ -27,23 +27,52 @@
  *)
 
 open Syntax
-
+open Class_deps
+open Utils
+       
 type class_ = Hierarchy of hierarchy
             | Reference of name
             | RootReference of name
             | Primitive of string * (class_ list)
             | Method of string list
 
- and hierarchy = { fields : class_field list ; super : class_ list }
-                               
- and class_element = { element_name : string ; element_rhs : class_ }
-                       
- and class_field = Named_element of class_element
-                 | Replaceable of class_element
-                 | Function of class_element
+ and hierarchy = { fields : class_element StrMap.t ; super : class_ list }
 
+ and class_element = { kind : class_element_kind ; body : class_ }
+
+ and class_element_kind = Static
+                        | Replaceable
+                        | Function
+
+type class_value = VHierarchy of value_hierarchy
+                 | VPrimitive of string * class_value list
+                 | VMethod of string list
+
+ and value_hierarchy = { vfields : class_value_element StrMap.t ; vsuper : class_value list }
+                               
+ and class_value_element = { vkind : class_element_kind ; vbody : class_value }
+                            
 type t = class_
 
-type ptr = { named : string list ; super_class : int option } 
+type pointee_kind = SuperClass of int
+                  | NamedElement of class_element_kind
+           
+type ptr = { named : name ; pointee_kind : pointee_kind } 
 
+type prefix_found = { found : name ; not_found : str }
+                           
+type lookup_result = Found of class_value_element
+                   | NothingFound
+                   | PrefixFound of prefix_found
+
+type unresolved_dependency = { searching : name ; dependency : kontext_label }
+                                      
+exception UnresolvedDependency of unresolved_dependency
+             
 val translate_topdefs : typedef list -> t
+
+val expand : class_element -> kontext_label -> (ptr * class_) list
+
+val eval : class_value_element -> scope -> (ptr * class_) -> lookup_result
+
+                                            
