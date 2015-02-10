@@ -64,7 +64,7 @@ and typedef_options = { type_replaceable : bool ;
 
 (** Typedefs share a lot of common code. 
     This is reflected by the {! Syntax.typedef_struct }: {v 'a v} denotes the definition's distincitve payload. *)
-and 'a typedef_struct = { td_name : string ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options }
+and 'a typedef_struct = { td_name : str ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options }
                           
 (** The definition of a new type/class etc. *)
 and typedef_desc = Short of texp typedef_struct
@@ -119,7 +119,7 @@ and variability = Constant | Parameter | Discrete
 
 and causality = Input | Output
 
-and named_import = { global : name ; local : string }
+and named_import = { global : name ; local : str }
 
 and import = import_desc commented
                      

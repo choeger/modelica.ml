@@ -45,8 +45,11 @@ type token =
                                 
 open Batteries
 
-module StrMap = Map.Make(String)
-module StrSet = Set.Make(String)
+module StrMap = struct include Map.Make(String)
+                       let union m1 m2 = Enum.fold (fun m (k,v) -> add k v m) m1 (enum m2)
+                       let find_or_else v x m = if mem x m then find x m else v
+                end
+module StrSet = Set.Make(String) 
                         
 module List = List
 

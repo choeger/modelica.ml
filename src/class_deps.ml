@@ -30,13 +30,14 @@ open Batteries
 open Utils
 open Syntax
 open Traversal
+open Location
        
-type kontext_label = Path of string list
-                   | Superclass of string list
+type kontext_label = Path of name
+                   | Superclass of name
 
 type dependency_source = {
   source_label : kontext_label;
-  required_elements : string list;
+  required_elements : name;
 }
                                           
 type dependency = {
@@ -50,24 +51,22 @@ type lexical_typedef = {
 }
 
 type scope_entry = {
-  scope_name : string list ;
+  scope_name : name ;
   scope_tainted: bool;
-  scope_entries :  string StrMap.t;
+  scope_entries :  str StrMap.t;
 }
 
 type scope = scope_entry list
                                   
-
-(** Find all possible global names of a given identifier in the given scope *)
-let rec find x required_elements = function
+let rec search_scope x required_elements = function
     (* when x is in the scope, tainted does not matter, it shadows all entries above *)
-    {scope_entries; scope_name}::rest when StrMap.mem x scope_entries -> [{source_label = Path ((StrMap.find x scope_entries)::scope_name) ; required_elements}]
+    {scope_entries; scope_name}::rest when StrMap.mem x.txt scope_entries -> [{source_label = Path ((StrMap.find x.txt scope_entries)::scope_name) ; required_elements}]
   (* when the scope is not tainted, use "normal" lexical scoping *)
-  | {scope_tainted=false}::rest -> find x required_elements rest
+  | {scope_tainted=false}::rest -> search_scope x required_elements rest
   (* when the scope is tainted, we have to consider it *)
-  | {scope_tainted=true; scope_name}::rest -> {source_label = Superclass scope_name ; required_elements = x::required_elements} ::(find x required_elements rest)
+  | {scope_tainted=true; scope_name}::rest -> {source_label = Superclass scope_name ; required_elements = x::required_elements} ::(search_scope x required_elements rest)
   | [] -> []
-                         
+            
 type scanner_result = {
   found : lexical_typedef list;
   scope : scope;
@@ -80,10 +79,10 @@ let builtin = function
 (** Compute a dependency from a type-expression *)
 let rec dependency es scope = function
   | TName [x] when builtin x.txt -> None
-  | TName [x] -> let from = find x.txt es scope in Some {local_name = x.txt ; from }
-  | TRootName [x]-> Some {from = [{source_label = Path(x.txt :: es); required_elements = []}] ; local_name=x.txt}
-  | TName(t::base) -> dependency (t.txt::es) scope (TName base)
-  | TRootName(t::base) -> dependency (t.txt::es) scope (TRootName base)
+  | TName [x] -> let from = search_scope x es scope in Some {local_name = x.txt ; from }
+  | TRootName [x]-> Some {from = [{source_label = Path(x :: es); required_elements = []}] ; local_name=x.txt}
+  | TName(t::base) -> dependency (t::es) scope (TName base)
+  | TRootName(t::base) -> dependency (t::es) scope (TRootName base)
   | TArray {base_type} -> dependency es scope base_type
   | TMod {mod_type} -> dependency es scope mod_type (* TODO: redeclarations might cause additional dependencies, covered by folder ? - Test *)
   | TVar {flagged} -> dependency es scope flagged
@@ -129,15 +128,15 @@ let local_scope scope name {imports;public;protected} =
     | NamedImport {global=[]; _} | Unnamed [] -> (* cannot happen, make ocamlc happy *) scope                                                                    
 
     (* in the case of a renaming import, pick up the substitution *)
-    | NamedImport {global;local} -> let locals::global = List.rev (lunloc global) in
-                                    {scope_name=global; scope_tainted=false; scope_entries=StrMap.singleton local locals}::scope
+    | NamedImport {global;local} -> let locals::global = List.rev global in
+                                    {scope_name=global; scope_tainted=false; scope_entries=StrMap.singleton local.txt locals}::scope
 
-    | Unnamed name -> let local::global = List.rev (lunloc name) in {scope_name=global; scope_tainted=false; scope_entries=StrMap.singleton local local}::scope
-    | UnqualifiedImport name -> {scope_name=lunloc name; scope_tainted=true; scope_entries=StrMap.empty}::scope
+    | Unnamed name -> let local::global = List.rev name in {scope_name=global; scope_tainted=false; scope_entries=StrMap.singleton local.txt local}::scope
+    | UnqualifiedImport name -> {scope_name=name; scope_tainted=true; scope_entries=StrMap.empty}::scope
   in
   
   let scope_entries =
-    let add_entry x td = let n = name td.commented in StrMap.add n n x in
+    let add_entry x td = let n = name td.commented in StrMap.add n.txt n x in
     fold_all add_entry StrMap.empty [public.typedefs; public.redeclared_types; protected.typedefs; protected.redeclared_types] (*TODO: do we need to check protected?*)
   in
   {scope_name; scope_tainted; scope_entries}::(List.fold_left imported_names scope imports)
@@ -216,9 +215,11 @@ module KontextLabel = struct
 
   (* create a string list from a label *)
   let pp = function Path(a) -> a
-                  | Superclass a -> "Σ"::a
-             
-  let compare a b = List.compare String.compare (pp a) (pp b)                                                                                              
+                  | Superclass a -> (mknoloc "Σ")::a
+
+  let str_compare a b = String.compare a.txt b.txt 
+                                                     
+  let compare a b = List.compare str_compare (pp a) (pp b)                                                                                              
 
   let hash = Hashtbl.hash
   let equal a b = a = b

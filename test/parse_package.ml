@@ -35,16 +35,19 @@ open Class_deps
 open ClassLang
 open Utils
 open Batteries
+open Location
        
 let stats u =
   let {def_count; type_count} = generate_stats u in
   Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
 
-let write_name o = List.print ~sep:"." IO.nwrite o
+let write_str o str = IO.nwrite o str.txt
+                
+let write_name = List.print ~sep:"." write_str
 
 let write_label o = function
     Path name -> write_name o name
-  | Superclass name -> write_name o ("Σ"::name)
+  | Superclass name -> write_name o ((mknoloc "Σ")::name)
 
 let write_source o {source_label; required_elements} = 
   write_label o source_label ; IO.nwrite o "(" ; write_name o required_elements ; IO.nwrite o ")"
@@ -73,7 +76,7 @@ let print_label label = Printf.printf "    %s\n" (label2str label)
 
 let print_group labels = Printf.printf "group of size %d:\n" (List.length labels) ; List.iter print_label labels ; Printf.printf "end;\n"
                                            
-let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrMap.singleton start start}]
+let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrMap.singleton start.txt start}]
 
 let name = function
     Short tds -> tds.td_name | Composition tds -> tds.td_name | Enumeration tds -> tds.td_name | OpenEnumeration tds -> tds.td_name | DerSpec tds -> tds.td_name | Extension tds -> tds.td_name

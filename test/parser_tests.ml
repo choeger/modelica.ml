@@ -275,8 +275,8 @@ let test_cases = [
   
 
   import "import X" (uncommented (Unnamed [nl "X"])) ;
-  import "import Y=X" (uncommented (NamedImport {global = [nl "X"] ; local = "Y" }));
-  
+  import "import Y=X" (uncommented (NamedImport {global = [nl "X"] ; local = nl "Y" }));
+ 
   import "import X.*" (uncommented (UnqualifiedImport [nl "X"]));
 
 
@@ -328,10 +328,10 @@ let test_cases = [
           comment = unannotated ( Some (nl "[w,tau] positive sliding friction characteristic (w>=0)") ) 
         }];
 
-  typedef "type T = A" (uncommented (Short { empty_typedef with td_name = "T" ; type_exp = type_name ["A"] })) ;
+  typedef "type T = A" (uncommented (Short { empty_typedef with td_name = nl "T" ; type_exp = type_name ["A"] })) ;
 
   (let def = uncommented { empty_def with def_name = "x" ; def_type = type_name ["S"] } in
-   typedef "class T S x; end T" (uncommented (Composition { empty_typedef with td_name = "T" ;
+   typedef "class T S x; end T" (uncommented (Composition { empty_typedef with td_name = nl"T" ;
                                                                                type_exp = {empty_composition with public = {
                                                                                             empty_elements with
                                                                                             defs = [def] } };
@@ -339,7 +339,7 @@ let test_cases = [
                                                           } )));
 
   (let def = uncommented { empty_def with def_name = "x" ; def_type = type_name ["S"] } in
-               typedef "class T \"comment\" S x; end T" { commented = Composition { empty_typedef with td_name = "T" ;
+               typedef "class T \"comment\" S x; end T" { commented = Composition { empty_typedef with td_name = nl"T" ;
                                                                                                        type_exp = {
                                                                                                          empty_composition with
                                                                                                          public = { empty_elements with
@@ -349,20 +349,20 @@ let test_cases = [
                                               comment = unannotated ( Some (nl "comment") ) ;
                                             } );
   
-  typedef "partial model A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
+  typedef "partial model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                type_exp = empty_composition;
                                                                                sort = Model ;
                                                                                type_options = { no_type_options with partial = true };
                                                              } ));
 
-  typedef "replaceable model A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
+  typedef "replaceable model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                      type_exp = empty_composition;
                                                                                      sort = Model ;
                                                                                      type_options = {
                                                                                        no_type_options with type_replaceable = true };
                                                                 } ));
 
-  typedef "replaceable package A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
+  typedef "replaceable package A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                        type_exp = empty_composition;
                                                                                        sort = Package ;
                                                                                        type_options = {
@@ -370,7 +370,7 @@ let test_cases = [
                                                                 } ));
 
   
-  typedef "encapsulated model A end A" (uncommented (Composition { empty_typedef with td_name = "A" ;
+  typedef "encapsulated model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                        type_exp = empty_composition;
                                                                                        sort = Model ;
                                                                                        type_options = {
@@ -378,7 +378,7 @@ let test_cases = [
                                                                   } ));
 
   typedef "replaceable encapsulated partial model A end A"
-          (uncommented (Composition { empty_typedef with td_name = "A" ;
+          (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                          type_exp = empty_composition;
                                                          sort = Model ;
                                                          type_options = {
@@ -391,12 +391,12 @@ let test_cases = [
 
 
   typedef "model X redeclare type T = S; end X"
-          (uncommented (Composition { empty_typedef with td_name = "X" ;
+          (uncommented (Composition { empty_typedef with td_name = nl"X" ;
                                                          type_exp = { empty_composition with
                                                                       public = { empty_elements with
                                                                                  redeclared_types = [
                                                                                  uncommented (
-                                                                                     Short { empty_typedef with td_name = "T" ;
+                                                                                     Short { empty_typedef with td_name = nl"T" ;
                                                                                                                 type_exp = type_name ["S"]
                                                                                            }
                                                                                    )] } 
@@ -405,11 +405,11 @@ let test_cases = [
                                     } ));
 
   typedef "model X replaceable package T = S; end X"
-          (uncommented (Composition { empty_typedef with td_name = "X" ;
+          (uncommented (Composition { empty_typedef with td_name = nl"X" ;
                                                          type_exp = { empty_composition with
                                                                       public = { empty_elements with
                                                                       typedefs = [ uncommented (
-                                                                                       Short { empty_typedef with td_name = "T" ;
+                                                                                       Short { empty_typedef with td_name = nl"T" ;
                                                                                                                   type_exp = type_name ["S"] ;
                                                                                                                   sort = Package ;
                                                                                                                   type_options = {
@@ -423,7 +423,7 @@ let test_cases = [
                                     } ));
   
   typedef "model X equation 1 = 1; end X"
-          (uncommented (Composition { empty_typedef with td_name = "X" ;
+          (uncommented (Composition { empty_typedef with td_name = nl"X" ;
                                                          type_exp = { empty_composition with
                                                                       cargo = { empty_behavior with
                                                                                 equations = [ uncommented (
@@ -437,7 +437,7 @@ let test_cases = [
                                     } ));
   
   typedef "model X annotation ();  end X"
-          ({commented = (Composition { empty_typedef with td_name = "X" ;
+          ({commented = (Composition { empty_typedef with td_name = nl"X" ;
                                                          type_exp = empty_composition ;
                                                          sort = Model ;
                                     }) ;
@@ -445,23 +445,23 @@ let test_cases = [
            });
   
   
-  typedef "type E = enumeration(x)" (uncommented (Enumeration {empty_typedef with td_name="E" ;
+  typedef "type E = enumeration(x)" (uncommented (Enumeration {empty_typedef with td_name = nl "E" ;
                                                                                   type_exp = [uncommented "x"];
 
                                                               } )) ;
 
-  typedef "type E = enumeration(:)" (uncommented (OpenEnumeration {empty_typedef with td_name="E" ;
+  typedef "type E = enumeration(:)" (uncommented (OpenEnumeration {empty_typedef with td_name = nl "E" ;
                                                                                       type_exp = ();
                                                                                       
                                                                   } )) ;
 
-  typedef "type E = der(foo.bar, x, y)" (uncommented (DerSpec {empty_typedef with td_name="E" ;
+  typedef "type E = der(foo.bar, x, y)" (uncommented (DerSpec {empty_typedef with td_name = nl "E" ;
                                                                                   type_exp = { der_name = [nl "foo"; nl "bar"];
                                                                                                idents = [nl "x";nl "y"] }
                                                                                       
                                                                   } )) ;
   typedef "class extends X Real p; end X"
-          (uncommented (Extension {empty_typedef with td_name = "X" ;
+          (uncommented (Extension {empty_typedef with td_name = nl"X" ;
                                                       sort = Class ;
                                                       type_exp = ({ empty_composition with
                                                                     public = { empty_elements with 
@@ -476,7 +476,7 @@ let test_cases = [
 
   typedef "function f external \"C\" f(); end f"
           (uncommented (Composition {
-                            empty_typedef with td_name = "f" ;
+                            empty_typedef with td_name = nl"f" ;
                                                type_exp = { empty_composition with
                                                             cargo = { empty_behavior with
                                                                       external_ = Some (
@@ -492,7 +492,7 @@ let test_cases = [
                                                sort = Function } ));
                                                                             
   typedef "function f external \"C\" x = f(); end f"
-          (uncommented (Composition { empty_typedef with td_name = "f" ;
+          (uncommented (Composition { empty_typedef with td_name = nl"f" ;
                                                          type_exp = { empty_composition with
                                                                       cargo = { empty_behavior with
                                                                                 external_ = Some (
@@ -509,14 +509,14 @@ let test_cases = [
 
   typedef "type A = B(redeclare type C = D)"
           (uncommented (Short { empty_typedef with
-                                td_name = "A" ;
+                                td_name = nl"A" ;
                                 type_exp = TMod { mod_type=type_name ["B"] ;
                                                   modification = { no_modification with
                                                                    types = [{ redecl_each = false ;
                                                                               redecl_type =
                                                                                 uncommented ({
                                                                                               empty_typedef with
-                                                                                              td_name = "C" ;
+                                                                                              td_name = nl"C" ;
                                                                                               type_exp = type_name ["D"]
                                                                                             })
                                                                             }]}
@@ -525,14 +525,14 @@ let test_cases = [
   
   typedef "type A = B(replaceable type C = D)"
           (uncommented (Short { empty_typedef with
-                                td_name = "A" ;
+                                td_name = nl"A" ;
                                 type_exp = TMod { mod_type=type_name ["B"] ;
                                                   modification = {
                                                     no_modification with
                                                     types = [{ redecl_each = false ;
                                                                redecl_type =
                                                                  uncommented { empty_typedef with
-                                                                               td_name = "C" ;
+                                                                               td_name = nl"C" ;
                                                                                type_exp = type_name ["D"] ;
                                                                                type_options = {
                                                                                  no_type_options with
@@ -545,7 +545,7 @@ let test_cases = [
 
   typedef "type A = B(redeclare C c)"
           (uncommented (Short { empty_typedef with
-                                td_name = "A" ;
+                                td_name = nl"A" ;
                                 type_exp = TMod { mod_type=type_name ["B"] ;
                                                   modification = { no_modification with
                                                                    components = [{ each = false ;
@@ -561,7 +561,7 @@ let test_cases = [
 
   typedef "type A = B(replaceable C c)"
           (uncommented (Short { empty_typedef with
-                                td_name = "A" ;
+                                td_name = nl"A" ;
                                 type_exp = TMod { mod_type=type_name ["B"] ;
                                                   modification = { no_modification with
                                                                    components = [{ each = false ;
@@ -579,7 +579,7 @@ let test_cases = [
 
   typedef "function f algorithm print(\"hello, world!\"); end f"
           (uncommented
-             (Composition { empty_typedef with td_name = "f" ;
+             (Composition { empty_typedef with td_name = nl "f" ;
                                                type_exp = { empty_composition with
                                                             cargo = { empty_behavior with
                                                                       algorithms = [[uncommented (

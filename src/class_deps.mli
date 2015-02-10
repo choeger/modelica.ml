@@ -32,8 +32,8 @@
 open Utils
 open Syntax
 
-type kontext_label = Path of string list
-                   | Superclass of string list
+type kontext_label = Path of name
+                   | Superclass of name
 (** A kontext label (kontext means a type-with-a-hole 
     and needs to be distinguished from the context used 
     during evaluation) is a basically a pointer to a 
@@ -45,7 +45,7 @@ type kontext_label = Path of string list
 
 type dependency_source = {
   source_label : kontext_label;
-  required_elements : string list;
+  required_elements : name;
 }
 (** The source of a dependency is a kontext label together with a 
     (possibly empty) list of fields that need lookup. When this list
@@ -66,9 +66,9 @@ type lexical_typedef = {
     contains a set of dependencies. *) 
 
 type scope_entry = {
-  scope_name : string list ;
+  scope_name : name ;
   scope_tainted: bool;
-  scope_entries :  string StrMap.t;
+  scope_entries :  str StrMap.t;
 }
 (** A scope entry is a named area in the source code, where type-definitions can be found.
     A scope is tainted, when the corresponding class contains an extends-clause.
@@ -79,7 +79,10 @@ type scope_entry = {
                      
 type scope = scope_entry list
 (** The scope is a list of scope entries (in lookup order to allow for lexical shadowing). *)
-                         
+
+val search_scope : str -> name -> scope -> dependency_source list
+(** Find all possible global names of a given identifier in the given scope *)
+              
 val scan_dependencies : scope -> typedef -> lexical_typedef list
 (** Create a list of lexical type definitions from a type definition AST for dependency analysis *)
                                                             

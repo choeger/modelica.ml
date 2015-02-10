@@ -66,6 +66,7 @@ module TD_Desc = struct
   type sort = typedef_desc
                 
   let fold_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
+    (fold_located this.fold_identifier this td_name) %>
     (sub this type_exp) %>
       (fold_option this.fold_constraint this cns) %>
       (this.fold_typedef_options this type_options)
@@ -79,6 +80,7 @@ module TD_Desc = struct
     | DerSpec tds -> fold_tds this.fold_der_spec this tds
 
   let map_tds sub this { td_name ; sort ; type_exp ; cns ; type_options } =
+    let td_name = map_located this.map_identifier this td_name in
     let type_options = this.map_typedef_options this type_options in
     let type_exp = sub this type_exp in
     let cns = Option.map (this.map_constraint this) cns in
@@ -107,12 +109,12 @@ module Import_Desc = struct
   type sort = import_desc
 
   let fold this = function
-      NamedImport { global ; local } -> this.fold_name this global 
+      NamedImport { global ; local } -> (this.fold_name this global ) %> (fold_located this.fold_identifier this local)
     | Unnamed name -> this.fold_name this name
     | UnqualifiedImport name -> this.fold_name this name
                 
   let map this = function
-      NamedImport { global ; local } -> NamedImport { global = this.map_name this global ; local }
+      NamedImport { global ; local } -> NamedImport { global = this.map_name this global ; local = map_located this.map_identifier this local}
     | Unnamed name -> Unnamed (this.map_name this name)
     | UnqualifiedImport name -> UnqualifiedImport (this.map_name this name)
 

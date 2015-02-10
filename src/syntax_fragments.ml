@@ -51,7 +51,7 @@ let empty_def  = { def_name ="" ; def_type = TName []; def_options = no_def_opti
 let no_type_options = { partial = false ; encapsulated = false ;
                         type_final = false ; type_replaceable = false ;}
 
-let empty_typedef = { td_name = "" ; type_exp = () ; type_options = no_type_options ; cns = None ; sort = Type}
+let empty_typedef = { td_name = Location.mknoloc "" ; type_exp = () ; type_options = no_type_options ; cns = None ; sort = Type}
 
 let empty_behavior = { algorithms = [] ; initial_algorithms = [] ; equations = [] ; initial_equations = [] ; external_ = None }
 
