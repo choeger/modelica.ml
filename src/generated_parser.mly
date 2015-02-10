@@ -331,7 +331,7 @@ modification_arguments_head : m = modification_arguments { m }
 
 modification_arguments : REDECLARE redecl_each=flag(EACH) type_final=flag(FINAL) type_replaceable=flag(REPLACEABLE)
                          partial=flag(PARTIAL) sort = type_sort 
-                         td_name=IDENT EQ type_exp = type_expression comment=comment cns = option(constraining_clause) 
+                         td_name=ident EQ type_exp = type_expression comment=comment cns = option(constraining_clause) 
                          rest=modification_arguments_tail
                          { { rest with types = { 
                                     redecl_each ;
@@ -342,7 +342,7 @@ modification_arguments : REDECLARE redecl_each=flag(EACH) type_final=flag(FINAL)
                                                     comment } 
                                     } :: rest.types } }
                        | redecl_each=flag(EACH) type_final=flag(FINAL) REPLACEABLE partial=flag(PARTIAL) sort = type_sort 
-                         td_name=IDENT EQ type_exp = type_expression comment=comment cns = option(constraining_clause) 
+                         td_name=ident EQ type_exp = type_expression comment=comment cns = option(constraining_clause) 
                          rest=modification_arguments_tail
                          { { rest with types = { 
                                     redecl_each ;
@@ -387,7 +387,7 @@ mod_component_clause : scope=scope def_type = type_expression component=declarat
                        { declaration_to_def def_type {no_def_options with scope} def_constraint component }
 
 import : IMPORT name=separated_nonempty_list(DOT, ident) comment = comment { { commented = Unnamed name ; comment } }
-       | IMPORT local=IDENT EQ global=separated_nonempty_list(DOT, ident) comment = comment 
+       | IMPORT local=ident EQ global=separated_nonempty_list(DOT, ident) comment = comment 
          { { commented = NamedImport {global;local} ; comment } } 
        | IMPORT name=separated_nonempty_list(DOT, ident) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
                                                                                     
@@ -439,27 +439,27 @@ enum_literal : commented=IDENT comment=comment { { commented ; comment } }
 
 composition_annotation : a = annotation SEMICOLON { a }
 
-type_definition : type_options = typedef_prefix sort = type_sort td_name=IDENT EQ type_exp = type_expression
+type_definition : type_options = typedef_prefix sort = type_sort td_name=ident EQ type_exp = type_expression
                   comment=comment cns = option(constraining_clause) 
                   { { commented = Short { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
 
-                | type_options = typedef_prefix sort = type_sort td_name=IDENT annotated_elem=option(str) type_exp=composition 
+                | type_options = typedef_prefix sort = type_sort td_name=ident annotated_elem=option(str) type_exp=composition 
                   annotation=option(composition_annotation) end_name=END_IDENT cns = option(constraining_clause) 
                   { { commented = Composition { td_name ; sort ; type_options ; type_exp ; cns} ;  comment = {annotated_elem;annotation}}}
 
-                | type_options = typedef_prefix sort = type_sort EXTENDS td_name=IDENT modification=option(class_modification) 
+                | type_options = typedef_prefix sort = type_sort EXTENDS td_name=ident modification=option(class_modification) 
                   annotated_elem=option(str) composition=composition annotation=option(composition_annotation) end_name=END_IDENT
                   cns = option(constraining_clause) 
                   { { commented = Extension { td_name ; sort ; type_options ; type_exp=(composition,modification) ; cns} ;  
                       comment = {annotated_elem;annotation}}}
 
-                | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ ENUMERATION LPAREN type_exp=separated_nonempty_list(COMMA, enum_literal) RPAREN comment = comment cns = option(constraining_clause) 
+                | type_options = typedef_prefix sort = type_sort td_name=ident EQ ENUMERATION LPAREN type_exp=separated_nonempty_list(COMMA, enum_literal) RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = Enumeration { td_name ; sort ; type_options ; type_exp ; cns} ;  comment } }
 
-                | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ ENUMERATION LPAREN COLON RPAREN comment = comment cns = option(constraining_clause) 
+                | type_options = typedef_prefix sort = type_sort td_name=ident EQ ENUMERATION LPAREN COLON RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = OpenEnumeration { td_name ; sort ; type_options ; type_exp = () ; cns} ;  comment } }
 
-                | type_options = typedef_prefix sort = type_sort td_name=IDENT EQ DER LPAREN der_name=separated_nonempty_list(DOT, ident)
+                | type_options = typedef_prefix sort = type_sort td_name=ident EQ DER LPAREN der_name=separated_nonempty_list(DOT, ident)
                   COMMA idents=separated_nonempty_list(COMMA, ident) RPAREN comment = comment cns = option(constraining_clause) 
                   { { commented = DerSpec { td_name ; sort ; type_options ; type_exp = {der_name;idents} ; cns} ;  comment } }
 

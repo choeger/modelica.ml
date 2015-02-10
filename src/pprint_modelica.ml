@@ -206,9 +206,9 @@ let pp_elements_prefixed prefix pp fmt = function
   | es -> fprintf fmt "@[%s@ @[%a@]@ @]" prefix (pp_print_list pp) es
                   
 let pp_typedef_struct pp pp_constraint fmt { td_name ; sort ; type_exp ; cns ; type_options } =
-  fprintf fmt "@[%a%a@ %s@ %a%a@]" pp_typedef_options type_options
+  fprintf fmt "@[%a%a@ %a@ %a%a@]" pp_typedef_options type_options
           pp_typedef_sort sort
-          td_name
+          pp_str td_name
           pp type_exp
           (pp_option pp_constraint) cns
           
@@ -301,7 +301,7 @@ and pp_texpr fmt = function
                                            
 and pp_import_desc fmt = function
     Unnamed name -> fprintf fmt "@[import@ %a@]" pp_name name 
-  | NamedImport {global; local} -> fprintf fmt "@[import@ %s@ =@ %a@]" local pp_name global
+  | NamedImport {global; local} -> fprintf fmt "@[import@ %a@ =@ %a@]" pp_str local pp_name global
   | UnqualifiedImport name -> fprintf fmt "@[import@ %a.*@]" pp_name name 
     
 and pp_import fmt {commented;comment} =
@@ -350,9 +350,9 @@ and pp_composition fmt { imports ; public; protected; cargo ; } =
   fprintf fmt "@]" ;  
 
 and pp_extension_def fmt { td_name ; sort ; type_exp=(composition,modification) ; cns ; type_options } comment =
-  fprintf fmt "@[%a%a@ extends@ %s%a@ %a%a@]" pp_typedef_options type_options
+  fprintf fmt "@[%a%a@ extends@ %a%a@ %a%a@]" pp_typedef_options type_options
           pp_typedef_sort sort
-          td_name
+          pp_str td_name
           (pp_option (pp_paren pp_modification)) modification
           (pp_composition_rhs td_name comment) composition
           (pp_option pp_constraint) cns
@@ -377,7 +377,7 @@ and pp_comp_annotation fmt cmt = match cmt.annotation with
   | None -> ()
           
 and pp_composition_rhs x cmt fmt c =
-  fprintf fmt "@[%a@ %a@ %a@]@ end %s" pp_comment_string cmt.annotated_elem pp_composition c pp_comp_annotation cmt x 
+  fprintf fmt "@[%a@ %a@ %a@]@ end %a" pp_comment_string cmt.annotated_elem pp_composition c pp_comp_annotation cmt pp_str x 
           
 and pp_typedef fmt = function
   | {commented=OpenEnumeration tds ; comment} -> pp_typedef_struct pp_open_enum_rhs pp_constraint fmt tds ;
