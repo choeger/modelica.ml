@@ -45,11 +45,6 @@ type dependency = {
   from : dependency_source list;
 }
 
-type lexical_typedef = {
-  kontext_label : kontext_label;
-  dependencies : dependency list;
-}
-
 type scope_entry = {
   scope_name : name ;
   scope_tainted: bool;
@@ -57,7 +52,29 @@ type scope_entry = {
 }
 
 type scope = scope_entry list
+
+type lexical_typedef = {
+    kontext_label : kontext_label;
+    scope : scope;
+    dependencies : dependency list;
+}
+
+let write_str o str = IO.nwrite o str.txt
+                
+let write_name = List.print ~sep:"." write_str
+
+let write_label o = function
+    Path name -> write_name o name
+  | Superclass name -> write_name o ((mknoloc "Σ")::name)
+
+let name2str name =
+  let o = IO.output_string () in
+  write_name o name ; IO.close_out o
                                   
+let label2str name =
+  let o = IO.output_string () in
+  write_label o name ; IO.close_out o
+                                                            
 let rec search_scope x required_elements = function
     (* when x is in the scope, tainted does not matter, it shadows all entries above *)
     {scope_entries; scope_name}::rest when StrMap.mem x.txt scope_entries -> [{source_label = Path ((StrMap.find x.txt scope_entries)::scope_name) ; required_elements}]
@@ -73,16 +90,16 @@ type scanner_result = {
 }
 
 let builtin = function
-  | "ExternalObject" | "String" | "Real" | "Boolean" | "Integer" -> true
+  | "Complex" | "ExternalObject" | "String" | "Real" | "Boolean" | "Integer" -> true
   | _ -> false
-                        
+
+let rec last x = function [] -> x | x::xs -> last x xs
+           
 (** Compute a dependency from a type-expression *)
 let rec dependency es scope = function
   | TName [x] when builtin x.txt -> None
-  | TName [x] -> let from = search_scope x es scope in Some {local_name = x.txt ; from }
-  | TRootName [x]-> Some {from = [{source_label = Path(x :: es); required_elements = []}] ; local_name=x.txt}
-  | TName(t::base) -> dependency (t::es) scope (TName base)
-  | TRootName(t::base) -> dependency (t::es) scope (TRootName base)
+  | TRootName(x::xs) -> Some {from = [{source_label = Path([x]); required_elements = xs}] ; local_name=(last x xs).txt}
+  | TName(x::xs) -> let from = search_scope x xs scope in Some {local_name = (last x xs).txt ; from }
   | TArray {base_type} -> dependency es scope base_type
   | TMod {mod_type} -> dependency es scope mod_type (* TODO: redeclarations might cause additional dependencies, covered by folder ? - Test *)
   | TVar {flagged} -> dependency es scope flagged
@@ -117,7 +134,7 @@ let rec fold_all f x = function
 let local_scope scope name {imports;public;protected} =
   (* name of the actual scope *)
   let scope_name = match scope with [] -> [name] | {scope_name}::_ -> name::scope_name in
-  let scope_tainted = public.extensions != [] || protected.extensions != [] in
+  let scope_tainted = (public.extensions != [] || protected.extensions != []) in
 
   let name = function
       Short tds -> tds.td_name | Composition tds -> tds.td_name | Enumeration tds -> tds.td_name | OpenEnumeration tds -> tds.td_name | DerSpec tds -> tds.td_name | Extension tds -> tds.td_name in
@@ -132,7 +149,7 @@ let local_scope scope name {imports;public;protected} =
                                     {scope_name=global; scope_tainted=false; scope_entries=StrMap.singleton local.txt locals}::scope
 
     | Unnamed name -> let local::global = List.rev name in {scope_name=global; scope_tainted=false; scope_entries=StrMap.singleton local.txt local}::scope
-    | UnqualifiedImport name -> {scope_name=name; scope_tainted=true; scope_entries=StrMap.empty}::scope
+    | UnqualifiedImport name -> {scope_name=List.rev name; scope_tainted=true; scope_entries=StrMap.empty}::scope
   in
   
   let scope_entries =
@@ -148,7 +165,7 @@ let scan this td {found;scope} = match td with
                            parent::_ -> Path (tds.td_name::parent.scope_name)
                          | _ -> Path [tds.td_name]
                        in
-                       let typedef = {kontext_label; dependencies=[]} in
+                       let typedef = {kontext_label; scope; dependencies=[]} in
                        {found = typedef::found; scope}                     
                      end
   | Short tds -> begin
@@ -161,17 +178,19 @@ let scan this td {found;scope} = match td with
                  let rhs = tds.type_exp in
                  let f = (dependency_collector scope) in
                  let dependencies = f.fold_texp f rhs [] in
-                 let typedef = {kontext_label; dependencies} in
+                 let typedef = {kontext_label; scope; dependencies} in
                  {found = typedef::found; scope}
                end
   | Composition tds -> begin
                        let body = tds.type_exp in
-                       
+
                        (* local extensions to the scope *)
                        let (local_scope::rest) = local_scope scope tds.td_name body in
+
+                       let inheritance_scope = {local_scope with scope_tainted = false}::rest in
                        
                        (* dependencies of the local extends-clauses *)
-                       let superclass_dependencies = superclass_deps (local_scope::rest) body in
+                       let superclass_dependencies = superclass_deps inheritance_scope body in
                        
                        (* dependencies of the local component definitions *)
                        let dependencies = local_deps (local_scope::rest) body in
@@ -187,8 +206,8 @@ let scan this td {found;scope} = match td with
                        let superclasses = { source_label = superclass_label ; required_elements = []} in
                        let inheritance = { local_name="Σ" ; from = [superclasses] } in
 
-                       let component_def = {kontext_label=Path local_scope.scope_name; dependencies=inheritance::dependencies} in
-                       let inheritance_def = {kontext_label=superclass_label; dependencies=superclass_dependencies} in
+                       let component_def = {kontext_label=Path local_scope.scope_name; scope=local_scope::rest ; dependencies=inheritance::dependencies} in
+                       let inheritance_def = {kontext_label=superclass_label; scope=inheritance_scope ; dependencies=superclass_dependencies} in
                        
                        (* forget about the local scope and name again, remember lexical defs *)
                        {found=component_def::inheritance_def::found'; scope}
@@ -221,8 +240,10 @@ module KontextLabel = struct
                                                      
   let compare a b = List.compare str_compare (pp a) (pp b)                                                                                              
 
-  let hash = Hashtbl.hash
-  let equal a b = a = b
+  let hash = function Path(p) -> Hashtbl.hash (lunloc p)
+                    | Superclass(p) -> Hashtbl.hash ("Σ"::(lunloc p))
+                                                    
+  let equal a b = compare a b = 0
   let default = Path []
 end
 
@@ -254,6 +275,10 @@ let subgraph vs g =
   let retain v g' = LexicalDepGraph.fold_succ (add_succ v) g v g' in
   LabelSet.fold retain vs LexicalDepGraph.empty
 
+let log_label d = BatLog.logf "  Label: %s\n" (label2str d) 
+                
+let log_group ds = BatLog.log "Group:\n" ; List.iter log_label ds
+                
 let cut_superclass_deps g group =
   (* try to cut all dependencies to a superclass if that dependency is lexically smaller than (i.e. "inside") the inheriting class *)
   let is_superclass = function Superclass _ -> true | _ -> false in
@@ -263,7 +288,6 @@ let cut_superclass_deps g group =
   if LabelSet.is_empty sigmas then [group] else    
      let vs = LabelSet.of_list group in
      let g' = subgraph vs g in
-     Printf.printf "Got %d vertices and %d edges in the scc sub-graph\n" (LexicalDepGraph.nb_vertex g') (LexicalDepGraph.nb_edges g') ;
      let delete_incoming sigma incoming g = if (lexically_smaller incoming sigma) then
                                               LexicalDepGraph.remove_edge g incoming sigma
                                             else g in
@@ -271,7 +295,8 @@ let cut_superclass_deps g group =
      let cutted = LabelSet.fold delete_back_deps sigmas g' in
 
      let ret = Scc.scc_list cutted in
-     Printf.printf "Split a group of %d vertices into %d sub-groups\n" length_orig (List.length ret) ; ret
+
+     ret
                                                                                                          
 let prep_scc g = function
     [] -> []
@@ -279,11 +304,12 @@ let prep_scc g = function
   | x::xs -> cut_superclass_deps g (x::xs)
                   
 let topological_order deps =
-  let add_dependency_edge source g dest = 
+  let add_dependency_edge source g dest =
+    BatLog.logf "%s depends on %s\n" (label2str source) (label2str dest.source_label) ;
     LexicalDepGraph.add_edge g source dest.source_label
   in
 
-  let add_dependency_edges source g {from} =    
+  let add_dependency_edges source g {from} = 
     List.fold_left (add_dependency_edge source) g from
   in
 
@@ -299,9 +325,13 @@ let topological_order deps =
   
   let g = List.fold_left add_to_graph LexicalDepGraph.empty deps in
 
-  Printf.printf "Got %d vertices and %d edges in the dependency graph\n" (LexicalDepGraph.nb_vertex g) (LexicalDepGraph.nb_edges g) ;
+  let ret = List.flatten (List.map (prep_scc g) (Scc.scc_list g)) in
+  Printf.printf "Got %d vertices and %d edges in %d strongly connected components in the dependency graph out of %d lexical definitions\n" (LexicalDepGraph.nb_vertex g) (LexicalDepGraph.nb_edges g) (List.length ret) (List.length deps) ;
   
-  List.flatten (List.map (prep_scc g) (Scc.scc_list g))
+  List.iter log_group ret;
+  ret
+     
+
   
   
 

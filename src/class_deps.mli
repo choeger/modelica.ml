@@ -43,6 +43,12 @@ type kontext_label = Path of name
     are evaluated (as they are specified to be independent of each other).
  *) 
 
+module LabelMap : Map.S with type key = kontext_label                                     
+
+val name2str : name -> string
+
+val label2str : kontext_label -> string
+                                          
 type dependency_source = {
   source_label : kontext_label;
   required_elements : name;
@@ -57,13 +63,7 @@ type dependency = {
   from : dependency_source list;
 }
 (** A dependency is a set of possible sources for a local name *)
-                    
-type lexical_typedef = {
-  kontext_label : kontext_label;
-  dependencies : dependency list;
-}
-(** A lexical type-definition is identified by its kontext label and 
-    contains a set of dependencies. *) 
+
 
 type scope_entry = {
   scope_name : name ;
@@ -76,10 +76,18 @@ type scope_entry = {
     imports not fully supported, though.
     The entries of a scope_entries are the (possibly locally renamed) lexically defined entities. 
  *) 
-                     
+
 type scope = scope_entry list
 (** The scope is a list of scope entries (in lookup order to allow for lexical shadowing). *)
-
+                     
+type lexical_typedef = {
+    kontext_label : kontext_label;
+    scope : scope;
+    dependencies : dependency list;
+}
+(** A lexical type-definition is identified by its kontext label and 
+    contains a set of dependencies. *) 
+                    
 val search_scope : str -> name -> scope -> dependency_source list
 (** Find all possible global names of a given identifier in the given scope *)
               
@@ -88,3 +96,6 @@ val scan_dependencies : scope -> typedef -> lexical_typedef list
                                                             
 val topological_order : lexical_typedef list -> kontext_label list list
 (** Sort the found kontext labels topological in dependency order *)
+
+val builtin : string -> bool
+(** Check if the given name is a builtin type in Modelica *)
