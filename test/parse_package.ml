@@ -40,61 +40,15 @@ open Location
 let stats u =
   let {def_count; type_count} = generate_stats u in
   Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
-
-let write_str o str = IO.nwrite o str.txt
-                
-let write_name = List.print ~sep:"." write_str
-
-let write_label o = function
-    Path name -> write_name o name
-  | Superclass name -> write_name o ((mknoloc "Σ")::name)
-
-let write_source o {source_label; required_elements} = 
-  write_label o source_label ; IO.nwrite o "(" ; write_name o required_elements ; IO.nwrite o ")"
-                                                                                          
-let name2str name =
-  let o = IO.output_string () in
-  write_name o name ; IO.close_out o
-
-let label2str name =
-  let o = IO.output_string () in
-  write_label o name ; IO.close_out o
-
-let from2str from =
-  let o = IO.output_string () in
-  List.print ~first:"{" ~sep:"|" ~last:"}" write_source o from ; IO.close_out o
-                                                        
-let print_dep { local_name ; from } =
-    Printf.printf "  '%s' from %s\n" local_name (from2str from)
-                                                      
-let print_def {kontext_label;dependencies} = Printf.printf "%d dependencies in %s\n" (List.length dependencies) (label2str kontext_label) ;
-                                             List.iter print_dep dependencies 
-
-let print_name global_name = Printf.printf "    %s\n" (name2str global_name)
-
-let print_label label = Printf.printf "    %s\n" (label2str label)
-
-let print_group labels = Printf.printf "group of size %d:\n" (List.length labels) ; List.iter print_label labels ; Printf.printf "end;\n"
-                                           
-let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrMap.singleton start.txt start}]
-
-let name = function
-    Short tds -> tds.td_name | Composition tds -> tds.td_name | Enumeration tds -> tds.td_name | OpenEnumeration tds -> tds.td_name | DerSpec tds -> tds.td_name | Extension tds -> tds.td_name
-                                                     
-let deps u = match u.toplevel_defs with
-    d::_ -> let ldefs = Class_deps.scan_dependencies (global_scope (name d.commented)) d in
-            List.iter print_def ldefs ;
-            List.iter print_group (topological_order ldefs)
+                                             
+let normalize u = match u.toplevel_defs with
+    d::_ -> ClassLang.normalize d ; Printf.printf "Class language normalization successful\n"
   | _ -> ()
-
-let translate u = 
-  let class_ = translate_topdefs u.toplevel_defs in
-  Printf.printf "Translation to class language successful\n"
            
 let _ =
   Format.pp_set_margin Format.str_formatter (140);
   match (scan [] argv.(1)) with
-    Some pkg ->  begin match merge pkg with Some u -> stats u ; deps u; translate u; (*Printf.printf "%s\n" (unit2str ~max:(max_int - 1) u);*) 0 | None -> 1 end
+    Some pkg ->  begin match merge pkg with Some u -> normalize u ; (*Printf.printf "%s\n" (unit2str ~max:(max_int - 1) u);*) 0 | None -> 1 end
   | None -> Printf.eprintf "'%s' does not seem to be a Modelica package.\n" argv.(1) ; 1
               
                   

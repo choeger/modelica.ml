@@ -29,12 +29,16 @@
 open Batteries
 open Utils
 open Syntax
+open Folder
 open Traversal
 open Location
+
+type outside_superclass = {extended:str; parent:name}
        
 type kontext_label = Path of name
                    | Superclass of name
-
+                   | OutsideSuperclass of outside_superclass
+                                     
 type dependency_source = {
   source_label : kontext_label;
   required_elements : name;
@@ -66,7 +70,8 @@ let write_name = List.print ~sep:"." write_str
 let write_label o = function
     Path name -> write_name o name
   | Superclass name -> write_name o ((mknoloc "Σ")::name)
-
+  | OutsideSuperclass {extended; parent} -> write_name o ((mknoloc "Ω")::extended::parent) 
+                                  
 let name2str name =
   let o = IO.output_string () in
   write_name o name ; IO.close_out o
@@ -94,22 +99,18 @@ let builtin = function
   | _ -> false
 
 let rec last x = function [] -> x | x::xs -> last x xs
-           
+
 (** Compute a dependency from a type-expression *)
-let rec dependency es scope = function
-  | TName [x] when builtin x.txt -> None
-  | TRootName(x::xs) -> Some {from = [{source_label = Path([x]); required_elements = xs}] ; local_name=(last x xs).txt}
-  | TName(x::xs) -> let from = search_scope x xs scope in Some {local_name = (last x xs).txt ; from }
-  | TArray {base_type} -> dependency es scope base_type
-  | TMod {mod_type} -> dependency es scope mod_type (* TODO: redeclarations might cause additional dependencies, covered by folder ? - Test *)
-  | TVar {flagged} -> dependency es scope flagged
-  | TCon {flagged} -> dependency es scope flagged
-  | TCau {flagged} -> dependency es scope flagged
+let dependency scope this texp deps = match texp with
+  | TName [x] when builtin x.txt -> deps
+  | TRootName(x::xs) -> {from = [{source_label = Path([x]); required_elements = xs}] ; local_name=(last x xs).txt}::deps
+  | TName(x::xs) -> let from = search_scope x xs scope in {local_name = (last x xs).txt ; from }::deps
+  | TArray {base_type} -> this.fold_texp this base_type deps
+  | TMod {mod_type; modification} -> let ds = this.fold_modification this modification deps in
+                                     this.fold_texp this mod_type ds                                         
+  | TVar {flagged} | TCon {flagged} | TCau {flagged} -> this.fold_texp this flagged deps
 
-
-let fold_dependencies scope this texp deps = match (dependency [] scope texp) with Some d when (List.mem d deps) -> deps | Some d -> d::deps | None -> deps
-
-let dependency_collector scope = { default_folder with fold_texp = fold_dependencies scope;
+let dependency_collector scope = { default_folder with fold_texp = dependency scope;
                                                        fold_typedef = Folder.fold_id ;
                                                        fold_redeclared_typedef = Folder.fold_id;
                                  }
@@ -157,7 +158,37 @@ let local_scope scope name {imports;public;protected} =
     fold_all add_entry StrMap.empty [public.typedefs; public.redeclared_types; protected.typedefs; protected.redeclared_types] (*TODO: do we need to check protected?*)
   in
   {scope_name; scope_tainted; scope_entries}::(List.fold_left imported_names scope imports)
-        
+
+let scan_composition this ?force_tainted:(ft=false) {found;scope} tds =
+  let body = tds.type_exp in
+
+  (* local extensions to the scope *)
+  let (local_scope::rest) = local_scope scope tds.td_name body in
+  let local_scope = {local_scope with scope_tainted = local_scope.scope_tainted || ft} in 
+  
+  let inheritance_scope = {local_scope with scope_tainted = false}::rest in
+                       
+  (* dependencies of the local extends-clauses *)
+  let superclass_dependencies = superclass_deps inheritance_scope body in
+                       
+  (* dependencies of the local component definitions *)
+  let dependencies = local_deps (local_scope::rest) body in
+
+  (* scan dependencies of lexical children *)
+  let {found=found'} =
+    Composition.fold this tds.type_exp {scope=local_scope::rest; found}
+  in
+
+  (* create an artificial dependency: superclasses have to be resolved before the 
+     whole class can be resolved *)
+  let superclass_label = Superclass local_scope.scope_name in
+  let superclasses = { source_label = superclass_label ; required_elements = []} in
+  let inheritance = { local_name="Σ" ; from = [superclasses] } in
+
+  let component_def = {kontext_label=Path local_scope.scope_name; scope=local_scope::rest ; dependencies=inheritance::dependencies} in
+  let inheritance_def = {kontext_label=superclass_label; scope=inheritance_scope ; dependencies=superclass_dependencies} in
+  component_def::inheritance_def::found'
+  
 let scan this td {found;scope} = match td with
   | Enumeration tds -> begin
                        (* enumerations do not depend on other types *)
@@ -181,37 +212,18 @@ let scan this td {found;scope} = match td with
                  let typedef = {kontext_label; scope; dependencies} in
                  {found = typedef::found; scope}
                end
-  | Composition tds -> begin
-                       let body = tds.type_exp in
-
-                       (* local extensions to the scope *)
-                       let (local_scope::rest) = local_scope scope tds.td_name body in
-
-                       let inheritance_scope = {local_scope with scope_tainted = false}::rest in
-                       
-                       (* dependencies of the local extends-clauses *)
-                       let superclass_dependencies = superclass_deps inheritance_scope body in
-                       
-                       (* dependencies of the local component definitions *)
-                       let dependencies = local_deps (local_scope::rest) body in
-
-                       (* scan dependencies of lexical children *)
-                       let {found=found'} =
-                         Composition.fold this tds.type_exp {scope=local_scope::rest; found}
-                       in
-
-                       (* create an artificial dependency: superclasses have to be resolved before the 
-                          whole class can be resolved *)
-                       let superclass_label = Superclass local_scope.scope_name in
-                       let superclasses = { source_label = superclass_label ; required_elements = []} in
-                       let inheritance = { local_name="Σ" ; from = [superclasses] } in
-
-                       let component_def = {kontext_label=Path local_scope.scope_name; scope=local_scope::rest ; dependencies=inheritance::dependencies} in
-                       let inheritance_def = {kontext_label=superclass_label; scope=inheritance_scope ; dependencies=superclass_dependencies} in
-                       
-                       (* forget about the local scope and name again, remember lexical defs *)
-                       {found=component_def::inheritance_def::found'; scope}
-                     end
+  | Composition tds -> 
+      let found = scan_composition this {found;scope} tds in
+      (* forget about the local scope and name again, remember lexical defs *)
+      {found; scope}
+  | Extension tds ->
+     let comp,m = tds.type_exp in
+     let local_scope::rest = scope in (* cannot be empty due to syntactic restriction *)
+     let found = scan_composition this ~force_tainted:true {found;scope} {tds with type_exp = comp} in
+     let omega = {kontext_label = OutsideSuperclass {extended=tds.td_name; parent = local_scope.scope_name } ; scope;
+                  dependencies=[{local_name=tds.td_name.txt; from=[{source_label=Superclass local_scope.scope_name; required_elements=[]}]}]} in     
+     (* forget about the local scope and name again, remember lexical defs *)
+     {found = omega::found; scope}
   | _ -> TD_Desc.fold this td {found;scope}
 
 
@@ -223,26 +235,29 @@ let rec prefix a = function
              | y::_ -> false                         
                
 let lexically_below p = function
-    Superclass(r) | Path r -> prefix (List.rev r) p
+    OutsideSuperclass {extended;parent} -> prefix (List.rev (extended::parent)) p
+  | Superclass(r) | Path r -> prefix (List.rev r) p
                           
 let lexically_smaller = function
-    Superclass(r) | Path r -> lexically_below (List.rev r)
+    OutsideSuperclass {extended;parent} -> lexically_below (extended::parent) 
+  | Superclass(r) | Path r -> lexically_below (List.rev r)
                       
 module KontextLabel = struct
          
   type t = kontext_label
-
   (* create a string list from a label *)
   let pp = function Path(a) -> a
                   | Superclass a -> (mknoloc "Σ")::a
-
+                  | OutsideSuperclass {extended;parent} -> (mknoloc "Ω") :: extended :: parent
+                                                                                          
   let str_compare a b = String.compare a.txt b.txt 
-                                                     
-  let compare a b = List.compare str_compare (pp a) (pp b)                                                                                              
 
+  let compare a b = List.compare str_compare (pp a) (pp b)                                                                                              
+ 
   let hash = function Path(p) -> Hashtbl.hash (lunloc p)
                     | Superclass(p) -> Hashtbl.hash ("Σ"::(lunloc p))
-                                                    
+                    | OutsideSuperclass {extended;parent} -> Hashtbl.hash ("Ω"::extended.txt::(lunloc parent))                        
+                      
   let equal a b = compare a b = 0
   let default = Path []
 end
@@ -314,6 +329,7 @@ let topological_order deps =
   in
 
   let rec add_downwards_dependency g = function
+    | (OutsideSuperclass {extended; parent}) as osc -> LexicalDepGraph.add_edge g (Superclass (extended::parent)) osc
     | Path(name :: rest) -> LexicalDepGraph.add_edge (add_downwards_dependency g (Path rest)) (Path rest) (Path (name::rest))
     | _ -> g
   in

@@ -32,8 +32,12 @@
 open Utils
 open Syntax
 
+type outside_superclass = {extended:str; parent:name}
+(** A superclass that lies outside its own scope (i.e. as in the 'redeclare class extends ... ' mechanism *)
+                            
 type kontext_label = Path of name
                    | Superclass of name
+                   | OutsideSuperclass of outside_superclass
 (** A kontext label (kontext means a type-with-a-hole 
     and needs to be distinguished from the context used 
     during evaluation) is a basically a pointer to a 
