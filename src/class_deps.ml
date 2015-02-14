@@ -330,6 +330,7 @@ let topological_order deps =
 
   let rec add_downwards_dependency g = function
     | (OutsideSuperclass {extended; parent}) as osc -> LexicalDepGraph.add_edge g (Superclass (extended::parent)) osc
+    | Path([name]) -> g
     | Path(name :: rest) -> LexicalDepGraph.add_edge (add_downwards_dependency g (Path rest)) (Path rest) (Path (name::rest))
     | _ -> g
   in
