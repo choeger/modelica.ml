@@ -44,6 +44,7 @@ type class_ = Hierarchy of hierarchy
  and class_element_kind = Static
                         | Replaceable
                         | Function
+type t = class_
 
 type class_value = VHierarchy of value_hierarchy
                  | VPrimitive of string * class_value list
@@ -56,9 +57,10 @@ type class_value = VHierarchy of value_hierarchy
                                
  and class_value_element = { vkind : class_element_kind ; vbody : class_value }
                             
-type t = class_
+val empty_hierarchy : value_hierarchy
 
-
+val value_hierarchy_to_yojson : value_hierarchy -> Yojson.Safe.json
+                        
 type unresolved_dependency = { searching : name ; dependency : kontext_label }
                                       
 exception UnresolvedDependency of unresolved_dependency

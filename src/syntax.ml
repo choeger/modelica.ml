@@ -38,10 +38,10 @@
 open Utils
 open Location
 
-type str = string loc
+type str = string loc [@@deriving yojson]
        
 (** A type-name is a list of strings separated by dots, e.g. Modelica.Icons.Example *)
-type name = str list
+type name = str list [@@deriving yojson]
                     
  (** Something that can be commented can wrapped in this record *)
 type 'a commented = { commented : 'a ; comment : comment }

@@ -26,6 +26,21 @@
  *
  *)
 
+type position = Lexing.position = {
+      pos_fname : string;
+      pos_lnum : int;
+      pos_bol : int;
+      pos_cnum : int;
+    } [@@deriving yojson]
+
+type location = Location.t = {
+      loc_start: position;
+      loc_end: position;
+      loc_ghost: bool;
+    } [@@deriving yojson]
+      
+type 'a loc = 'a Location.loc = { txt : 'a; loc : location; } [@@deriving yojson]
+
 type token =
  GT | LT | NEQ | GEQ | LEQ | EQ | EQEQ | LPAREN | RPAREN | LBRACKET | RBRACKET | LBRACE | RBRACE | SEMICOLON | COMMA | DOT | COLON | COLONEQ
  | INT of int
@@ -48,6 +63,8 @@ open Batteries
 module StrMap = struct include Map.Make(String)
                        let union m1 m2 = Enum.fold (fun m (k,v) -> add k v m) m1 (enum m2)
                        let find_or_else v x m = if mem x m then find x m else v
+                       let to_yojson a m = `Assoc (List.map (fun (k,v) -> (k,a v)) (bindings m))
+                       let of_yojson js f = (`Error "Not yet implemented")
                 end
 module StrSet = Set.Make(String) 
                         

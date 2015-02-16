@@ -83,7 +83,10 @@ type scope_entry = {
 
 type scope = scope_entry list
 (** The scope is a list of scope entries (in lookup order to allow for lexical shadowing). *)
-                     
+
+val scope_to_yojson : scope -> Yojson.Safe.json
+val scope_of_yojson : Yojson.Safe.json -> [`Ok of scope | `Error of string]
+                         
 type lexical_typedef = {
     kontext_label : kontext_label;
     scope : scope;

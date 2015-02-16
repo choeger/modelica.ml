@@ -32,13 +32,15 @@ open Syntax
 open Class_deps
 open Utils
 open Location
-       
+
+         
 type class_ = Hierarchy of hierarchy
             | Reference of name
             | RootReference of name
             | Primitive of string * (class_ list)
             | Method of string list
-
+                               [@@deriving yojson]
+                               
  and hierarchy = { fields : class_element StrMap.t ; super : class_ list }
                                
  and class_element = { kind : class_element_kind ; body : class_ }
@@ -53,6 +55,7 @@ type class_value = VHierarchy of value_hierarchy
                  | VPrimitive of string * class_value list
                  | VMethod of string list
                  | VDelayed of delayed_value
+                                 [@@deriving yojson]
 
  and delayed_value = { environment : scope ; expression : class_ }
                                  
@@ -60,6 +63,7 @@ type class_value = VHierarchy of value_hierarchy
                                
  and class_value_element = { vkind : class_element_kind ; vbody : class_value }
 
+                             
 let empty_hierarchy = {vfields=StrMap.empty ; vsuper = []}
 
 open CamlFormat
@@ -295,7 +299,7 @@ let eval_label c scope global = function
      let r = List.rev (extended::parent) in
      begin
        match get_element global {vkind=Static; vbody=VHierarchy global} r with
-         Found {vbody=(VHierarchy h) as v} -> BatLog.logf "Adding superclass %s to %s\n" (cv2str v) (name2str r) ; add_superclasses global [v] (extended::parent)
+         Found {vbody=(VHierarchy h) as v} -> add_superclasses global [v] (extended::parent)
        | Found (_) -> raise (EvaluationException (Printf.sprintf "Illegal inheritance redeclaration of '%s' in %s" extended.txt (name2str parent)))
        | _ -> raise (EvaluationException (Printf.sprintf "Unknown superclass '%s' in %s" extended.txt (name2str parent)))
      end                                                    
@@ -347,7 +351,6 @@ let log_def {kontext_label; dependencies} = BatLog.logf "Dependencies for %s:\n"
                            
 let normalize top = 
     let deps = scan_dependencies (global_scope (name top.commented)) top in
-    List.iter log_def deps ;
     let scopes = List.fold_left (fun m {kontext_label;scope} -> LabelMap.add kontext_label scope m) LabelMap.empty deps in
     let sccs = topological_order deps in
     do_normalize (List.length sccs) 0 ({body=translate_topdefs [top];kind=Static}) scopes empty_hierarchy sccs

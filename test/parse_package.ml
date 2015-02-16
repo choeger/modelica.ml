@@ -42,13 +42,16 @@ let stats u =
   Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
                                              
 let normalize u = match u.toplevel_defs with
-    d::_ -> ClassLang.normalize d ; Printf.printf "Class language normalization successful\n"
-  | _ -> ()
+    d::_ -> ClassLang.normalize d
+  | _ -> ClassLang.empty_hierarchy
            
 let _ =
   Format.pp_set_margin Format.str_formatter (140);
   match (scan [] argv.(1)) with
-    Some pkg ->  begin match merge pkg with Some u -> normalize u ; (*Printf.printf "%s\n" (unit2str ~max:(max_int - 1) u);*) 0 | None -> 1 end
+    Some pkg ->  begin match merge pkg with Some u ->
+                                            let hier = normalize u in
+                                            Printf.printf "%s\n" (Yojson.Safe.pretty_to_string (ClassLang.value_hierarchy_to_yojson hier)) ; 0
+                                          | None -> 1 end
   | None -> Printf.eprintf "'%s' does not seem to be a Modelica package.\n" argv.(1) ; 1
               
                   

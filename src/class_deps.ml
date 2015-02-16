@@ -53,9 +53,9 @@ type scope_entry = {
   scope_name : name ;
   scope_tainted: bool;
   scope_entries :  str StrMap.t;
-}
+} [@@deriving yojson]
 
-type scope = scope_entry list
+type scope = scope_entry list [@@deriving yojson]
 
 type lexical_typedef = {
     kontext_label : kontext_label;
@@ -320,7 +320,7 @@ let prep_scc g = function
                   
 let topological_order deps =
   let add_dependency_edge source g dest =
-    BatLog.logf "%s depends on %s\n" (label2str source) (label2str dest.source_label) ;
+    (*BatLog.logf "%s depends on %s\n" (label2str source) (label2str dest.source_label) ;*)
     LexicalDepGraph.add_edge g source dest.source_label
   in
 
@@ -343,7 +343,7 @@ let topological_order deps =
   let g = List.fold_left add_to_graph LexicalDepGraph.empty deps in
 
   let ret = List.flatten (List.map (prep_scc g) (Scc.scc_list g)) in
-  Printf.printf "Got %d vertices and %d edges in %d strongly connected components in the dependency graph out of %d lexical definitions\n" (LexicalDepGraph.nb_vertex g) (LexicalDepGraph.nb_edges g) (List.length ret) (List.length deps) ;
+  BatLog.logf "Got %d vertices and %d edges in %d strongly connected components in the dependency graph out of %d lexical definitions\n" (LexicalDepGraph.nb_vertex g) (LexicalDepGraph.nb_edges g) (List.length ret) (List.length deps) ;
   
   List.iter log_group ret;
   ret
