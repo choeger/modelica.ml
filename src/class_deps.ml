@@ -344,8 +344,6 @@ let topological_order deps =
 
   let ret = List.flatten (List.map (prep_scc g) (Scc.scc_list g)) in
   BatLog.logf "Got %d vertices and %d edges in %d strongly connected components in the dependency graph out of %d lexical definitions\n" (LexicalDepGraph.nb_vertex g) (LexicalDepGraph.nb_edges g) (List.length ret) (List.length deps) ;
-  
-  List.iter log_group ret;
   ret
      
 

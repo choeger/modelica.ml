@@ -51,7 +51,7 @@ type class_value = VHierarchy of value_hierarchy
                  | VMethod of string list
                  | VDelayed of delayed_value
 
- and delayed_value = { environment : scope ; expression : class_ }
+ and delayed_value = { environment : scope ; expression : class_ ; def_label:name}
                                      
  and value_hierarchy = { vfields : class_value_element StrMap.t ; vsuper : class_value list }
                                

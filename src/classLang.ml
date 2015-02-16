@@ -57,7 +57,7 @@ type class_value = VHierarchy of value_hierarchy
                  | VDelayed of delayed_value
                                  [@@deriving yojson]
 
- and delayed_value = { environment : scope ; expression : class_ }
+ and delayed_value = { environment : scope ; expression : class_ ; def_label : name }
                                  
  and value_hierarchy = { vfields : class_value_element StrMap.t ; vsuper : class_value list }
                                
@@ -181,8 +181,15 @@ let result2str = function Found _ -> "OK"
                | NothingFound name -> "No path to " ^ (name2str name)
                                                         
 let value_of = function Found(e) -> e.vbody | r -> raise (EvaluationException (result2str r))
-                                    
-let rec unfold global {environment; expression} = eval global environment expression
+
+let unfolding = ref 0 
+
+exception UnfoldingException
+                    
+let rec unfold global {environment; expression; def_label} =
+  BatLog.logf "Unfolding: %s. Counter: %d\n" (name2str def_label) !unfolding;
+  if !unfolding < 100 then begin unfolding := !unfolding + 1 ; let v = eval global environment expression in BatLog.logf "Done unfolding: %s. Counter: %d\n" (name2str def_label) !unfolding; v end
+  else raise UnfoldingException
                                              
 and eval v scope = function
   | Hierarchy {fields;super} -> VHierarchy {vfields = StrMap.map (eval_element v scope) fields; vsuper = List.map (eval v scope) super}
@@ -256,16 +263,19 @@ let rec merge_kind a = function
   | b -> b
             
 let rec merge_elements global b = function
-    {vbody=VHierarchy ha; vkind=ka} as a -> begin match b with {vbody=VHierarchy hb; vkind=kb} -> {vbody=VHierarchy (merge global ha hb); vkind=merge_kind kb ka}
+    {vbody=VHierarchy ha; vkind=ka} as a -> begin match b with {vbody=VHierarchy hb; vkind=kb} -> {vbody=VHierarchy (merge global hb ha); vkind=merge_kind kb ka}
                                                              | {vbody=VDelayed delayed; vkind=kb} -> merge_elements global {vbody=unfold global delayed; vkind=kb} a
                                                              | _ -> raise (DereferenceException ("Cannot merge non-hierarchy " ^ (cve2str b)))
                                             end
-  | {vbody=VDelayed d; vkind} -> merge_elements global b {vbody=unfold global d; vkind}
+  | {vbody=VDelayed d; vkind} -> begin match b with
+                                       | {vbody=VDelayed d'} when d.def_label = d'.def_label -> {vbody=VDelayed d; vkind}
+                                       | _ -> merge_elements global b {vbody=unfold global d; vkind}
+                                 end
   | a -> raise (DereferenceException ("Cannot merge non-hierarchy " ^ (cve2str b) ^ " with lhs " ^ (cve2str a)))
                
                
 and merge global ha hb = 
-  let merge_add fds (x,cve) = if StrMap.mem x fds then StrMap.modify x (merge_elements global cve) fds else StrMap.add x cve fds in
+  let merge_add fds (x,cve) = if StrMap.mem x fds then begin StrMap.modify x (merge_elements global cve) fds end else StrMap.add x cve fds in
   let vfields = List.fold_left merge_add ha.vfields (StrMap.bindings hb.vfields) in
   let vsuper = ha.vsuper @ hb.vsuper in
   {vfields; vsuper}
@@ -321,22 +331,34 @@ let step all count c scopes v kontext_label =
         
 exception SccNotSupportedException
 
-let rec step_recursive c scopes v = function
+let rec prepare_recursive c scopes v = function
   | [] -> v
   | (OutsideSuperclass _ | Superclass _ )::_ -> raise SccNotSupportedException
   | (Path []) :: _ -> raise SccNotSupportedException
-  | Path(x::p)::r -> let q = List.rev(x::p) in
+  | Path(x::p)::r -> let q = List.rev(x::p) in                                          
+                     BatLog.logf "Handling possibly recursive element %s\n" (name2str (x::p)) ;
                      match find_static_name c q with
                        None -> raise (ExpansionException (name2str q))
-                     | Some {kind;body} -> let vbody = VDelayed {environment = LabelMap.find (Path p) scopes; expression = body} in
+                     (* As for the non-recursive case, we only "evaluate" leafs of the definition tree *)
+                     | Some {body=Hierarchy h} -> (* everything inside is covered by other labels *) prepare_recursive c scopes (add v empty_hierarchy (x::p)) r
+                     (* Only add a recursive entry for the leafs *)
+                     | Some {kind;body} -> let vbody = VDelayed {environment = LabelMap.find (Path p) scopes; expression = body; def_label=x::p} in
+                                           BatLog.logf "Adding recursive entry for %s\n" (name2str (x::p)) ;
                                            let v' = add v {vfields = StrMap.singleton x.txt {vkind=kind;vbody}; vsuper=[]} p in
-                                           step_recursive c scopes v' r
+                                           prepare_recursive c scopes v' r
                                                           
-            
-let rec do_normalize all count c scopes v = function
-    [] -> v
-  | [l]::r -> do_normalize all (count + 1) c scopes (step all (count+1) c scopes v l) r
-  | x::r -> do_normalize all (count + 1) c scopes (step_recursive c scopes v x) r
+
+let rec do_normalize all count c scopes v r = function
+    [] -> begin match r with
+                  [] -> v
+                | [l]::r -> do_normalize all count c scopes v r [l]
+                | x::r ->
+                   let v' = prepare_recursive c scopes v x in
+                   do_normalize all count c scopes v' r x
+          end
+  | x::xs ->
+     let v' = (step all (count+1) c scopes v x) in
+     do_normalize all (count + 1) c scopes v' r xs
 
 let name = function
     Short tds -> tds.td_name | Composition tds -> tds.td_name | Enumeration tds -> tds.td_name | OpenEnumeration tds -> tds.td_name | DerSpec tds -> tds.td_name | Extension tds -> tds.td_name
@@ -353,4 +375,5 @@ let normalize top =
     let deps = scan_dependencies (global_scope (name top.commented)) top in
     let scopes = List.fold_left (fun m {kontext_label;scope} -> LabelMap.add kontext_label scope m) LabelMap.empty deps in
     let sccs = topological_order deps in
-    do_normalize (List.length sccs) 0 ({body=translate_topdefs [top];kind=Static}) scopes empty_hierarchy sccs
+    let length = List.fold_left (fun s l -> s + (List.length l)) 0 sccs in
+    do_normalize length 0 ({body=translate_topdefs [top];kind=Static}) scopes empty_hierarchy sccs []
