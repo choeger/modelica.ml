@@ -29,7 +29,7 @@ This is a package built with oasis, so the following sequence should build it:
 ### Dependencies:
 
 ```sh
-opam install ppx_deriving batteries menhir oUnit ANSITerminal
+opam install ppx_deriving batteries menhir oUnit ANSITerminal ppx_deriving_yojson sedlex
 ```
 
 ### Configuration
