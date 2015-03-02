@@ -52,7 +52,52 @@ let expr_test input f =
   parse_test expr_parser
 
 let nl = mknoloc
-           
+
+let int x = no_attr (Int x)
+let real x = no_attr (Real x)
+let ide x = no_attr (Ide x)
+let bool x = no_attr (Bool x)
+let proj x = no_attr (Proj x)
+let string x = no_attr (String x)
+let colon = no_attr Colon
+let der = no_attr Der
+let assert_ = no_attr Assert
+let end_ = no_attr End
+let initial = no_attr Initial
+let rootIde x = no_attr (RootIde x)
+let app x = no_attr (App x)
+let pow x = no_attr (Pow x)
+let dpow x = no_attr (DPow x)
+let mul x = no_attr (Mul x)
+let dmul x = no_attr (DMul x)
+let div x = no_attr (Div x)
+let ddiv x = no_attr (DDiv x)
+let plus x = no_attr (Plus x)
+let dplus x = no_attr (DPlus x)
+let minus x = no_attr (Minus x)
+let dminus x = no_attr (DMinus x)
+let uminus x = no_attr (UMinus x)
+let uplus x = no_attr (UPlus x)
+let udminus x = no_attr (UDMinus x)
+let udplus x = no_attr (UDPlus x)
+let gt x = no_attr (Gt x)
+let lt x = no_attr (Lt x)
+let leq x = no_attr (Leq x)
+let geq x = no_attr (Geq x)
+let neq x = no_attr (Neq x)
+let eq_ x = no_attr (Eq x)
+let and_ x = no_attr (And x)
+let or_ x = no_attr (Or x)
+let not_ x = no_attr (Not x)
+let if_ x = no_attr (If x)
+let arrayaccess x = no_attr (ArrayAccess x)
+let range x = no_attr (Range x)
+let compr x = no_attr (Compr x)
+let array x = no_attr (Array x)
+let marray x = no_attr (MArray x)
+let explicitclosure x = no_attr (ExplicitClosure x)
+let outputexpression x = no_attr (OutputExpression x)
+                 
 let parser_test_case parser lprinter sprinter prep input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::
@@ -98,147 +143,147 @@ let prep_typedef = erase_location.map_typedef erase_location
 let typedef input expected = parser_test_case td_parser (td2str ~max:100) (td2str ~max:20) prep_typedef input expected
                                            
 let test_cases = [ 
-  expr "1.234" (Real(1.234));
-  expr "10e2" (Real(1000.));
-  expr "x" (Ide("x")) ;
-  expr "new_foo" (Ide "new_foo");
-  expr "1" (Int(1));
+  expr "1.234" (real(1.234));
+  expr "10e2" (real(1000.));
+  expr "x" (ide("x")) ;
+  expr "new_foo" (ide "new_foo");
+  expr "1" (int(1));
 
   (* TODO: copy/move to lexer test suite as approporiate *)
-  expr "derfoo" (Ide "derfoo") ;
-  expr "not1" (Ide "not1") ;
-  expr "foo /* comment */ " (Ide "foo") ;
-  expr "true" (Bool true) ;
-  expr "false" (Bool false) ;
+  expr "derfoo" (ide "derfoo") ;
+  expr "not1" (ide "not1") ;
+  expr "foo /* comment */ " (ide "foo") ;
+  expr "true" (bool true) ;
+  expr "false" (bool false) ;
   
-  expr "\"foo\"" (String "foo") ;
+  expr "\"foo\"" (string "foo") ;
   
-  expr "42" (Int 42) ;
+  expr "42" (int 42) ;
 
-  expr "42 /* the answer*/" (Int 42) ;
+  expr "42 /* the answer*/" (int 42) ;
 
-  expr ("42 /*" ^ (String.repeat "the answer " 10000) ^ "*/") (Int 42) ;
+  expr ("42 /*" ^ (String.repeat "the answer " 10000) ^ "*/") (int 42) ;
 
-  expr "42 // the answer" (Int 42) ;
+  expr "42 // the answer" (int 42) ;
 
-  expr "42.0" (Real 42.) ;
+  expr "42.0" (real 42.) ;
 
-  expr "\"foo \n bar\"" (String "foo \n bar") ;
+  expr "\"foo \n bar\"" (string "foo \n bar") ;
 
-  expr "\"\\\"\"" (String "\"") ;
+  expr "\"\\\"\"" (string "\"") ;
 
   (let x = (String.repeat "ABC" 1000) in
-   expr ("\"" ^ x ^ "\"") (String x) );
+   expr ("\"" ^ x ^ "\"") (string x) );
 
-  expr "x.bar" (Proj ({field = "bar"; object_=(Ide "x") }));
+  expr "x.bar" (proj ({field = "bar"; object_=(ide "x") }));
 
-  expr "'foo'" (Ide "'foo'") ;
+  expr "'foo'" (ide "'foo'") ;
 
-  expr "'foo' " (Ide "'foo'") ;
+  expr "'foo' " (ide "'foo'") ;
 
-  expr "'foo'//bar" (Ide "'foo'") ;
+  expr "'foo'//bar" (ide "'foo'") ;
 
-  expr "'foo \\\\n'" (Ide "'foo \\\\n'") ;
+  expr "'foo \\\\n'" (ide "'foo \\\\n'") ;
 
-  expr ":" Colon ;
-  expr "der" Der ;
-  expr "initial" Initial ;
-  expr "end" End ;
-  expr "assert" Assert ;
+  expr ":" colon ;
+  expr "der" der ;
+  expr "initial" initial ;
+  expr "end" end_ ;
+  expr "assert" assert_ ;
   
-  expr "a.b.c"  (Proj { object_ = Proj { object_ = (Ide "a"); field = "b"} ; field = "c" } );
-  expr "a.'b'.c"  (Proj { object_ = Proj { object_ = (Ide "a"); field = "'b'"} ; field = "c" } ) ;
-  expr "a/* comment */.b.c"  (Proj { object_ = Proj { object_ = (Ide "a"); field = "b"} ; field = "c" }) ;
+  expr "a.b.c"  (proj { object_ = proj { object_ = (ide "a"); field = "b"} ; field = "c" } );
+  expr "a.'b'.c"  (proj { object_ = proj { object_ = (ide "a"); field = "'b'"} ; field = "c" } ) ;
+  expr "a/* comment */.b.c"  (proj { object_ = proj { object_ = (ide "a"); field = "b"} ; field = "c" }) ;
   
-  expr ".x" (RootIde "x") ;
-  expr ".x.y" (Proj {object_ = (RootIde "x"); field = "y"}) ;
+  expr ".x" (rootIde "x") ;
+  expr ".x.y" (proj {object_ = (rootIde "x"); field = "y"}) ;
 
   (* functions *)
-  expr "f()" (App {fun_= (Ide "f"); args=[]; named_args=[] });
-  expr "f()()" (App {fun_= App { fun_=Ide "f"; args=[]; named_args=[] }; args=[]; named_args=[]});
-  expr "f(1.0)" (App {fun_=Ide "f"; args=[Real 1.]; named_args=[] }) ;
-  expr "f(x=1.0)" (App {fun_= (Ide "f"); args=[]; named_args=[named "x" (Real 1.0)]});
-  expr "f(1.0, x=1.0)" (App {fun_= (Ide "f"); args=[Real 1.]; named_args=[named "x" (Real 1.0)]});
-  expr "function x" (ExplicitClosure (Ide "x"));
+  expr "f()" (app {fun_= (ide "f"); args=[]; named_args=[] });
+  expr "f()()" (app {fun_= app { fun_=ide "f"; args=[]; named_args=[] }; args=[]; named_args=[]});
+  expr "f(1.0)" (app {fun_=ide "f"; args=[real 1.]; named_args=[] }) ;
+  expr "f(x=1.0)" (app {fun_= (ide "f"); args=[]; named_args=[named "x" (real 1.0)]});
+  expr "f(1.0, x=1.0)" (app {fun_= (ide "f"); args=[real 1.]; named_args=[named "x" (real 1.0)]});
+  expr "function x" (explicitclosure (ide "x"));
 
   (* precedences *)
-  expr "1 + 2 * 3" (Plus { left = Int 1 ; right = Mul { left = Int 2 ; right = Int 3 } });
-  expr "2 * 3 + 1" (Plus { left = Mul { left = Int 2 ; right = Int 3 } ; right = Int 1 });
-  expr "(1 + 2) * 3" (Mul { left = Plus { left = Int 1 ; right = Int 2 } ; right = Int 3 });
-  expr "3 * (1 + 2)" (Mul { right = Plus { left = Int 1 ; right = Int 2 } ; left = Int 3 });
-  expr "3 * 2 ^ 4" (Mul { left = Int 3 ; right = Pow { left = Int 2 ; right = Int 4 } });
-  expr "2 ^ 4 * 3" (Mul { right = Int 3 ; left = Pow { left = Int 2 ; right = Int 4 } });
-  expr "-2 * 3" (UMinus (Mul { left = Int 2 ; right = Int 3 }) ) ;
-  expr "-2 - 3" (Minus { left = UMinus (Int 2) ; right = Int 3 }) ;
+  expr "1 + 2 * 3" (plus { left = int 1 ; right = mul { left = int 2 ; right = int 3 } });
+  expr "2 * 3 + 1" (plus { left = mul { left = int 2 ; right = int 3 } ; right = int 1 });
+  expr "(1 + 2) * 3" (mul { left = plus { left = int 1 ; right = int 2 } ; right = int 3 });
+  expr "3 * (1 + 2)" (mul { right = plus { left = int 1 ; right = int 2 } ; left = int 3 });
+  expr "3 * 2 ^ 4" (mul { left = int 3 ; right = pow { left = int 2 ; right = int 4 } });
+  expr "2 ^ 4 * 3" (mul { right = int 3 ; left = pow { left = int 2 ; right = int 4 } });
+  expr "-2 * 3" (uminus (mul { left = int 2 ; right = int 3 }) ) ;
+  expr "-2 - 3" (minus { left = uminus (int 2) ; right = int 3 }) ;
 
-  expr "-2 * 3 < 2*3" (Lt {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
-  expr "-2 * 3 > 2*3" (Gt {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
-  expr "-2 * 3 <= 2*3" (Leq {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
-  expr "-2 * 3 >= 2*3" (Geq {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
-  expr "-2 * 3 <> 2*3" (Neq {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
-  expr "-2 * 3 == 2*3" (Eq {left= UMinus (Mul { left = Int 2 ; right = Int 3 }) ; right=Mul { left = Int 2 ; right = Int 3 } } ) ;
+  expr "-2 * 3 < 2*3" (lt {left= uminus (mul { left = int 2 ; right = int 3 }) ; right=mul { left = int 2 ; right = int 3 } } ) ;
+  expr "-2 * 3 > 2*3" (gt {left= uminus (mul { left = int 2 ; right = int 3 }) ; right=mul { left = int 2 ; right = int 3 } } ) ;
+  expr "-2 * 3 <= 2*3" (leq {left= uminus (mul { left = int 2 ; right = int 3 }) ; right=mul { left = int 2 ; right = int 3 } } ) ;
+  expr "-2 * 3 >= 2*3" (geq {left= uminus (mul { left = int 2 ; right = int 3 }) ; right=mul { left = int 2 ; right = int 3 } } ) ;
+  expr "-2 * 3 <> 2*3" (neq {left= uminus (mul { left = int 2 ; right = int 3 }) ; right=mul { left = int 2 ; right = int 3 } } ) ;
+  expr "-2 * 3 == 2*3" (eq_ {left= uminus (mul { left = int 2 ; right = int 3 }) ; right=mul { left = int 2 ; right = int 3 } } ) ;
 
-  expr "1 < 2 and 2 < 3" (And {left= (Lt { left = Int 1 ; right = Int 2 }) ; right=Lt { left = Int 2 ; right = Int 3 } }) ;
-  expr "1 < 2 or 2 < 3" (Or {left= (Lt { left = Int 1 ; right = Int 2 }) ; right=Lt { left = Int 2 ; right = Int 3 } }) ;
-  expr "1 < 2 and x or y" (Or {left=And {left= (Lt { left = Int 1 ; right = Int 2 }) ; right=Ide "x" }; right=Ide "y"}) ;
+  expr "1 < 2 and 2 < 3" (and_ {left= (lt { left = int 1 ; right = int 2 }) ; right=lt { left = int 2 ; right = int 3 } }) ;
+  expr "1 < 2 or 2 < 3" (or_ {left= (lt { left = int 1 ; right = int 2 }) ; right=lt { left = int 2 ; right = int 3 } }) ;
+  expr "1 < 2 and x or y" (or_ {left=and_ {left= (lt { left = int 1 ; right = int 2 }) ; right=ide "x" }; right=ide "y"}) ;
 
   (* arrays *)
-  expr "x[1]" (ArrayAccess { lhs = Ide "x" ; indices = [Int 1] }) ;
-  expr "x[1].y" (Proj { object_ = ArrayAccess { lhs = Ide "x" ; indices = [Int 1] } ; field = "y" });
-  expr "{true}" (Array [Bool true]);
-  expr "[4,2;0,0]" (MArray [[Int 4; Int 2];[Int 0; Int 0]]);
+  expr "x[1]" (arrayaccess { lhs = ide "x" ; indices = [int 1] }) ;
+  expr "x[1].y" (proj { object_ = arrayaccess { lhs = ide "x" ; indices = [int 1] } ; field = "y" });
+  expr "{true}" (array [bool true]);
+  expr "[4,2;0,0]" (marray [[int 4; int 2];[int 0; int 0]]);
     
   (* if/then *)
-  expr "if true then false else true" (If { condition = Bool true; then_ = Bool false; else_if = []; else_ = Bool true });
-  expr "if true then false elseif false then true else true" (If { condition = Bool true; then_ = Bool false;
-                                                                   else_if = [{guard=Bool false; elsethen=Bool true}];
-                                                                   else_ = Bool true });
+  expr "if true then false else true" (if_ { condition = bool true; then_ = bool false; else_if = []; else_ = bool true });
+  expr "if true then false elseif false then true else true" (if_ { condition = bool true; then_ = bool false;
+                                                                    else_if = [{guard=bool false; elsethen=bool true}];
+                                                                    else_ = bool true });
 
        
   (* comprehension *)
-  expr "{x for x in foo}" (Array[Compr {exp = Ide "x"; idxs = [{variable=nl "x"; range=Some (Ide "foo")}]}]);
-  expr "{x for x}" (Array [Compr {exp = Ide "x"; idxs = [{variable=nl "x"; range=None}]}]);
+  expr "{x for x in foo}" (array[compr {exp = ide "x"; idxs = [{variable=nl "x"; range=Some (ide "foo")}]}]);
+  expr "{x for x}" (array [compr {exp = ide "x"; idxs = [{variable=nl "x"; range=None}]}]);
 
   (* statements *)
   stmt "return;" (uncommented Return) ;
   stmt "break;" (uncommented Break) ;
-  stmt "assert();" (uncommented (Call {procedure=Assert; pargs=[]; pnamed_args = [] }));
+  stmt "assert();" (uncommented (Call {procedure=assert_; pargs=[]; pnamed_args = [] }));
   stmt "print(\"... testAllFunctions(..) is logged in \" + file);"
-       (uncommented (Call {procedure=Ide"print" ; pargs = [
-                             Plus { left=String "... testAllFunctions(..) is logged in "; right = Ide "file" }
+       (uncommented (Call {procedure=ide"print" ; pargs = [
+                             plus { left=string "... testAllFunctions(..) is logged in "; right = ide "file" }
                            ]; pnamed_args =  [] }));
   
-  stmt "if true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
-  stmt "if true then break; elseif true then break; end if;" (uncommented (IfStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
-  stmt "when true then break; elsewhen true then break; end when;" (uncommented (WhenStmt { condition = Bool true ; then_ = [uncommented Break] ; else_if = [{guard=Bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
-  stmt "f(1, x=3);" (uncommented (Call { procedure=Ide "f"; pargs = [Int 1]; pnamed_args = [named "x" (Int 3)]} ) );
-  stmt "x := 23;" (uncommented (Assignment { target=Ide "x" ; source = Int 23 } ));
-  stmt "(,) := 23;" (uncommented (Assignment { target=OutputExpression [None; None] ; source = Int 23 } ));
-  stmt "() := 23;" (uncommented (Assignment { target=OutputExpression [None] ; source = Int 23 } ));  
-  stmt "(x,,y) := 23;" (uncommented (Assignment { target=OutputExpression([Some (Ide "x");None;Some (Ide "y")]) ; source = Int 23 } ));  
-  stmt "while true loop break; break; end while;" (uncommented (WhileStmt { while_ = Bool true ; do_ = [uncommented Break; uncommented Break] ; } ) );
+  stmt "if true then break; end if;" (uncommented (IfStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
+  stmt "if true then break; elseif true then break; end if;" (uncommented (IfStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [{guard=bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
+  stmt "when true then break; elsewhen true then break; end when;" (uncommented (WhenStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [{guard=bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
+  stmt "f(1, x=3);" (uncommented (Call { procedure=ide "f"; pargs = [int 1]; pnamed_args = [named "x" (int 3)]} ) );
+  stmt "x := 23;" (uncommented (Assignment { target=ide "x" ; source = int 23 } ));
+  stmt "(,) := 23;" (uncommented (Assignment { target=outputexpression [None; None] ; source = int 23 } ));
+  stmt "() := 23;" (uncommented (Assignment { target=outputexpression [None] ; source = int 23 } ));  
+  stmt "(x,,y) := 23;" (uncommented (Assignment { target=outputexpression([Some (ide "x");None;Some (ide "y")]) ; source = int 23 } ));  
+  stmt "while true loop break; break; end while;" (uncommented (WhileStmt { while_ = bool true ; do_ = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
-  stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=Some (Ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
+  stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=Some (ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
 
   (* equations *)
-  eq "x = 0;" (uncommented (SimpleEquation { left = Ide "x"; right = Int 0 })) ;
+  eq "x = 0;" (uncommented (SimpleEquation { left = ide "x"; right = int 0 })) ;
 
-  eq "if true then x.y = 0; end if;" (uncommented (IfEquation { condition= Bool true; then_ = [uncommented (SimpleEquation { left = Proj { object_ = Ide "x"; field= "y" } ;
-                                                                                                                            right = Int 0 } )] ;
+  eq "if true then x.y = 0; end if;" (uncommented (IfEquation { condition= bool true; then_ = [uncommented (SimpleEquation { left = proj { object_ = ide "x"; field= "y" } ;
+                                                                                                                            right = int 0 } )] ;
                                                                 else_if = []; else_ = [];
                                                               })) ;
 
   eq "if c(a[i]) then a[i].p.r = {0,0,0}; end if;"  (uncommented (IfEquation {
-                                                                      condition=App { fun_=Ide "c" ;
-                                                                                      args=[ArrayAccess {lhs = Ide "a" ; indices = [Ide "i"]}];
+                                                                      condition=app { fun_=ide "c" ;
+                                                                                      args=[arrayaccess{lhs = ide "a" ; indices = [ide "i"]}];
                                                                                       named_args=[] };
-                                                                      then_ = [uncommented (SimpleEquation { left = Proj { object_ = Proj { object_ =
-                                                                                                                                                ArrayAccess { lhs= Ide "a";
-                                                                                                                                                              indices=[Ide"i"] }; 
+                                                                      then_ = [uncommented (SimpleEquation { left = proj { object_ = proj { object_ =
+                                                                                                                                                arrayaccess{ lhs= ide "a";
+                                                                                                                                                              indices=[ide"i"] }; 
                                                                                                                                               field="p" } ;
                                                                                                                field = "r"
                                                                                                              } ;
-                                                                                               right = Array [Int 0; Int 0; Int 0];
+                                                                                               right = array [int 0; int 0; int 0];
                                                                                              })] ;
                                                                       else_if = []; else_ = [];
                                                                    })) ;
@@ -246,23 +291,23 @@ let test_cases = [
   eq "for i loop if true then x = 0; end if; end for;" (uncommented (ForEquation { idx= [{variable=nl "i" ; range=None}];
                                                                                    body=[uncommented (
                                                                                              IfEquation {
-                                                                                                 condition= Bool true;
-                                                                                                 then_ = [uncommented (SimpleEquation { left = Ide "x" ;
-                                                                                                                                       right = Int 0 })];
+                                                                                                 condition= bool true;
+                                                                                                 then_ = [uncommented (SimpleEquation { left = ide "x" ;
+                                                                                                                                       right = int 0 })];
                                                                                                                       else_if = []; else_ = []
                                                                                                                       
                                                                                                })] }));
-  eq "x = 23;" (uncommented (SimpleEquation { left=Ide "x" ; right = Int 23 } ));
-  eq "(,) = 23;" (uncommented (SimpleEquation { left=OutputExpression [None; None] ; right = Int 23 } ));
-  eq "() = 23;" (uncommented (SimpleEquation { left=OutputExpression [None] ; right = Int 23 } ));  
-  eq "(x,,y) = 23;" (uncommented (SimpleEquation { left=OutputExpression([Some (Ide "x");None;Some (Ide "y")]) ; right = Int 23 } ));  
+  eq "x = 23;" (uncommented (SimpleEquation { left=ide "x" ; right = int 23 } ));
+  eq "(,) = 23;" (uncommented (SimpleEquation { left=outputexpression [None; None] ; right = int 23 } ));
+  eq "() = 23;" (uncommented (SimpleEquation { left=outputexpression [None] ; right = int 23 } ));  
+  eq "(x,,y) = 23;" (uncommented (SimpleEquation { left=outputexpression([Some (ide "x");None;Some (ide "y")]) ; right = int 23 } ));  
 
 
   texpr "Modelica" (type_name ["Modelica"]);
   texpr "Modelica.Icons" (type_name ["Modelica";"Icons"]);
   texpr ".x" (root_type ["x"]);
   texpr ".x.y" (root_type ["x";"y"]);
-  texpr "Modelica.Icons.InterfacesPackage" (type_name ["Modelica";"Icons";"InterfacesPackage"]);
+  texpr "Modelica.Icons.interfacesPackage" (type_name ["Modelica";"Icons";"interfacesPackage"]);
   texpr "input Real" (TCau {flag = Input ; flagged = type_name ["Real"] });
   texpr "constant Real" (TVar {flag = Constant ; flagged = type_name ["Real"] });
   texpr "flow Real" (TCon {flag = Flow ; flagged = type_name ["Real"] });
@@ -272,7 +317,7 @@ let test_cases = [
                                                                                                   flagged =
                                                                                                     TCon { flag = Stream ;
                                                                                                            flagged = type_name ["Real"] } } } } ) ;
-  texpr "Real[2,3]" (TArray {base_type = type_name ["Real"]; dims = [Int 2 ; Int 3]} ) ;
+  texpr "Real[2,3]" (TArray {base_type = type_name ["Real"]; dims = [int 2 ; int 3]} ) ;
   texpr "T()" (TMod { mod_type = type_name ["T"] ; modification = no_modification } ) ;
   
 
@@ -304,7 +349,7 @@ let test_cases = [
                                                                                    
   defs "Medium medium := Medium()" [uncommented { empty_def with def_name = "medium" ;
                                                                  def_type = type_name ["Medium"] ;
-                                                                 def_rhs = Some ( App ( empty_app (Ide "Medium") ) ) ;
+                                                                 def_rhs = Some ( app ( empty_app (ide "Medium") ) ) ;
                                                 }] ;
 
   
@@ -317,15 +362,15 @@ let test_cases = [
 
   defs "Density rho=1.225 \"Air Density\"" [{ commented = { empty_def with def_name = "rho";
                                                                            def_type = type_name ["Density"];
-                                                                           def_rhs = Some (Real 1.225) ;
+                                                                           def_rhs = Some (real 1.225) ;
                                                           } ;
                                               comment = unannotated ( Some (nl "Air Density")  )}];
   
 
   defs "Real friction_pos[:, 2]=[0; 1] \"[w,tau] positive sliding friction characteristic (w>=0)\""
        [{ commented = { empty_def with def_name = "friction_pos";
-                                       def_type = TArray { base_type=type_name ["Real"]; dims = [Colon ; Int 2] } ;
-                                       def_rhs = Some (MArray [[Int 0];[Int 1]]) ;
+                                       def_type = TArray { base_type=type_name ["Real"]; dims = [colon ; int 2] } ;
+                                       def_rhs = Some (marray [[int 0];[int 1]]) ;
                       } ;
           comment = unannotated ( Some (nl "[w,tau] positive sliding friction characteristic (w>=0)") ) 
         }];
@@ -430,8 +475,8 @@ let test_cases = [
                                                                       cargo = { empty_behavior with
                                                                                 equations = [ uncommented (
                                                                                                   SimpleEquation {
-                                                                                                      left=Int 1;
-                                                                                                      right=Int 1}
+                                                                                                      left=int 1;
+                                                                                                      right=int 1}
                                                                                                 )]
                                                                               } ;
                                                                     } ;
@@ -500,7 +545,7 @@ let test_cases = [
                                                                                 external_ = Some (
                                                                                                 unannotated {
                                                                                                     lang="C" ;
-                                                                                                    ext_lhs=Some (Ide "x");
+                                                                                                    ext_lhs=Some (ide "x");
                                                                                                     ext_ident = "f";
                                                                                                     ext_args = []
                                                                                                   }
@@ -585,8 +630,8 @@ let test_cases = [
                                                type_exp = { empty_composition with
                                                             cargo = { empty_behavior with
                                                                       algorithms = [[uncommented (
-                                                                                       Call {procedure=Ide "print" ;
-                                                                                            pargs = [String "hello, world!"] ;
+                                                                                       Call {procedure=ide "print" ;
+                                                                                            pargs = [string "hello, world!"] ;
                                                                                             pnamed_args = [] } ) ]];
                                                                     } ;
                                                           } ;
@@ -602,23 +647,23 @@ let test_cases = [
                                                    [uncommented {mod_each=false;mod_final=false;
                                                                  mod_name=[nl "points"];
                                                                  mod_value= Some (Rebind (
-                                                                                      Array [
-                                                                                          Array [UMinus (Int 19); UMinus (Int 10)];
-                                                                                          Array [Int 20;UMinus (Int 10)];
-                                                                                          Array [Int 20;UMinus (Int 6)];
-                                                                                          Array [Int 38;UMinus (Int 6)];
+                                                                                      array [
+                                                                                          array [uminus (int 19); uminus (int 10)];
+                                                                                          array [int 20;uminus (int 10)];
+                                                                                          array [int 20;uminus (int 6)];
+                                                                                          array [int 38;uminus (int 6)];
                                                                                         ]));
                                                                 };
                                                     uncommented {mod_each=false;mod_final=false;
                                                                  mod_name=[nl "color"];
-                                                                 mod_value=Some (Rebind (Array [Int 255;Int 0;Int 255]));
-                                                                }
+                                                                 mod_value=Some (Rebind (array [int 255;int 0;int 255]));
+                                                                }                                                                
                                                    ]})
                        }]}
    in
    let annotation = Some line in
    eq "connect(not1.y, rSFlipFlop.R) annotation (Line(points={{-19,-10},{20,-10}, {20,-6},{38,-6}}, color={255,0,255}));" 
-      { commented = ExpEquation (App {(empty_app (Ide "connect")) with args=[name ["not1";"y"]; name ["rSFlipFlop"; "R"] ]}) ; 
+      { commented = ExpEquation (app {(empty_app (ide "connect")) with args=[name ["not1";"y"]; name ["rSFlipFlop"; "R"] ]}) ; 
         comment = { annotated_elem = None ; annotation } } );
   ]
 						  
