@@ -28,9 +28,10 @@
 
 open Batteries
 open Utils
-open Syntax
-open Folder
+module Traversal = Traversal.Make(Syntax.DefaultSyntax)
 open Traversal
+open Traversal.Syntax
+open Traversal.Folder
 open Location
 
 type outside_superclass = {extended:str; parent:name}

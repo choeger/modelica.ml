@@ -26,6 +26,7 @@
  *
  *)
 
+module Traversal = Traversal.Make(Syntax.DefaultSyntax)
 open Traversal
 
 type source_statistics = {

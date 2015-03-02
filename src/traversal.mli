@@ -26,67 +26,75 @@
  *
  *)
 
-open Syntax
+module type S = sig
+    module Syntax : Generic_syntax.S
+    module Mapper : Mapper.S with module Syntax = Syntax
+    module Folder : Folder.S with module Syntax = Syntax
+                                                           
+    open Syntax
 
-val default_folder : 'a Folder.folder
+    val default_folder : 'a Folder.folder
 
-val default_mapper : Mapper.mapper
+    val default_mapper : Mapper.mapper
                        
-module type TRAVERSAL = sig
-    type sort
+    module type TRAVERSAL = sig
+        type sort
 
-    val fold : (sort, 'a) Folder.fold_method
-    val map : sort Mapper.map_method
-  end
-                          
-module Unit : TRAVERSAL with type sort = unit_
+        val fold : (sort, 'a) Folder.fold_method
+        val map : sort Mapper.map_method
+      end
+           
+    module Unit : TRAVERSAL with type sort = unit_
 
-module DerSpec : TRAVERSAL with type sort = der_spec
+    module DerSpec : TRAVERSAL with type sort = der_spec
 
-module Import : TRAVERSAL with type sort = import
+    module Import : TRAVERSAL with type sort = import
 
-module Imports : TRAVERSAL with type sort = import list
+    module Imports : TRAVERSAL with type sort = import list
                                              
-module Comment : TRAVERSAL with type sort = comment
+    module Comment : TRAVERSAL with type sort = comment
 
-module Name : TRAVERSAL with type sort = name                   
+    module Name : TRAVERSAL with type sort = name                   
 
-module TD : TRAVERSAL with type sort = typedef
+    module TD : TRAVERSAL with type sort = typedef
 
-module TD_Desc : TRAVERSAL with type sort = typedef_desc
+    module TD_Desc : TRAVERSAL with type sort = typedef_desc
          
-module TRD : TRAVERSAL with type sort = type_redeclaration
+    module TRD : TRAVERSAL with type sort = type_redeclaration
 
-module CRD : TRAVERSAL with type sort = component_redeclaration 
-
-module CMOD : TRAVERSAL with type sort = component_modification
+    module CRD : TRAVERSAL with type sort = component_redeclaration 
+                                              
+    module CMOD : TRAVERSAL with type sort = component_modification
                
-module CMOD_Struct : TRAVERSAL with type sort = component_modification_struct
+    module CMOD_Struct : TRAVERSAL with type sort = component_modification_struct
 
-module CMOD_Value : TRAVERSAL with type sort = modification_value
+    module CMOD_Value : TRAVERSAL with type sort = modification_value
                        
-module Modification : TRAVERSAL with type sort = modification
+    module Modification : TRAVERSAL with type sort = modification
 
-module Equation_Desc : TRAVERSAL with type sort = equation_desc               
+    module Equation_Desc : TRAVERSAL with type sort = equation_desc               
 
-module Equation : TRAVERSAL with type sort = equation
+    module Equation : TRAVERSAL with type sort = equation
 
-module Idx : TRAVERSAL with type sort = idx
+    module Idx : TRAVERSAL with type sort = idx
 
-module Algorithm : TRAVERSAL with type sort = statement list
+    module Algorithm : TRAVERSAL with type sort = statement list
 
-module Statement : TRAVERSAL with type sort = statement
+    module Statement : TRAVERSAL with type sort = statement
 
-module Statement_Desc : TRAVERSAL with type sort = statement_desc
+    module Statement_Desc : TRAVERSAL with type sort = statement_desc
+                                                         
+    module Named_Arg : TRAVERSAL with type sort = named_arg
 
-module Named_Arg : TRAVERSAL with type sort = named_arg
+    module Exp : TRAVERSAL with type sort = exp
 
-module Exp : TRAVERSAL with type sort = exp
+    module Elements : TRAVERSAL with type sort = elements
 
-module Elements : TRAVERSAL with type sort = elements
+    module Composition : TRAVERSAL with type sort = composition
 
-module Composition : TRAVERSAL with type sort = composition
+    module Extension : TRAVERSAL with type sort = extension
 
-module Extension : TRAVERSAL with type sort = extension
+    module Extend : TRAVERSAL with type sort = extend
+  end
 
-module Extend : TRAVERSAL with type sort = extend
+module Make(Tree : Generic_syntax.S) : S with module Syntax = Tree
