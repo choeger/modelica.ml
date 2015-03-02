@@ -34,6 +34,8 @@ open Utils
        
 let empty_app f = { fun_ = f ; args = [] ; named_args = [] }
 
+let no_attr e = { term = e ; attr = () }
+                    
 let named x argument = {argument_name = Location.mknoloc x ; argument }
                     
 let no_comment = { annotated_elem = None ; annotation = None }
@@ -65,11 +67,11 @@ exception EmptyName
 
 let rec name_ object_ = function
   | [] -> object_
-  | field::r -> name_ (Proj { object_ ; field }) r
+  | field::r -> name_ (no_attr (Proj { object_ ; field })) r
 
 let name = function
   | [] -> raise EmptyName
-  | x::r -> name_ (Ide x) r
+  | x::r -> name_ (no_attr (Ide x)) r
                          
 let type_name xs = TName (List.map Location.mknoloc xs)
 

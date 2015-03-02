@@ -30,6 +30,9 @@
 
 open Syntax
 
+val no_attr : exp_struct -> exp
+(** Create an expression without any attributes *)
+       
 val empty_app : exp -> application
 (** Return an empty application with the given expression as function *)
 

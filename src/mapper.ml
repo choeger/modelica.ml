@@ -80,6 +80,8 @@ module type S = sig
 
          map_texp : mapper -> texp -> texp ;
          map_exp : mapper -> exp -> exp;
+         map_exp_struct : mapper -> exp_struct -> exp_struct;
+         map_attr : mapper -> attr -> attr;
 
          map_idx : mapper -> idx -> idx ;
          
@@ -179,6 +181,8 @@ module Make(Tree : Generic_syntax.S) = struct
 
          map_texp : mapper -> texp -> texp ;
          map_exp : mapper -> exp -> exp;
+         map_exp_struct : mapper -> exp_struct -> exp_struct;
+         map_attr : mapper -> attr -> attr;
 
          map_idx : mapper -> idx -> idx ;
          

@@ -65,6 +65,8 @@ module type S = sig
          fold_external_def : (external_def,'a) fold_method;
          fold_texp : (texp,'a) fold_method;
          fold_exp : (exp,'a) fold_method;
+         fold_exp_struct : (exp_struct,'a) fold_method;
+         fold_attr : (attr,'a) fold_method;
          fold_idx : (idx,'a) fold_method;
          fold_statement_desc : (statement_desc,'a) fold_method;
          fold_statement : (statement,'a) fold_method;

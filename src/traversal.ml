@@ -373,6 +373,18 @@ module Make(Tree : Generic_syntax.S) = struct
 
     module Exp = struct
         type sort = exp
+        let map this {term;attr} = {term=this.map_exp_struct this term; attr = this.map_attr this attr }
+        let fold this {term; attr} = this.fold_exp_struct this term %> this.fold_attr this attr
+      end                      
+
+    module Attr = struct
+        type sort = attr
+        let map = map_id
+        let fold = fold_id
+      end
+                   
+    module ExpStruct = struct
+        type sort = exp_struct
 
         let map_binary this {left ; right } = {left=this.map_exp this left ; right = this.map_exp this right }
         let fold_binary this {left; right } = this.fold_exp this left %> this.fold_exp this right
@@ -628,6 +640,8 @@ module Make(Tree : Generic_syntax.S) = struct
         fold_external_def = fold_id;
         fold_texp = TExp.fold;
         fold_exp = Exp.fold;
+        fold_exp_struct = ExpStruct.fold;
+        fold_attr = Attr.fold;
         fold_idx = Idx.fold;
         
         fold_statement_desc = Statement_Desc.fold;
@@ -690,6 +704,8 @@ module Make(Tree : Generic_syntax.S) = struct
         map_annotation = Modification.map;
         
         map_exp = Exp.map;
+        map_exp_struct = ExpStruct.map;
+        map_attr = Attr.map;
         map_statement = Statement.map;
         map_statement_desc = Statement_Desc.map;
         map_idx = Idx.map;

@@ -199,51 +199,53 @@ module type S = sig
      and application = { fun_ : exp ; args : exp list ; named_args : named_arg list }
 
      and comprehension = { exp : exp ; idxs : idx list }
+
+     and exp = { term : exp_struct ; attr : attr }
                            
-     and exp = Pow of binary_exp
-             | DPow of binary_exp
-             | Mul of binary_exp
-             | DMul of binary_exp
-             | Div of binary_exp
-             | DDiv of binary_exp
-             | Plus of binary_exp
-             | DPlus of binary_exp
-             | Minus of binary_exp
-             | DMinus of binary_exp
-             | UMinus of exp
-             | UPlus of exp
-             | UDMinus of exp
-             | UDPlus of exp
+     and exp_struct = Pow of binary_exp
+                    | DPow of binary_exp
+                    | Mul of binary_exp
+                    | DMul of binary_exp
+                    | Div of binary_exp
+                    | DDiv of binary_exp
+                    | Plus of binary_exp
+                    | DPlus of binary_exp
+                    | Minus of binary_exp
+                    | DMinus of binary_exp
+                    | UMinus of exp
+                    | UPlus of exp
+                    | UDMinus of exp
+                    | UDPlus of exp
 
-             | And of binary_exp
-             | Or of binary_exp
-             | Not of exp
+                    | And of binary_exp
+                    | Or of binary_exp
+                    | Not of exp
 
-             | Gt of binary_exp
-             | Lt of binary_exp
-             | Leq of binary_exp
-             | Geq of binary_exp
-             | Neq of binary_exp
-             | Eq of binary_exp
+                    | Gt of binary_exp
+                    | Lt of binary_exp
+                    | Leq of binary_exp
+                    | Geq of binary_exp
+                    | Neq of binary_exp
+                    | Eq of binary_exp
 
-             | If of if_expression
-             | ArrayAccess of array_access
-             | Range of range
-             | RootIde of string (* .foo *)
-             | Ide of string 
-             | Proj of projection
-             | App of application
-             | Bool of bool
-             | Int of int
-             | Real of float
-             | String of string
-             | Compr of comprehension
-             | Array of exp list
-             | MArray of (exp list) list
-             | ExplicitClosure of exp
-             | End | Colon | Der | Initial | Assert
-             | OutputExpression of exp option list
-                                       
+                    | If of if_expression
+                    | ArrayAccess of array_access
+                    | Range of range
+                    | RootIde of string (* .foo *)
+                    | Ide of string 
+                    | Proj of projection
+                    | App of application
+                    | Bool of bool
+                    | Int of int
+                    | Real of float
+                    | String of string
+                    | Compr of comprehension
+                    | Array of exp list
+                    | MArray of (exp list) list
+                    | ExplicitClosure of exp
+                    | End | Colon | Der | Initial | Assert
+                    | OutputExpression of exp option list
+
      and idx = { variable : str ; range : exp option }
 
      and tprojection = { class_type : texp ; type_element : string }
@@ -283,7 +285,7 @@ module type S = sig
            
 end
     
-module Make(Attr : Attributes) : S = struct
+module Make(Attr : Attributes) : S with type attr = Attr.t = struct
     (** Modelica 3.x abstract syntax 
         This module contains an interpretation of a "usable" form of the abstract syntax 
         of the modeling language {{: http://modelica.org}  Modelica}
@@ -460,51 +462,53 @@ module Make(Attr : Attributes) : S = struct
      and application = { fun_ : exp ; args : exp list ; named_args : named_arg list }
 
      and comprehension = { exp : exp ; idxs : idx list }
+
+     and exp = { term : exp_struct ; attr : attr }
                            
-     and exp = Pow of binary_exp
-             | DPow of binary_exp
-             | Mul of binary_exp
-             | DMul of binary_exp
-             | Div of binary_exp
-             | DDiv of binary_exp
-             | Plus of binary_exp
-             | DPlus of binary_exp
-             | Minus of binary_exp
-             | DMinus of binary_exp
-             | UMinus of exp
-             | UPlus of exp
-             | UDMinus of exp
-             | UDPlus of exp
+     and exp_struct = Pow of binary_exp
+                    | DPow of binary_exp
+                    | Mul of binary_exp
+                    | DMul of binary_exp
+                    | Div of binary_exp
+                    | DDiv of binary_exp
+                    | Plus of binary_exp
+                    | DPlus of binary_exp
+                    | Minus of binary_exp
+                    | DMinus of binary_exp
+                    | UMinus of exp
+                    | UPlus of exp
+                    | UDMinus of exp
+                    | UDPlus of exp
 
-             | And of binary_exp
-             | Or of binary_exp
-             | Not of exp
+                    | And of binary_exp
+                    | Or of binary_exp
+                    | Not of exp
 
-             | Gt of binary_exp
-             | Lt of binary_exp
-             | Leq of binary_exp
-             | Geq of binary_exp
-             | Neq of binary_exp
-             | Eq of binary_exp
+                    | Gt of binary_exp
+                    | Lt of binary_exp
+                    | Leq of binary_exp
+                    | Geq of binary_exp
+                    | Neq of binary_exp
+                    | Eq of binary_exp
 
-             | If of if_expression
-             | ArrayAccess of array_access
-             | Range of range
-             | RootIde of string (* .foo *)
-             | Ide of string 
-             | Proj of projection
-             | App of application
-             | Bool of bool
-             | Int of int
-             | Real of float
-             | String of string
-             | Compr of comprehension
-             | Array of exp list
-             | MArray of (exp list) list
-             | ExplicitClosure of exp
-             | End | Colon | Der | Initial | Assert
-             | OutputExpression of exp option list
-                                       
+                    | If of if_expression
+                    | ArrayAccess of array_access
+                    | Range of range
+                    | RootIde of string (* .foo *)
+                    | Ide of string 
+                    | Proj of projection
+                    | App of application
+                    | Bool of bool
+                    | Int of int
+                    | Real of float
+                    | String of string
+                    | Compr of comprehension
+                    | Array of exp list
+                    | MArray of (exp list) list
+                    | ExplicitClosure of exp
+                    | End | Colon | Der | Initial | Assert
+                    | OutputExpression of exp option list
+                                              
      and idx = { variable : str ; range : exp option }
 
      and tprojection = { class_type : texp ; type_element : string }
