@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 9672ab6fd763e2d04e0db8c0cd1edaa5)
+# DO NOT EDIT (digest: ded6fdf4750526413a21435800e5c5af)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -22,6 +22,7 @@ true: annot, bin_annot
 <src/*.ml{,i,y}>: pkg_ocamlgraph
 <src/*.ml{,i,y}>: pkg_ppx_deriving.show
 <src/*.ml{,i,y}>: pkg_ppx_deriving_yojson
+<src/*.ml{,i,y}>: pkg_ppx_import
 <src/*.ml{,i,y}>: pkg_ppx_monadic
 <src/*.ml{,i,y}>: pkg_sedlex
 # Executable modelica_frontend_tests
@@ -32,6 +33,7 @@ true: annot, bin_annot
 <test/modelica_frontend_tests.{native,byte}>: pkg_ocamlgraph
 <test/modelica_frontend_tests.{native,byte}>: pkg_ppx_deriving.show
 <test/modelica_frontend_tests.{native,byte}>: pkg_ppx_deriving_yojson
+<test/modelica_frontend_tests.{native,byte}>: pkg_ppx_import
 <test/modelica_frontend_tests.{native,byte}>: pkg_ppx_monadic
 <test/modelica_frontend_tests.{native,byte}>: pkg_sedlex
 <test/modelica_frontend_tests.{native,byte}>: use_modelica_ml
@@ -44,6 +46,7 @@ true: annot, bin_annot
 <test/parse_modelica.{native,byte}>: pkg_ocamlgraph
 <test/parse_modelica.{native,byte}>: pkg_ppx_deriving.show
 <test/parse_modelica.{native,byte}>: pkg_ppx_deriving_yojson
+<test/parse_modelica.{native,byte}>: pkg_ppx_import
 <test/parse_modelica.{native,byte}>: pkg_ppx_monadic
 <test/parse_modelica.{native,byte}>: pkg_sedlex
 <test/parse_modelica.{native,byte}>: use_modelica_ml
@@ -55,6 +58,7 @@ true: annot, bin_annot
 <test/parse_package.{native,byte}>: pkg_ocamlgraph
 <test/parse_package.{native,byte}>: pkg_ppx_deriving.show
 <test/parse_package.{native,byte}>: pkg_ppx_deriving_yojson
+<test/parse_package.{native,byte}>: pkg_ppx_import
 <test/parse_package.{native,byte}>: pkg_ppx_monadic
 <test/parse_package.{native,byte}>: pkg_sedlex
 <test/parse_package.{native,byte}>: use_modelica_ml
@@ -64,6 +68,7 @@ true: annot, bin_annot
 <test/*.ml{,i,y}>: pkg_ocamlgraph
 <test/*.ml{,i,y}>: pkg_ppx_deriving.show
 <test/*.ml{,i,y}>: pkg_ppx_deriving_yojson
+<test/*.ml{,i,y}>: pkg_ppx_import
 <test/*.ml{,i,y}>: pkg_ppx_monadic
 <test/*.ml{,i,y}>: pkg_sedlex
 <test/*.ml{,i,y}>: use_modelica_ml
