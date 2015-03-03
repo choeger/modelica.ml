@@ -284,7 +284,7 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                | WHEN condition=expr THEN then_ = list(statement) else_if = list(elsewhen_statement) ENDWHEN
                     { WhenStmt { condition; then_ ; else_if; else_ = []} }                                                                                                                         
                | FOR idx = list(index) LOOP body=list(statement) ENDFOR { ForStmt { idx; body } }
-               | WHILE while_=expr LOOP do_ = list(statement) ENDWHILE { WhileStmt { while_; do_ } }
+               | WHILE while_=expr LOOP while_body = list(statement) ENDWHILE { WhileStmt { while_; while_body } }
                | target=lexpr COLONEQ source=expr { Assignment { target; source } }                       
 
                                                

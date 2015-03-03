@@ -30,10 +30,22 @@ module type Attributes = sig
     type t
   end
 
+module Flags = struct
+    type scope = Inner | Outer | InnerOuter | Local 
+    type sort = Package | Class | Model | Block | Connector | ExpandableConnector | Record
+                | Function | Type | Operator | OperatorRecord | OperatorFunction 
+
+    type connectivity = Flow | Stream 
+                                
+    type variability = Constant | Parameter | Discrete 
+                                                
+    type causality = Input | Output
+  end
+                 
 module type S = sig 
     open Utils
     open Location
-
+           
     type attr
 
     type str = string loc [@@deriving yojson]
@@ -108,15 +120,6 @@ module type S = sig
      (** Partial derivative specification, see section 12.7.2 *)
      and der_spec = { der_name : name ; idents : str list }
 
-     and sort = Package | Class | Model | Block | Connector | ExpandableConnector | Record
-                | Function | Type | Operator | OperatorRecord | OperatorFunction 
-
-     and connectivity = Flow | Stream 
-
-     and variability = Constant | Parameter | Discrete 
-
-     and causality = Input | Output
-
      and named_import = { global : name ; local : str }
 
      and import = import_desc commented
@@ -127,7 +130,16 @@ module type S = sig
 
      and extend = { ext_type : texp ; ext_annotation : modification option }
 
-     and scope = Inner | Outer | InnerOuter | Local
+     and scope = Flags.scope = Inner | Outer | InnerOuter | Local 
+
+     and sort = Flags.sort = Package | Class | Model | Block | Connector | ExpandableConnector | Record
+                | Function | Type | Operator | OperatorRecord | OperatorFunction 
+
+     and connectivity = Flags.connectivity =  Flow | Stream 
+                                
+     and variability = Flags.variability= Constant | Parameter | Discrete 
+                                                
+     and causality = Flags.causality= Input | Output
 
      and definition_options = { final : bool ; scope : scope ; replaceable : bool }
 
@@ -168,7 +180,7 @@ module type S = sig
                                 
      and for_statement = statements for_loop_struct 
 
-     and while_statement = { while_ : exp ; do_ : statements }
+     and while_statement = { while_ : exp ; while_body : statements }
                              
      and equations = equation list
 
@@ -297,6 +309,8 @@ module Make(Attr : Attributes) : S with type attr = Attr.t = struct
     open Utils
     open Location
 
+    include Flags
+           
     type attr = Attr.t
            
     type str = string loc [@@deriving yojson]
@@ -371,15 +385,6 @@ module Make(Attr : Attributes) : S with type attr = Attr.t = struct
      (** Partial derivative specification, see section 12.7.2 *)
      and der_spec = { der_name : name ; idents : str list }
 
-     and sort = Package | Class | Model | Block | Connector | ExpandableConnector | Record
-                | Function | Type | Operator | OperatorRecord | OperatorFunction 
-
-     and connectivity = Flow | Stream 
-
-     and variability = Constant | Parameter | Discrete 
-
-     and causality = Input | Output
-
      and named_import = { global : name ; local : str }
 
      and import = import_desc commented
@@ -389,9 +394,7 @@ module Make(Attr : Attributes) : S with type attr = Attr.t = struct
                      | UnqualifiedImport of name
 
      and extend = { ext_type : texp ; ext_annotation : modification option }
-
-     and scope = Inner | Outer | InnerOuter | Local
-
+                                                
      and definition_options = { final : bool ; scope : scope ; replaceable : bool }
 
      and definition_structure = { def_name : string ; def_type : texp ; def_constraint : constraint_ option ;
@@ -431,7 +434,7 @@ module Make(Attr : Attributes) : S with type attr = Attr.t = struct
                                 
      and for_statement = statements for_loop_struct 
 
-     and while_statement = { while_ : exp ; do_ : statements }
+     and while_statement = { while_ : exp ; while_body : statements }
                              
      and equations = equation list
 

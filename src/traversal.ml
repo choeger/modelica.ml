@@ -341,8 +341,8 @@ module Make(Tree : Generic_syntax.S) = struct
           | Return -> fun a -> a
           | ForStmt for_statement -> fold_for_loop (fold_list this.fold_statement) this for_statement
                                                    
-          | WhileStmt { while_ ; do_ } -> this.fold_exp this while_ %>
-                                            fold_list this.fold_statement this do_ 
+          | WhileStmt { while_ ; while_body } -> this.fold_exp this while_ %>
+                                                   fold_list this.fold_statement this while_body
                                                       
         let map this = function
             Assignment { target ; source } -> Assignment { target = this.map_exp this target ;
@@ -357,8 +357,8 @@ module Make(Tree : Generic_syntax.S) = struct
           | Break -> Break
           | Return -> Return
           | ForStmt for_statement -> ForStmt (map_for_loop (map_list this.map_statement) this for_statement)
-          | WhileStmt { while_ ; do_ } -> WhileStmt { while_ = this.map_exp this while_ ;
-                                                      do_ = map_list this.map_statement this do_ }
+          | WhileStmt { while_ ; while_body } -> WhileStmt { while_ = this.map_exp this while_ ;
+                                                             while_body = map_list this.map_statement this while_body }
       end
 
     module Named_Arg = struct

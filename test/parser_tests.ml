@@ -261,7 +261,7 @@ let test_cases = [
   stmt "(,) := 23;" (uncommented (Assignment { target=outputexpression [None; None] ; source = int 23 } ));
   stmt "() := 23;" (uncommented (Assignment { target=outputexpression [None] ; source = int 23 } ));  
   stmt "(x,,y) := 23;" (uncommented (Assignment { target=outputexpression([Some (ide "x");None;Some (ide "y")]) ; source = int 23 } ));  
-  stmt "while true loop break; break; end while;" (uncommented (WhileStmt { while_ = bool true ; do_ = [uncommented Break; uncommented Break] ; } ) );
+  stmt "while true loop break; break; end while;" (uncommented (WhileStmt { while_ = bool true ; while_body = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=Some (ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
 

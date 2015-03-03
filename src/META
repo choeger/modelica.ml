@@ -1,9 +1,9 @@
 # OASIS_START
-# DO NOT EDIT (digest: abf77814705a5ddfadb02afe24b949b2)
+# DO NOT EDIT (digest: c6b0980ab0b91e9a184741e4287ab03a)
 version = "0.1.1"
 description = "Modelica abstract syntax and parser"
 requires =
-"batteries menhirLib sedlex ppx_deriving.show compiler-libs.common ocamlgraph ppx_deriving_yojson"
+"batteries menhirLib sedlex ppx_deriving.show compiler-libs.common ocamlgraph ppx_deriving_yojson ppx_monadic"
 archive(byte) = "modelica_ml.cma"
 archive(byte, plugin) = "modelica_ml.cma"
 archive(native) = "modelica_ml.cmxa"
