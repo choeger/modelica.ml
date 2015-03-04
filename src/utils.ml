@@ -57,7 +57,8 @@ type token =
  | CONSTRAINEDBY | EXTENDS | INNER | PROTECTED | WHILE | DER | EXTERNAL | INPUT | PUBLIC | WITHIN
  | ENDWHEN | ENDIF | ENDFOR | ENDWHILE | END_IDENT of string | INITIAL_EQUATION | INITIAL_ALGORITHM
                                 [@@deriving show]
-                                
+
+module StdFormat = Format
 open Batteries
 
 module StrMap = struct include Map.Make(String)
@@ -65,8 +66,17 @@ module StrMap = struct include Map.Make(String)
                        let find_or_else v x m = if mem x m then find x m else v
                        let to_yojson a m = `Assoc (List.map (fun (k,v) -> (k,a v)) (bindings m))
                        let of_yojson js f = (`Error "Not yet implemented")
+                       open StdFormat 
+                       let pp pp_v fmt s = let pp_comma fmt () = fprintf fmt "," in
+                                           let pp_pair fmt (k,v) = fprintf fmt "%s@ =@ %a" k pp_v v in
+                                           fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
                 end
-module StrSet = Set.Make(String) 
+module StrSet = struct include Set.Make(String) 
+                       let to_yojson s = `List (List.map (fun e -> `String e) (elements s))
+                       let of_yojson js = (`Error "Not yet implemented")
+                       open StdFormat
+                       let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_print_string) (elements s)
+                end
                         
 module List = List
 

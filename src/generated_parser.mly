@@ -70,6 +70,7 @@
 %left DOT LBRACKET /* highest precedence */
 
 %{
+    open Ast.Flags
     open Syntax
     open Syntax_fragments
     open Utils

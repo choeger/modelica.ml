@@ -29,7 +29,7 @@
 open Batteries
 
 module type S = sig
-    module Syntax : Generic_syntax.S
+    module Syntax : Ast.S
     open Syntax
     module Mapper : Mapper.S with module Syntax=Syntax
     module Folder : Folder.S with module Syntax=Syntax
@@ -71,7 +71,7 @@ module type S = sig
   end
 
 
-module Make(Tree : Generic_syntax.S) = struct
+module Make(Tree : Ast.S) = struct
     module Syntax = Tree
     module Mapper = Mapper.Make(Tree)
     module Folder = Folder.Make(Tree)

@@ -28,42 +28,15 @@
 
 module CamlFormat = Format
 open Batteries
+module Format = CamlFormat
+                  
+open Ast.Flags
 open Syntax
 open Class_deps
 open Utils
 open Location
-
-         
-type class_ = Hierarchy of hierarchy
-            | Reference of name
-            | RootReference of name
-            | Primitive of string * (class_ list)
-            | Method of string list
-                               [@@deriving yojson]
-                               
- and hierarchy = { fields : class_element StrMap.t ; super : class_ list }
-                               
- and class_element = { kind : class_element_kind ; body : class_ }
-
- and class_element_kind = Static
-                        | Replaceable
-                        | Function
-
-type t = class_
-
-type class_value = VHierarchy of value_hierarchy
-                 | VPrimitive of string * class_value list
-                 | VMethod of string list
-                 | VDelayed of delayed_value
-                                 [@@deriving yojson]
-
- and delayed_value = { environment : scope ; expression : class_ ; def_label : name }
-                                 
- and value_hierarchy = { vfields : class_value_element StrMap.t ; vsuper : class_value list }
-                               
- and class_value_element = { vkind : class_element_kind ; vbody : class_value }
-
-                             
+open Motypes
+                                    
 let empty_hierarchy = {vfields=StrMap.empty ; vsuper = []}
 
 open CamlFormat
@@ -73,7 +46,7 @@ let pp_comma fmt () = fprintf fmt ", "
 let rec pp_cv fmt = function
   | VDelayed _ -> fprintf fmt "<delayed>"
   | VHierarchy vh -> pp_hierarchy fmt vh
-  | VPrimitive (x, cs) -> fprintf fmt "@[%s(%a)@]" x (pp_print_list ~pp_sep:pp_comma pp_cv) cs
+  | VPrimitive ta -> pp_type_annotation fmt ta
 
 and pp_cv_element fmt {vkind;vbody} = fprintf fmt "%s%a" (match vkind with Function -> "function " | Replaceable -> "replaceable " | _ -> "") pp_cv vbody
                                   
@@ -102,7 +75,7 @@ let hier2str ?max:(n=8) cve =
                       
                       
 let kindof e = function
-    Syntax.Function | OperatorFunction -> { kind = Function ; body = e }
+    Ast.Flags.Function | OperatorFunction -> { kind = Function ; body = e }
     | _ -> { kind = Static; body = e}
              
 let rec translate_tds = function
@@ -110,9 +83,9 @@ let rec translate_tds = function
                                
   | Composition tds -> (tds.td_name.txt, kindof (Hierarchy (translate_comp tds.type_exp)) tds.sort)
                             
-  | Enumeration tds -> (tds.td_name.txt,kindof (Primitive ("enumeration", [])) tds.sort) 
-  | OpenEnumeration tds -> (tds.td_name.txt,kindof (Primitive ("open enumeration", [])) tds.sort)
-  | DerSpec tds -> (tds.td_name.txt,kindof (Primitive ("derivative", [])) tds.sort)
+  | Enumeration tds -> (tds.td_name.txt,kindof (Primitive (PEnumeration (StrSet.of_list (List.map (fun {commented} -> commented) tds.type_exp)))) tds.sort)
+  | OpenEnumeration tds -> (tds.td_name.txt,kindof (Primitive (PEnumeration StrSet.empty)) tds.sort)
+  | DerSpec tds -> (tds.td_name.txt,kindof (Primitive (PDer tds.type_exp)) tds.sort)
   | Extension tds ->
      let comp,mo = tds.type_exp in
      let h = translate_comp comp in

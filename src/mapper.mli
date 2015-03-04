@@ -29,7 +29,7 @@
 (** {2 A generic Syntax mapper inspired by OCaml's Ast_mapper } *)
 
 module type S = sig
-    module Syntax : Generic_syntax.S
+    module Syntax : Ast.S
     open Syntax
 
     type 'sort map_method = mapper -> 'sort -> 'sort
@@ -130,4 +130,4 @@ module type S = sig
                                                                                                             (** combine two generic mappers *)
   end
 
-module Make(Tree : Generic_syntax.S) : S with module Syntax = Tree
+module Make(Tree : Ast.S) : S with module Syntax = Tree

@@ -29,7 +29,7 @@
 open Batteries
 
 module type S = sig
-    module Syntax : Generic_syntax.S
+    module Syntax : Ast.S
     open Syntax 
     type ('s, 'a) fold_method = ('a folder) -> 's -> 'a -> 'a
      and 'a folder = {
@@ -89,7 +89,7 @@ module type S = sig
     val fold_conditional : ('sort, 'a) fold_method -> ('sort condition_struct, 'a) fold_method                                                           
   end
 
-module Make(Tree : Generic_syntax.S) = struct
+module Make(Tree : Ast.S) = struct
     type attr = Tree.attr
     module Syntax = Tree
     open Syntax

@@ -24,11 +24,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *)
+ *)                                                                 
 
 module NoAttributes = struct type t = unit end
 
-module DefaultSyntax = Generic_syntax.Make(NoAttributes)
+module DefaultSyntax = Ast.Make(NoAttributes)
 
 include DefaultSyntax
 

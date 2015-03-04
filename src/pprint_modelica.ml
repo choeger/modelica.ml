@@ -29,6 +29,7 @@
 module Enum = BatEnum
 open Format
 open Utils
+open Ast.Flags
 open Syntax
 open Location
 

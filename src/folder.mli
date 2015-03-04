@@ -28,7 +28,7 @@
 
 (** {2 A generic Syntax folder inspired by OCaml's Ast_mapper } *)
 module type S = sig
-    module Syntax : Generic_syntax.S
+    module Syntax : Ast.S
     open Syntax 
 
     type ('s, 'a) fold_method = ('a folder) -> 's -> 'a -> 'a
@@ -112,4 +112,4 @@ module type S = sig
     (** Lift an element fold method over a conditional structure containing this element as body *)
   end
 
-module Make(Tree : Generic_syntax.S) : S with module Syntax = Tree
+module Make(Tree : Ast.S) : S with module Syntax = Tree

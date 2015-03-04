@@ -1,18 +1,18 @@
 # OASIS_START
-# DO NOT EDIT (digest: 11dd192b69040aba3500abf4e1e4858e)
+# DO NOT EDIT (digest: a91ceb03671e9fff91ef8f81b8c38507)
 Modelica_parser
 Modelica_lexer
 Pprint_modelica
 Syntax
 Syntax_fragments
-Generic_syntax
+Ast
 Mapper
 Folder
 FileSystem
 Traversal
 Stats
 Class_deps
-ClassLang
+ClassNorm
 Motypes
 Generated_parser
 Utils

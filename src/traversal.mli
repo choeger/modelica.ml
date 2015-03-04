@@ -27,7 +27,7 @@
  *)
 
 module type S = sig
-    module Syntax : Generic_syntax.S
+    module Syntax : Ast.S
     module Mapper : Mapper.S with module Syntax = Syntax
     module Folder : Folder.S with module Syntax = Syntax
                                                            
@@ -97,4 +97,4 @@ module type S = sig
     module Extend : TRAVERSAL with type sort = extend
   end
 
-module Make(Tree : Generic_syntax.S) : S with module Syntax = Tree
+module Make(Tree : Ast.S) : S with module Syntax = Tree
