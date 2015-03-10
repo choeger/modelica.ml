@@ -13,8 +13,8 @@ Library modelica_ml
   BuildDepends:   batteries, menhirLib, sedlex, ppx_deriving.show,
                   compiler-libs.common, ocamlgraph, ppx_deriving_yojson, ppx_monadic, ppx_import	
   Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
-                  Syntax, Syntax_fragments, Ast, Mapper, Folder, FileSystem, Traversal,
-                  Stats, Class_deps, ClassNorm, Motypes
+                  Syntax, Syntax_fragments, Ast, Mapper, Folder, FileSystem, Traversal, Report,
+                  Stats, Class_deps, ClassNorm, ClassTrans, Motypes
   InternalModules: Generated_parser, Utils
   
 Test "Modelica Parser Tests"

@@ -34,72 +34,83 @@ open Utils
 open Ast.Flags
 
 module DS = Syntax
-       
-type type_ = Int | Real | String | Bool | Unit
-             | Array of array_struct
-             | ExternalObject of object_struct
-             | Enumeration of StrSet.t
-             | Record of object_struct
-             | Package of object_struct
-             | Function of function_type
-                             [@@deriving show,yojson]
-                             
- and recursive_struct = { recursive_name : string ; recursive_rhs : type_ } [@@deriving show,yojson]
 
- and array_struct = { element : type_ ; dimensions : int } [@@deriving show,yojson]
+type ('f,'e) flagged_struct = { flag : 'f; flagged : 'e } [@@deriving show,yojson]
+                                                                                                                                                                                    
+type class_term = Reference of DS.name
+                | RootReference of DS.name
+                | PReplaceable of class_term
+                | Redeclaration of redeclaration
+                | StrictRedeclaration of redeclaration
+                | PInt | PReal | PString | PBool | PExternalObject
+                | PArray of constr_array
+                | PClass of constr_class
+                | PEnumeration of StrSet.t
+                | PDer of DS.der_spec
+                | PSort of sort_defined_struct
+                | PVar of (variability, class_term) flagged_struct
+                | PCau of (causality, class_term) flagged_struct
+                | PCon of (connectivity, class_term) flagged_struct
+                                                     [@@deriving yojson,show]
 
- and object_struct = { dynamic_fields : type_ StrMap.t ; static_fields : type_ StrMap.t } [@@deriving show,yojson]
-                             
- and function_type = { inputs : (string * type_) StrMap.t ; outputs : type_ list } [@@deriving show,yojson]
+ and redeclaration = { rd_lhs : class_term ; rds : redeclared_element list }
 
-type class_ = Hierarchy of hierarchy
-            | Reference of DS.name
-            | RootReference of DS.name
-            | Primitive of type_construct
-            | Method of string list
-                               [@@deriving yojson,show]
-
- and type_construct = PInt | PReal | PString | PBool | PExternalObject
-                      | PArray of constr_array
-                      | PEnumeration of StrSet.t
-                      | PVar of constr_var
-                      | PConn of constr_conn
-                      | PDer of DS.der_spec
-                      | PCaus of constr_caus
-                                   [@@deriving yojson]
-
- and constr_array = { array_arg : class_ ; dimensions : int }
-
- and constr_var = { var_arg : class_ ; constr_variability : variability }
- and constr_conn = { conn_arg : class_ ; conn_variability : variability }
- and constr_caus = { caus_arg : class_ ; caus_variability : variability }
-                                              
- and hierarchy = { fields : class_element StrMap.t ; super : class_ list }
-                               
- and class_element = { kind : class_element_kind ; body : class_ }
-
- and class_element_kind = Static
-                        | Replaceable
-                        | Function
+ and redeclared_element = ClassMember of redecl_struct | Field of redecl_struct
                        
-type level2_type = { l2_variability : variability ;
-                     l2_causality : causality ;
-                     l2_connectivity : connectivity ;
-                     l2_type : type_ } [@@deriving show,yojson]
-                        
- and type_annotation = SimpleType of type_ | Level2Type of level2_type | UnknownType [@@deriving show,yojson]
-                                                                           
-type class_value = VHierarchy of value_hierarchy
-                 | VPrimitive of type_annotation
-                 | VMethod of string list
-                 | VDelayed of delayed_value
-                                 [@@deriving show,yojson]
+ and redecl_struct = { rd_name : string ; rd_rhs : class_term }
+                       
+ and sort_defined_struct = { defined_sort : sort ; rhs : class_term }
+                                                     
+ and constr_class = { class_sort : sort ; public : hierarchy ; protected : hierarchy }
+                                                       
+ and constr_array = { array_arg : class_term ; dimensions : int } 
+                                              
+ and hierarchy = { class_members : class_term StrMap.t ; super : class_term list ; fields : class_term StrMap.t }                               
 
- and delayed_value = { environment : scope ; expression : class_ ; def_label : DS.name }
-                                 
- and value_hierarchy = { vfields : class_value_element StrMap.t ; vsuper : class_value list }
+module Normalized = struct
+
+    type variability = Constant | Discrete | Parameter | Continuous [@@deriving show,yojson]
+    type causality = Input | Output | Acausal [@@deriving show,yojson]
+    type connectivity = Flow | Stream | Potential [@@deriving show,yojson]                                                     
+    
+    type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
+                       | Array of array_struct
+                       | ExternalObject of class_value StrMap.t
+                       | Enumeration of StrSet.t
+                       | Function of function_struct
+                       | Class of object_struct
+                       | Replaceable of replaceable_value
+                       | Delayed of delayed_value
+                                      [@@deriving show,yojson]
+
+     and replaceable_value = { current : class_value ; replaceable_body : class_term }
+                                           
+     and delayed_value = { environment : scope ; expression : class_term ; def_label : DS.name }
+                                  
+     and array_struct = { element : class_value ; dimensions : int } 
+
+     and object_struct = { object_sort : sort ; public : elements_struct ; protected : elements_struct }
+                                                                 
+     and elements_struct = { class_members : type_annotation StrMap.t ; super : class_value list ;
+                             dynamic_fields : type_annotation StrMap.t ; static_fields : class_value StrMap.t }
+                             
+     and function_struct = { inputs : (string * class_value) StrMap.t ; outputs : class_value list }
+
+     and level2_type = { l2_variability : variability ;
+                         l2_causality : causality ;
+                         l2_connectivity : connectivity ;
+                         l2_type : class_value }
+                        
+     and type_annotation = SimpleType of class_value | Level2Type of level2_type | UnknownType
+
+    let empty_elements = {class_members = StrMap.empty ; super = []; dynamic_fields=StrMap.empty ;static_fields=StrMap.empty}
+
+    let empty_class = Class {public=empty_elements;protected=empty_elements;object_sort=Class}
+
+    let empty_class_ta = SimpleType empty_class
+  end
+                                                                                           
                                
- and class_value_element = { vkind : class_element_kind ; vbody : class_value }
 
                                                                                    
 

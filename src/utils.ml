@@ -66,6 +66,7 @@ module StrMap = struct include Map.Make(String)
                        let find_or_else v x m = if mem x m then find x m else v
                        let to_yojson a m = `Assoc (List.map (fun (k,v) -> (k,a v)) (bindings m))
                        let of_yojson js f = (`Error "Not yet implemented")
+                       let of_list bs = of_enum (List.enum bs)
                        open StdFormat 
                        let pp pp_v fmt s = let pp_comma fmt () = fprintf fmt "," in
                                            let pp_pair fmt (k,v) = fprintf fmt "%s@ =@ %a" k pp_v v in
