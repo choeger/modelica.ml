@@ -84,6 +84,7 @@ type scope_entry = {
 type scope = scope_entry list
 (** The scope is a list of scope entries (in lookup order to allow for lexical shadowing). *)
 
+val pp_scope : Format.formatter -> scope -> unit                         
 val scope_to_yojson : scope -> Yojson.Safe.json
 val scope_of_yojson : Yojson.Safe.json -> [`Ok of scope | `Error of string]
                          

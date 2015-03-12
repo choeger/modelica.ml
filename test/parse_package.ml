@@ -32,7 +32,9 @@ open Pprint_modelica
 open Stats
 open Syntax
 open Class_deps
-open ClassLang
+open ClassNorm
+open Motypes
+open Report
 open Utils
 open Batteries
 open Location
@@ -42,15 +44,19 @@ let stats u =
   Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
                                              
 let normalize u = match u.toplevel_defs with
-    d::_ -> ClassLang.normalize d
-  | _ -> ClassLang.empty_hierarchy
-           
+    d::_ -> ClassNorm.normalize d
+  | _ -> {final_messages = []; final_result= Ok Normalized.empty_class_body}
+
+let print_message msg = Printf.printf "%s\n" (show_message msg)
+  
 let _ =
   Format.pp_set_margin Format.str_formatter (140);
   match (scan [] argv.(1)) with
     Some pkg ->  begin match merge pkg with Some u ->
                                             let hier = normalize u in
-                                            Printf.printf "%s\n" (Yojson.Safe.pretty_to_string (ClassLang.value_hierarchy_to_yojson hier)) ; 0
+                                            Printf.printf "%d messages.\n" (List.length hier.final_messages) ;
+                                            List.iter print_message hier.final_messages ;                                              
+                                            0
                                           | None -> 1 end
   | None -> Printf.eprintf "'%s' does not seem to be a Modelica package.\n" argv.(1) ; 1
               

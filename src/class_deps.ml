@@ -33,7 +33,8 @@ open Traversal
 open Traversal.Syntax
 open Traversal.Folder
 open Location
-
+module Format = Utils.StdFormat
+       
 type outside_superclass = {extended:str; parent:name}
        
 type kontext_label = Path of name
@@ -54,9 +55,9 @@ type scope_entry = {
   scope_name : name ;
   scope_tainted: bool;
   scope_entries :  str StrMap.t;
-} [@@deriving yojson]
+} [@@deriving yojson,show]
 
-type scope = scope_entry list [@@deriving yojson]
+type scope = scope_entry list [@@deriving yojson,show]
 
 type lexical_typedef = {
     kontext_label : kontext_label;

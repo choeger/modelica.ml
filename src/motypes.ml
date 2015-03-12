@@ -85,7 +85,7 @@ module Normalized = struct
 
      and replaceable_value = { current : class_value ; replaceable_body : class_term }
                                            
-     and delayed_value = { environment : scope ; expression : class_term ; def_label : DS.name }
+     and delayed_value = { environment : Class_deps.scope ; expression : class_term ; def_label : DS.name }
                                   
      and array_struct = { element : class_value ; dimensions : int } 
 
@@ -105,7 +105,9 @@ module Normalized = struct
 
     let empty_elements = {class_members = StrMap.empty ; super = []; dynamic_fields=StrMap.empty ;static_fields=StrMap.empty}
 
-    let empty_class = Class {public=empty_elements;protected=empty_elements;object_sort=Class}
+    let empty_class_body = {public=empty_elements;protected=empty_elements;object_sort=Class}
+                           
+    let empty_class = Class empty_class_body
 
     let empty_class_ta = SimpleType empty_class
   end

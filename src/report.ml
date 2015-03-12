@@ -30,16 +30,23 @@ open Motypes
 open Motypes.Normalized
 open Utils
        
-type level = Info | Warning | Error
+type level = Info | Warning | Error [@@deriving show]
 
 type 'a result = Ok of 'a | Failed
-                                
+                              
 type message = { level : level ; where : Location.t ; what : string }
 
+let show_message {level;what} = Printf.sprintf "%s: %s" (show_level level) what
+                 
 type state = { messages : message list; input : class_term ; output : Normalized.object_struct }
                  
 type 'a report = { result : 'a result ; state : state }
 
+type 'a final_report = { final_result : 'a result ; final_messages : message list }
+
+let run m state = let {result;state} = m state in
+                  {final_result=result; final_messages=state.messages}
+                         
 let bind m f state = let {state;result} = m state in
                      match result with Failed -> {state;result=Failed}
                                      | Ok a -> f a state

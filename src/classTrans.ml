@@ -35,7 +35,8 @@ open Class_deps
 open Utils
 open Location
 open Motypes
-
+open Batteries
+       
 let attach_sort ct sort = PSort { rhs = ct ; defined_sort = sort }
 
 let empty_class_hierarchy = { class_members = StrMap.empty ; fields = StrMap.empty ; super = [] }
