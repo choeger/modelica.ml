@@ -43,21 +43,17 @@ let stats u =
   let {def_count; type_count} = generate_stats u in
   Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
                                              
-let normalize u = match u.toplevel_defs with
-    d::_ -> ClassNorm.normalize d
-  | _ -> {final_messages = []; final_result= Ok Normalized.empty_class_body}
-
+let normalize u = ClassNorm.normalize u.toplevel_defs
+                                      
 let print_message msg = Printf.printf "%s\n" (show_message msg)
   
 let _ =
   Format.pp_set_margin Format.str_formatter (140);
-  match (scan [] argv.(1)) with
-    Some pkg ->  begin match merge pkg with Some u ->
-                                            let hier = normalize u in
-                                            Printf.printf "%d messages.\n" (List.length hier.final_messages) ;
-                                            List.iter print_message hier.final_messages ;                                              
-                                            0
-                                          | None -> 1 end
-  | None -> Printf.eprintf "'%s' does not seem to be a Modelica package.\n" argv.(1) ; 1
+  match (scan_root argv.(1)) with
+  | {root_files = []; root_packages = []} -> Printf.eprintf "'%s' seems to contain no Modelica content.\n" argv.(1) ; 1
+  | root ->  let hier = normalize (merge_root root) in
+             Printf.printf "%d messages.\n" (List.length hier.final_messages) ;
+             List.iter print_message hier.final_messages ;                                              
+             0
               
                   

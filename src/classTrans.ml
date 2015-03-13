@@ -96,6 +96,10 @@ and translate_strict_redeclarations rd_lhs {types} =
                                                            in ClassMember {rd_name ; rd_rhs}) types}
     
 and translate_texp = function
+  | TName [{txt="Real"}] -> PReal
+  | TName [{txt="Integer"}] -> PInt
+  | TName [{txt="Boolean"}] -> PBool
+  | TName [{txt="String"}] -> PString
   | TName n -> Reference n
   | TRootName n -> RootReference n
                                  

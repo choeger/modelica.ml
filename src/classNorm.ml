@@ -101,7 +101,16 @@ and eval_elements scope {fields} = Report.do_ ;
                                    let static_fields = StrMap.of_list (filter_static (StrMap.bindings dynamic_fields)) in
                                    return {Normalized.class_members = StrMap.empty; super = []; dynamic_fields; static_fields}
 
-                                         
+and eval_flagged scope f flagged =
+  Report.do_ ;
+  v <-- eval scope flagged ;
+  let open Normalized in
+  begin
+    match v with UnknownType -> return UnknownType
+               | Level2Type l2 -> return (Level2Type (f l2))
+               | SimpleType t -> 
+                  return (Level2Type (f (default_level2 t)))
+  end                                         
 
 and eval scope = function
   | PClass {class_sort; public; protected} -> Report.do_ ;
@@ -134,8 +143,25 @@ and eval scope = function
            | SimpleType t -> return (SimpleType (Array {element= t; dimensions}))
            | Level2Type l2 -> return (Level2Type {l2 with l2_type = Array {element = l2.l2_type; dimensions}})
      end
-  
-                                    
+
+  | PCau {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_causality = Normalized.cau_from_ast flag}) flagged
+  | PCon {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_connectivity = Normalized.con_from_ast flag}) flagged                            
+  | PVar {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_variability = Normalized.var_from_ast flag}) flagged
+
+  | PReplaceable t -> Report.do_ ;
+                      v <-- eval scope t ;
+                      begin
+                        let open Normalized in
+                        match v with
+                          UnknownType -> return UnknownType
+                        | SimpleType current -> return (SimpleType (Replaceable {current; replaceable_body=t; replaceable_env=scope}))
+                        | Level2Type l2 -> return (Level2Type {l2 with l2_type = Replaceable {current=l2.l2_type; replaceable_body=t; replaceable_env=scope}})
+                      end             
+  (* ignore empty redeclarations *)
+  | StrictRedeclaration {rd_lhs; rds = []} -> eval scope rd_lhs
+  | Redeclaration {rd_lhs; rds = []} -> eval scope rd_lhs
+                                        
+  | _ as e -> Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "'%s' not yet implemented" (show_class_term e)}; fail
 
 and get_class_element_in {Normalized.class_members; super; static_fields; dynamic_fields} x xs =
   if StrMap.mem x.txt class_members then begin      
@@ -461,12 +487,12 @@ let rec do_normalize all count scopes r = function
 let name = function
     Short tds -> tds.td_name | Composition tds -> tds.td_name | Enumeration tds -> tds.td_name | OpenEnumeration tds -> tds.td_name | DerSpec tds -> tds.td_name | Extension tds -> tds.td_name
                   
-let global_scope start = [{scope_name=[];scope_tainted=false;scope_entries=StrMap.singleton start.txt start}]
+let global_scope start = List.map (fun td -> {scope_name=[];scope_tainted=false;scope_entries=StrMap.singleton ((name td.commented).txt) (name td.commented)}) start
 
 let normalize top = 
-    let deps = scan_dependencies (global_scope (name top.commented)) top in
+    let deps = scan_dependencies (global_scope top) top in
     let scopes = List.fold_left (fun m {kontext_label;scope} -> LabelMap.add kontext_label scope m) LabelMap.empty deps in
     let sccs = topological_order deps in
     let length = List.fold_left (fun s l -> s + (List.length l)) 0 sccs in
-    let state = {messages = []; input = ClassTrans.translate_topdefs [top]; output = Normalized.empty_class_body} in    
+    let state = {messages = []; input = ClassTrans.translate_topdefs top; output = Normalized.empty_class_body} in    
     Report.run (Report.do_ ; do_normalize length 0 scopes sccs [] ; output) state

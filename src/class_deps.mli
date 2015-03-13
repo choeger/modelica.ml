@@ -99,7 +99,7 @@ type lexical_typedef = {
 val search_scope : str -> name -> scope -> dependency_source list
 (** Find all possible global names of a given identifier in the given scope *)
               
-val scan_dependencies : scope -> typedef -> lexical_typedef list
+val scan_dependencies : scope -> typedef list -> lexical_typedef list
 (** Create a list of lexical type definitions from a type definition AST for dependency analysis *)
                                                             
 val topological_order : lexical_typedef list -> kontext_label list list

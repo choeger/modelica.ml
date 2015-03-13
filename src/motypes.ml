@@ -72,6 +72,17 @@ module Normalized = struct
     type variability = Constant | Discrete | Parameter | Continuous [@@deriving show,yojson]
     type causality = Input | Output | Acausal [@@deriving show,yojson]
     type connectivity = Flow | Stream | Potential [@@deriving show,yojson]                                                     
+
+    let cau_from_ast =
+      function Ast.Flags.Input -> Input
+             | Ast.Flags.Output -> Output
+    let var_from_ast =
+      function Ast.Flags.Constant -> Constant
+             | Ast.Flags.Parameter -> Parameter
+             | Ast.Flags.Discrete -> Discrete
+    let con_from_ast =
+      function Ast.Flags.Flow -> Flow
+             | Ast.Flags.Stream -> Stream
     
     type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                        | Array of array_struct
@@ -83,7 +94,7 @@ module Normalized = struct
                        | Delayed of delayed_value
                                       [@@deriving show,yojson]
 
-     and replaceable_value = { current : class_value ; replaceable_body : class_term }
+     and replaceable_value = { current : class_value ; replaceable_body : class_term ; replaceable_env : Class_deps.scope }
                                            
      and delayed_value = { environment : Class_deps.scope ; expression : class_term ; def_label : DS.name }
                                   
@@ -103,6 +114,8 @@ module Normalized = struct
                         
      and type_annotation = SimpleType of class_value | Level2Type of level2_type | UnknownType
 
+    let default_level2 l2_type = {l2_variability=Constant; l2_causality=Acausal; l2_connectivity=Potential; l2_type}
+                                                                                     
     let empty_elements = {class_members = StrMap.empty ; super = []; dynamic_fields=StrMap.empty ;static_fields=StrMap.empty}
 
     let empty_class_body = {public=empty_elements;protected=empty_elements;object_sort=Class}

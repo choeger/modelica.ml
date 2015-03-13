@@ -30,6 +30,17 @@
 
 type package
 
+type pkg_root = {
+    root_files : string list ;
+    root_packages : package list;
+  }
+
+val scan_root : string -> pkg_root
+(** Tries to scan the whole package root path *)
+
+val merge_root : pkg_root -> Syntax.unit_
+(** Parse the whole package root *)
+                            
 val package_name : package -> string list
 (** Yields the assumed name of the package.mo file *)
        

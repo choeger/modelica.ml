@@ -281,7 +281,7 @@ let refine_dependency defs {local_name; from} = {local_name; from=List.map (refi
                                                   
 let scan_dependencies scope typedef =
   let scanner = { default_folder with fold_typedef_desc = scan } in
-  let { found } = scanner.fold_typedef scanner typedef { found = []; scope} in
+  let { found } = Traversal.Folder.fold_list scanner.fold_typedef scanner typedef { found = []; scope} in
   let add = fun s d -> LabelSet.add d.kontext_label s in
   let set = List.fold_left add LabelSet.empty found in
   let refine d = {d with dependencies = List.map (refine_dependency set) d.dependencies} in
