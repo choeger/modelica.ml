@@ -68,9 +68,10 @@ module StrMap = struct include Map.Make(String)
                        let of_yojson js f = (`Error "Not yet implemented")
                        let of_list bs = of_enum (List.enum bs)
                        open StdFormat 
-                       let pp pp_v fmt s = let pp_comma fmt () = fprintf fmt "," in
-                                           let pp_pair fmt (k,v) = fprintf fmt "%s@ =@ %a" k pp_v v in
-                                           fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
+                       let pp pp_v fmt s =
+                         let pp_comma fmt () = fprintf fmt "," in
+                         let pp_pair fmt (k,v) = fprintf fmt "%s@ =@ %a" k pp_v v in
+                         fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
                 end
 module StrSet = struct include Set.Make(String) 
                        let to_yojson s = `List (List.map (fun e -> `String e) (elements s))
@@ -78,7 +79,13 @@ module StrSet = struct include Set.Make(String)
                        open StdFormat
                        let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_print_string) (elements s)
                 end
-                        
+
+module Deque = struct include Deque
+                      open StdFormat
+                      let pp pp_v fmt dq = let pp_comma fmt () = fprintf fmt "," in
+                                           fprintf fmt "@[%a@]" (pp_print_list ~pp_sep:pp_comma pp_v) (to_list dq)
+               end
+                  
 module List = List
 
 

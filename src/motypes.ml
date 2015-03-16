@@ -94,9 +94,9 @@ module Normalized = struct
                        | Delayed of delayed_value
                                       [@@deriving show,yojson]
 
-     and replaceable_value = { current : class_value ; replaceable_body : class_term ; replaceable_env : Class_deps.scope }
+     and replaceable_value = { current : class_value ; replaceable_body : class_term ; replaceable_env : Class_deps.scope [@opaque] }
                                            
-     and delayed_value = { environment : Class_deps.scope ; expression : class_term ; def_label : DS.name }
+     and delayed_value = { environment : Class_deps.scope [@opaque] ; expression : class_term [@opaque]; def_label : DS.name }
                                   
      and array_struct = { element : class_value ; dimensions : int } 
 
@@ -125,7 +125,6 @@ module Normalized = struct
     let empty_class_ta = SimpleType empty_class
   end
                                                                                            
-                               
 
                                                                                    
 

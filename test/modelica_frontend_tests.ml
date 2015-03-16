@@ -26,13 +26,15 @@
  *
  *)
 
-open OUnit
+open OUnit2
 		  
 let suite = "Modelica Frontend" >:::
 	      [
 		(* Lexer_tests.suite ; *)
-		Parser_tests.suite ; 
+		Parser_tests.suite ;
+                Class_tests.suite ;
 	      ]
 		
 let _ =
   run_test_tt_main suite
+                   

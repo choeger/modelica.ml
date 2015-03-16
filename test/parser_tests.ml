@@ -26,7 +26,7 @@
  *
  *)
 
-open OUnit
+open OUnit2
 open Utils
 open Batteries
 open Modelica_parser
@@ -42,7 +42,7 @@ let parse_test parser input f =
   let ucs = state_from_utf8_string "test input" input in
   let next () = next_token ucs in
   let last () = last_token ucs in
-  fun () ->
+  fun _ ->
   try
     f (parser next last)
   with 

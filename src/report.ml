@@ -26,6 +26,9 @@
  *
  *)
 
+module StdFormat = Format
+open Batteries
+module Format = StdFormat
 open Motypes
 open Motypes.Normalized
 open Utils
@@ -37,7 +40,11 @@ type 'a result = Ok of 'a | Failed
 type message = { level : level ; where : Location.t ; what : string }
 
 let show_message {level;what} = Printf.sprintf "%s: %s" (show_level level) what
-                 
+
+let print_message o msg = IO.nwrite o (show_message msg)
+
+let print_messages o msgs = List.print ~sep:"\n" print_message o msgs
+                                  
 type state = { messages : message list; input : class_term ; output : Normalized.object_struct }
                  
 type 'a report = { result : 'a result ; state : state }
@@ -53,10 +60,10 @@ let bind m f state = let {state;result} = m state in
 
 let return a state = {state ; result = Ok a}
 
-let rec on_unit_sequence f = function
+let rec miter f = function
     [] -> return ()
-  | x::xs ->
-     do_ ; f x ; on_unit_sequence f xs
+  | x::xs ->     
+     bind (f x) (fun () -> miter f xs)
                        
 let rec on_sequence f = function
     (* TODO: tail_recursion *)

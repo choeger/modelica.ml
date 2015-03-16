@@ -44,15 +44,17 @@ exception ExpansionException of string
                                         
 type prefix_found = { found : name ; not_found : name }
 
+let show_prefix_found {found; not_found} = "No element named " ^ (name2str not_found) ^ " in " ^ (name2str found)
+                      
 type found_class = { found_value : Normalized.class_value ; found_visible : bool }
                       
 type lookup_result = Found of found_class
                    | NothingFound of name
                    | PrefixFound of prefix_found
 
-type unresolved_dependency = { searching : name ; dependency : kontext_label }
-
-let fail_unresolved {searching; dependency} = Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "Dependency %s not evaluated\n" (label2str dependency)} ; fail
+type unresolved_dependency = { searching : name ; partial_result : prefix_found ; dependency : kontext_label }
+                               
+let fail_unresolved {searching; partial_result; dependency} = Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "Dependency %s not evaluated:\n%s\n" (label2str dependency) (show_prefix_found partial_result)} ; fail
                                
 exception DereferenceException of string
 
@@ -60,7 +62,7 @@ exception EvaluationException of string
 exception UnresolvedDependency of unresolved_dependency
                                     
 let result2str = function Found _ -> "OK"
-               | PrefixFound {found; not_found} -> "No element named " ^ (name2str not_found) ^ " in " ^ (name2str found)
+               | PrefixFound pf -> show_prefix_found pf 
                | NothingFound name -> "No path to " ^ (name2str name)
                                                         
 let unfolding = ref 0 
@@ -144,10 +146,23 @@ and eval scope = function
            | Level2Type l2 -> return (Level2Type {l2 with l2_type = Array {element = l2.l2_type; dimensions}})
      end
 
+  | PEnumeration es -> return (Normalized.SimpleType (Normalized.Enumeration es))
+
   | PCau {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_causality = Normalized.cau_from_ast flag}) flagged
   | PCon {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_connectivity = Normalized.con_from_ast flag}) flagged                            
   | PVar {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_variability = Normalized.var_from_ast flag}) flagged
 
+  | PSort {defined_sort; rhs} -> Report.do_ ;
+                                 v <-- eval scope rhs ;
+                                 let open Normalized in
+                                 begin
+                                   match v with
+                                   | SimpleType (Class {object_sort; public; protected}) when (defined_sort = object_sort) -> return v
+                                   | SimpleType (Class {object_sort; public; protected}) ->
+                                      Report.do_ ; log{level=Error; where=none; what=Printf.sprintf "Sort mismatch. This is not a %s but a %s" (show_sort defined_sort) (show_sort object_sort)}; fail
+                                   | _ when defined_sort = Type -> return v
+                                   | _ ->  Report.do_ ; log{level=Error; where=none; what=Printf.sprintf "Sort mismatch. This is not a %s but a type." (show_sort defined_sort)}; fail
+                                 end
   | PReplaceable t -> Report.do_ ;
                       v <-- eval scope t ;
                       begin
@@ -233,7 +248,8 @@ and lookup prefix suffix = function
            | PrefixFound pf -> return (PrefixFound pf)
            | Found f -> return (Found {f with found_visible = found_visible && f.found_visible})
          end
-       | _ -> fail_unresolved { searching = prefix::suffix ; dependency = Superclass p }
+       | PrefixFound partial_result -> fail_unresolved { searching = prefix::suffix ; partial_result; dependency = Superclass p }
+       | NothingFound not_found -> fail_unresolved { searching = prefix::suffix ; partial_result = {found=[]; not_found}; dependency = Superclass p }
      end
 
   | {source_label=Path(p)} :: _ ->
@@ -249,7 +265,8 @@ and lookup prefix suffix = function
            | PrefixFound {found; not_found} -> return (PrefixFound {found = prefix::found ; not_found})
            | r -> return r
          end
-       | _ -> fail_unresolved { searching = prefix::suffix ; dependency = Path p }
+       | PrefixFound partial_result -> fail_unresolved { searching = prefix::suffix ; partial_result ; dependency = Path p }
+       | NothingFound not_found -> fail_unresolved { searching = prefix::suffix ; partial_result = {found=[]; not_found}; dependency = Superclass p }
      end
                                     
 and start_lookup scope prefix suffix =
@@ -261,13 +278,13 @@ type class_ptr_element = PublicClass of string | ProtectedClass of string
 let pp_class_ptr_element fmt = function
     PublicClass s -> Format.fprintf fmt "<public %s>" s                                    
   | ProtectedClass s -> Format.fprintf fmt "<protected %s>" s
-                                              
-type lexical_path = class_ptr_element list [@@deriving show]
+                                       
+type lexical_path = class_ptr_element Deque.t [@@deriving show]
 
 type found_lexical = {lexical_path : lexical_path ; lexical_def : class_term }
                                       
 let rec find_static_name lexical_def acc = function
-    [] -> Some {lexical_path = List.rev acc; lexical_def}
+    [] -> Some {lexical_path = acc; lexical_def}
   | x::r -> begin match lexical_def with
                     (* ignore redeclarations for static (aka lexical) lookup *)
                     (StrictRedeclaration {rd_lhs} | Redeclaration {rd_lhs}) -> find_static_name rd_lhs acc (x::r)
@@ -278,15 +295,15 @@ let rec find_static_name lexical_def acc = function
                            None -> begin
                              match StrMap.Exceptionless.find x.txt protected.class_members  with
                                None -> None
-                             | Some e -> find_static_name e ((PublicClass x.txt)::acc) r
+                             | Some e -> find_static_name e (Deque.snoc acc (PublicClass x.txt)) r
                            end
-                         | Some e -> find_static_name e ((PublicClass x.txt)::acc) r
+                         | Some e -> find_static_name e (Deque.snoc acc (PublicClass x.txt)) r
                        end
                          
                   | _ -> None
             end
 
-type merge_tip = { tip_name : string ; tip_value : Normalized.type_annotation }
+type merge_tip = { tip_name : string ; tip_value : Normalized.type_annotation [@opaque]} [@@deriving show]
               
 type merge_ptr = VoidTip
                | InsidePublic of merge_class
@@ -294,61 +311,100 @@ type merge_ptr = VoidTip
                | InsideProtected of merge_class
                | ProtectedTip of merge_tip
                | PublicSuperClass of Normalized.class_value
-               | ProtectedSuperClass of Normalized.class_value
+               | ProtectedSuperClass of Normalized.class_value [@@deriving show]
 
-and merge_class = { class_name : string ; current_value : Normalized.object_struct ; next : merge_ptr }
+and merge_class = { class_name : string ; current_value : Normalized.object_struct [@opaque] ; next : merge_ptr } [@@deriving show]
 
+let structure = let open Normalized in
+                function    
+                | SimpleType (Class os) -> return os
+                | _ -> log{where=none;level=Error;what="Merge failed in non-structure"}; fail
+
+let merge_classes cv_old cv_new =
+  let open Normalized in 
+  Report.do_ ;
+  os' <-- structure cv_new ;
+  os'' <-- structure cv_old ;
+  return (SimpleType (Class {os'' with public = {os''.public with static_fields = os'.public.static_fields ; dynamic_fields = os'.public.dynamic_fields } ;
+                                       protected = {os''.protected with static_fields = os'.protected.static_fields ; dynamic_fields = os'.protected.dynamic_fields }
+                            }))
+                                                                                           
 let rec apply_merge (os:Normalized.object_struct) = function
   (* tips *)
-  | VoidTip -> os
-  | PublicTip {tip_name; tip_value} -> {os with Normalized.public = {os.public with Normalized.class_members = StrMap.add tip_name tip_value os.public.class_members}}
-  | ProtectedTip {tip_name; tip_value} -> {os with protected = {os.protected with class_members = StrMap.add tip_name tip_value os.protected.class_members}}
-  | PublicSuperClass s ->  {os with public = {os.public with super = s :: os.public.super}}
-  | ProtectedSuperClass s ->  {os with public = {os.protected with super = s :: os.protected.super}}
+  | VoidTip -> return os
+
+  (* merge tips when already present *)
+  | PublicTip {tip_name; tip_value} when StrMap.mem tip_name os.public.class_members ->
+     Report.do_ ; cv <-- merge_classes (StrMap.find tip_name os.public.class_members) tip_value ;
+     (* we only pick the dynamic/static fields, types are already present *)
+     return {os with public = {os.public with class_members = StrMap.add tip_name cv os.public.class_members}}
+
+  | ProtectedTip {tip_name; tip_value} when StrMap.mem tip_name os.protected.class_members ->
+     Report.do_ ; cv <-- merge_classes (StrMap.find tip_name os.public.class_members) tip_value ;
+     (* we only pick the dynamic/static fields, types are already present *)
+     return {os with protected = {os.protected with class_members = StrMap.add tip_name cv os.protected.class_members}}
+            
+  (* Direct overwrite every other tip *)
+  | PublicTip {tip_name; tip_value} -> return {os with public = {os.public with class_members = StrMap.add tip_name tip_value os.public.class_members}}
+  | ProtectedTip {tip_name; tip_value} -> return {os with protected = {os.protected with class_members = StrMap.add tip_name tip_value os.protected.class_members}}
+
+  | PublicSuperClass s -> return {os with public = {os.public with super = s :: os.public.super}}
+  | ProtectedSuperClass s -> return {os with public = {os.protected with super = s :: os.protected.super}}
 
   (* paths *)
-  | InsidePublic {class_name; current_value; next} -> let cv = Normalized.SimpleType (Class (apply_merge current_value next)) in
-                                                      {current_value with public = {current_value.public with class_members = StrMap.add class_name  cv current_value.public.class_members}}
-  | InsideProtected {class_name; current_value; next} -> let cv = Normalized.SimpleType (Class (apply_merge current_value next)) in
-                                                         {current_value with protected = {current_value.protected with class_members = StrMap.add class_name cv current_value.protected.class_members}}
+  | InsidePublic {class_name; current_value; next} ->
+     Report.do_ ;
+     os' <-- apply_merge current_value next ;
+     let cv = Normalized.SimpleType (Class os') in
+     return {os with public = {os.public with class_members = StrMap.add class_name cv os.public.class_members}}
 
-
-let rec lexical2merge tip cv = function
-  | [] -> return tip
-  | (PublicClass class_name) :: ptr ->  begin
+  | InsideProtected {class_name; current_value; next} ->
+     Report.do_ ;
+     os' <-- apply_merge current_value next ;
+     let cv = Normalized.SimpleType (Class os') in
+     return {os with protected = {os.protected with class_members = StrMap.add class_name cv os.protected.class_members}}
+       
+let rec lexical2merge tip cv p = match (Deque.front p) with
+  | None -> return tip
+  | Some (PublicClass class_name, ptr) ->  begin
       let open Normalized in
       match cv with
 
         SimpleType (Class os) ->
         let cv' = if StrMap.mem class_name os.public.class_members then StrMap.find class_name os.public.class_members else empty_class_ta in
         Report.do_ ;
+        os <-- structure cv' ;
         next <-- lexical2merge tip cv' ptr ;
         return (InsidePublic {class_name; current_value = os; next})
 
-      | SimpleType (Delayed dv) -> Report.do_ ; cv' <-- unfold dv ; lexical2merge tip cv' ((PublicClass class_name) :: ptr)
+      | SimpleType (Delayed dv) -> Report.do_ ; cv' <-- unfold dv ; lexical2merge tip cv' p
       | _ -> Report.do_ ; log{where=none;level=Error;what="Cannot merge non-class type with non-empty path " ^ class_name}; fail
     end
                                           
-  | (ProtectedClass class_name) :: ptr ->  begin
+  | Some (ProtectedClass class_name, ptr) ->  begin
       let open Normalized in
       match cv with
 
         SimpleType (Class os) ->
         let cv' = if StrMap.mem class_name os.protected.class_members then StrMap.find class_name os.protected.class_members else empty_class_ta in
         Report.do_ ;
+        os <-- structure cv' ;
         next <-- lexical2merge tip cv' ptr ;
         return (InsideProtected {class_name; current_value = os; next})
 
-      | SimpleType (Delayed dv) -> Report.do_ ; cv' <-- unfold dv ; lexical2merge tip cv' ((ProtectedClass class_name) :: ptr)
+      | SimpleType (Delayed dv) -> Report.do_ ; cv' <-- unfold dv ; lexical2merge tip cv' p
       | _ -> Report.do_ ; log{where=none;level=Error;what="Cannot merge non-class type with non-empty path " ^ class_name}; fail
     end
                                                     
 let add tip ptr =
   Report.do_ ;
   os <-- output ;
-  mergePath <-- lexical2merge tip (SimpleType (Class os)) ptr ;
-  set_output (apply_merge os mergePath)
-
+  mergePath <-- begin
+      lexical2merge tip (SimpleType (Class os)) ptr
+    end ;
+  v <-- apply_merge os mergePath ;
+  set_output v
+             
 let rec lexical_class_body = function
     (StrictRedeclaration {rd_lhs} | Redeclaration {rd_lhs}) -> lexical_class_body rd_lhs
   | PClass b -> return b
@@ -360,15 +416,19 @@ let eval_label scope = function
       Report.do_ ;
       c <-- input ;      
       let r = List.rev(x::p) in
-      match find_static_name c [] r with
+      match find_static_name c Deque.empty r with
       (* we do not need to lookup dependencies of a static path, due to dependency analysis. 
          handle just the case where the hierarchy is empty *)
-      | Some {lexical_path=hd::ptr; lexical_def} ->
+      | Some {lexical_path; lexical_def} ->
          Report.do_ ;
          (* if the body is a hierarchy, it is an empty one and we only have to add the name *)
          tip_value <-- eval scope lexical_def ;
-         let tip = match hd with PublicClass tip_name -> PublicTip {tip_name;tip_value} | ProtectedClass tip_name -> ProtectedTip {tip_name;tip_value} in             
-         add tip ptr
+         (rest,tip) <-- begin
+             match Deque.rear lexical_path with Some (r, PublicClass tip_name) -> return (r, PublicTip {tip_name;tip_value})
+                                              | Some (r, ProtectedClass tip_name) -> return (r, ProtectedTip {tip_name;tip_value})
+                                              | None -> Report.do_ ; log{level=Error;where=none;what="Empty lexical path found. Error."};fail
+           end ;
+         add tip rest
              
       | _ -> Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "Expansion of '%s' failed." (name2str r)}; fail
     end
@@ -382,7 +442,7 @@ let eval_label scope = function
      begin
        Report.do_ ;
        c <-- input ;
-       match find_static_name c [] r with
+       match find_static_name c Deque.empty r with
        | Some {lexical_path} -> begin
            Report.do_ ;
            global <-- output ;
@@ -401,7 +461,7 @@ let eval_label scope = function
      c <-- input ;
      let r = List.rev p in
      
-     begin match find_static_name c [] r with
+     begin match find_static_name c Deque.empty r with
              Some {lexical_path; lexical_def} ->
              Report.do_ ;             
              (* create an empty class just in case *)
@@ -418,12 +478,12 @@ let eval_label scope = function
              let eval_protected_super v = Report.do_ ; 
                                           v <-- eval scope lexical_def ;
                                           s <-- simplify v ;
-                                          let tip = ProtectedSuperClass s in  
+                                          let tip = ProtectedSuperClass s in
                                           add tip lexical_path
              in
 
-             on_unit_sequence eval_public_super public.super ;
-             on_unit_sequence eval_protected_super protected.super ;
+             miter eval_public_super public.super ;
+             miter eval_protected_super protected.super ;
              
            | _ -> Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "Expansion of %s failed." (name2str r)}; fail
      end
@@ -444,23 +504,29 @@ let rec prepare_recursive scopes = function
                      Report.do_ ;
                      c <-- input ;
                      log{level=Warning;where=none;what=Printf.sprintf "Handling possibly recursive element %s\n" (name2str (x::p))} ;
-                     match find_static_name c [] q with
+                     match find_static_name c Deque.empty q with
                      (* As for the non-recursive case, we only "evaluate" leafs of the definition tree *)
-                     | Some {lexical_def=PClass h;lexical_path=hd::ptr} -> (* everything inside, including the recursive occurrence, is covered by other labels *)
+                     | Some {lexical_def=PClass h;lexical_path} -> (* everything inside, including the recursive occurrence, is covered by other labels *)
                         Report.do_; 
                         let tip_value = Normalized.empty_class_ta in
-                        let tip = match hd with PublicClass tip_name -> PublicTip {tip_name;tip_value}
-                                              | ProtectedClass tip_name -> ProtectedTip {tip_name;tip_value} in             
+                        (ptr, tip) <-- begin match Deque.rear lexical_path with Some (ptr, PublicClass tip_name) -> return (ptr, PublicTip {tip_name;tip_value})
+                                                                              | Some (ptr, ProtectedClass tip_name) -> return (ptr, ProtectedTip {tip_name;tip_value})
+                                                                              | None -> Report.do_ ; log{level=Error;where=none;what="Empty lexical path found. Error."};fail
+                                                                                                                                                                           
+                                       end;             
                         add tip ptr ;
                         prepare_recursive scopes r
                                           
                      (* Only add a recursive entry for the leafs *)
-                     | Some {lexical_def;lexical_path=hd::ptr} ->
+                     | Some {lexical_def;lexical_path} ->
                         Report.do_;
                         log{level=Warning;where=none;what=Printf.sprintf "Adding recursive entry for %s\n" (name2str (x::p))} ;
                         let tip_value = Normalized.SimpleType (Normalized.Delayed {environment = LabelMap.find (Path p) scopes; expression = lexical_def; def_label=x::p}) in
-                        let tip = match hd with PublicClass tip_name -> PublicTip {tip_name;tip_value}
-                                              | ProtectedClass tip_name -> ProtectedTip {tip_name;tip_value} in 
+                        (ptr, tip) <-- begin match Deque.rear lexical_path with Some (ptr, PublicClass tip_name) -> return (ptr, PublicTip {tip_name;tip_value})
+                                                                              | Some (ptr, ProtectedClass tip_name) -> return (ptr, ProtectedTip {tip_name;tip_value})
+                                                                              | None -> Report.do_ ; log{level=Error;where=none;what="Empty lexical path found. Error."};fail
+                                                                                                                                                                           
+                                       end;             
                         add tip ptr ;
                         prepare_recursive scopes r
                                           
@@ -474,6 +540,7 @@ let rec do_normalize all count scopes r = function
                    do_normalize all count scopes r [l]
                 | x::r ->
                    (* handle a recursive scc *)
+                   BatLog.logf "Preparing a recursive group with %d entries\n" (List.length x) ;
                    Report.do_ ;
                    prepare_recursive scopes x ;
                    do_normalize all count scopes r x
@@ -490,9 +557,12 @@ let name = function
 let global_scope start = List.map (fun td -> {scope_name=[];scope_tainted=false;scope_entries=StrMap.singleton ((name td.commented).txt) (name td.commented)}) start
 
 let normalize top = 
-    let deps = scan_dependencies (global_scope top) top in
-    let scopes = List.fold_left (fun m {kontext_label;scope} -> LabelMap.add kontext_label scope m) LabelMap.empty deps in
-    let sccs = topological_order deps in
-    let length = List.fold_left (fun s l -> s + (List.length l)) 0 sccs in
-    let state = {messages = []; input = ClassTrans.translate_topdefs top; output = Normalized.empty_class_body} in    
-    Report.run (Report.do_ ; do_normalize length 0 scopes sccs [] ; output) state
+  BatLog.logf "Starting class-language normalization.\n" ;
+  let deps = scan_dependencies (global_scope top) top in
+  let scopes = List.fold_left (fun m {kontext_label;scope} -> LabelMap.add kontext_label scope m) LabelMap.empty deps in
+  let sccs = topological_order deps in
+  let length = List.fold_left (fun s l -> s + (List.length l)) 0 sccs in
+  let state = {messages = []; input = ClassTrans.translate_topdefs top; output = Normalized.empty_class_body} in    
+  let o = Report.run (Report.do_ ; do_normalize length 0 scopes sccs [] ; output) state in
+  BatLog.logf "Finished class-language normalization.\n" ;
+  o
