@@ -97,7 +97,7 @@ type scanner_result = {
 }
 
 let builtin = function
-  | "Complex" | "ExternalObject" | "String" | "Real" | "Boolean" | "Integer" -> true
+  | "ExternalObject" | "String" | "Real" | "Boolean" | "Integer" -> true
   | _ -> false
 
 let rec last x = function [] -> x | x::xs -> last x xs
@@ -339,7 +339,8 @@ let topological_order deps =
   
   let add_to_graph g { kontext_label ; dependencies } =
     let g' = add_downwards_dependency g kontext_label in
-    List.fold_left (add_dependency_edges kontext_label) g' dependencies
+    let g'' = LexicalDepGraph.add_vertex g' kontext_label in
+    List.fold_left (add_dependency_edges kontext_label) g'' dependencies
   in    
   
   let g = List.fold_left add_to_graph LexicalDepGraph.empty deps in
