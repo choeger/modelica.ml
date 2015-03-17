@@ -90,12 +90,9 @@ module Normalized = struct
                        | Enumeration of StrSet.t
                        | Function of function_struct
                        | Class of object_struct
-                       | Replaceable of replaceable_value
                        | Delayed of delayed_value
                                       [@@deriving show,yojson]
 
-     and replaceable_value = { current : class_value ; replaceable_body : class_term ; replaceable_env : Class_deps.scope [@opaque] }
-                                           
      and delayed_value = { environment : Class_deps.scope [@opaque] ; expression : class_term [@opaque]; def_label : DS.name }
                                   
      and array_struct = { element : class_value ; dimensions : int } 
@@ -112,7 +109,10 @@ module Normalized = struct
                          l2_connectivity : connectivity ;
                          l2_type : class_value }
                         
-     and type_annotation = SimpleType of class_value | Level2Type of level2_type | UnknownType
+     and type_annotation = SimpleType of class_value | Level2Type of level2_type | UnknownType | Replaceable of replaceable_value
+                           
+     and replaceable_value = { current : type_annotation ; replaceable_body : class_term ; replaceable_env : Class_deps.scope [@opaque] }
+                                           
 
     let default_level2 l2_type = {l2_variability=Constant; l2_causality=Acausal; l2_connectivity=Potential; l2_type}
                                                                                      
@@ -123,6 +123,10 @@ module Normalized = struct
     let empty_class = Class empty_class_body
 
     let empty_class_ta = SimpleType empty_class
+
+    let state_select = Enumeration (StrSet.of_list ["never";"default";"avoid";"prefer";"always"])
+
+    let state_select_ta = SimpleType state_select 
   end
                                                                                            
 

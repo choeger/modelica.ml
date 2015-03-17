@@ -46,12 +46,15 @@ type prefix_found = { found : name ; not_found : name }
 
 let show_prefix_found {found; not_found} = "No element named " ^ (name2str not_found) ^ " in " ^ (name2str found)
                       
-type found_class = { found_value : Normalized.class_value ; found_visible : bool }
-                      
+type found_class = { found_value : Normalized.type_annotation ; found_visible : bool }
+
+type found_replaceable = { fr_self : Normalized.object_struct ; fr_visible : bool ; fr_def : class_term ; fr_scope : scope ; fr_current : Normalized.type_annotation }
+                     
 type lookup_result = Found of found_class
+                   | FoundReplaceable of found_replaceable
                    | NothingFound of name
                    | PrefixFound of prefix_found
-
+                                      
 type unresolved_dependency = { searching : name ; partial_result : prefix_found ; dependency : kontext_label }
                                
 let fail_unresolved {searching; partial_result; dependency} = Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "Dependency %s not evaluated:\n%s\n" (label2str dependency) (show_prefix_found partial_result)} ; fail
@@ -89,7 +92,7 @@ let simplify =
      return l2_type
 
 let value_of = function
-  | Found{found_value} -> return (Normalized.SimpleType found_value)
+  | Found{found_value} -> return found_value
   | _ as f -> Report.do_ ; log{where=none;level=Error;what=result2str f}; fail
             
 (* TODO: guard against circular evaluation/repeat until value *)
@@ -113,7 +116,7 @@ and eval_flagged scope f flagged =
                | SimpleType t -> 
                   return (Level2Type (f (default_level2 t)))
   end                                         
-
+                                                                               
 and eval scope = function
   | PClass {class_sort; public; protected} -> Report.do_ ;
                                               protected <-- eval_elements scope protected ;
@@ -124,12 +127,13 @@ and eval scope = function
   | Reference [] -> Report.do_ ;
                     log {where=none; level=Error ; what="Empty name found. Probably a bug."} ;
                     fail
+  | Reference [{txt="StateSelect"}] -> return (Normalized.state_select_ta)
+
                       
   | PInt -> return (Normalized.SimpleType Int)
   | PReal -> return (Normalized.SimpleType Real)
   | PString -> return (Normalized.SimpleType String)
   | PBool -> return (Normalized.SimpleType Bool)
-  | PEnumeration ls -> return (Normalized.SimpleType (Enumeration ls))
   | Reference (x::xs) -> Report.do_ ; f <-- start_lookup scope x xs ; value_of f
   | RootReference n -> Report.do_ ;
                        g <-- output ; 
@@ -152,6 +156,16 @@ and eval scope = function
   | PCon {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_connectivity = Normalized.con_from_ast flag}) flagged                            
   | PVar {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_variability = Normalized.var_from_ast flag}) flagged
 
+  | PSort {defined_sort=Connector; rhs} -> Report.do_ ;
+                                           v <-- eval scope rhs ;
+                                           let open Normalized in
+                                           begin
+                                             match v with
+                                               SimpleType cv -> return (Level2Type {l2_type=cv; l2_variability=Continuous; l2_causality=Acausal; l2_connectivity=Potential})
+                                             | Level2Type l2 -> return (Level2Type {l2 with l2_variability=Continuous})
+                                             | UnknownType -> Report.do_ ; log{level=Warning; where=none; what="Unknown type"} ; return UnknownType
+                                           end
+                                             
   | PSort {defined_sort; rhs} -> Report.do_ ;
                                  v <-- eval scope rhs ;
                                  let open Normalized in
@@ -169,8 +183,7 @@ and eval scope = function
                         let open Normalized in
                         match v with
                           UnknownType -> return UnknownType
-                        | SimpleType current -> return (SimpleType (Replaceable {current; replaceable_body=t; replaceable_env=scope}))
-                        | Level2Type l2 -> return (Level2Type {l2 with l2_type = Replaceable {current=l2.l2_type; replaceable_body=t; replaceable_env=scope}})
+                        | (SimpleType _ | Level2Type _) as current -> return (Replaceable {current; replaceable_body=t; replaceable_env=scope})
                       end             
   (* ignore empty redeclarations *)
   | StrictRedeclaration {rd_lhs; rds = []} -> eval scope rd_lhs
@@ -190,21 +203,25 @@ and get_class_element_in {Normalized.class_members; super; static_fields; dynami
   else
     pickfirst_class (x::xs) super
 
-and get_class_element e p = match e with
-  | UnknownType -> Report.do_ ; log {level=Error;where=none;what=Printf.sprintf "Cannot resolve type '%s'" (name2str p)} ; fail 
+and get_class_element e p =
+  let open Normalized in 
+  match e with
+  | UnknownType -> Report.do_ ; log {level=Error;where=none;what=Printf.sprintf "Cannot resolve type '%s'" (name2str p)} ; fail
+  | Level2Type _ as found_value when p = [] -> return (Found {found_value; found_visible=true})
   | Level2Type _ -> Report.do_ ; log {level=Error;where=none;what=Printf.sprintf "Cannot resolve type '%s' from a level-2 type." (name2str p)} ; fail 
   | SimpleType cv -> get_class_element_st cv p
                                                                                                                                      
 and get_class_element_st e = function    
-    [] -> return (Found {found_value = e; found_visible=true})
+    [] -> return (Found {found_value = SimpleType e; found_visible=true})
   | x::xs -> begin
       match e with
-      | Class {protected;public} ->
+      | Class ({protected;public} as fr_self) ->
          Report.do_ ;
          f <--  get_class_element_in public x xs ;
          begin
            match f with
              NothingFound _ -> get_class_element_in protected x xs
+           | Found {found_value=Replaceable r; found_visible} -> return (FoundReplaceable {fr_self; fr_current=r.current; fr_visible=found_visible; fr_scope=r.replaceable_env; fr_def=r.replaceable_body})
            | _ as r -> return r
          end
       | Delayed d -> begin
@@ -241,8 +258,11 @@ and lookup prefix suffix = function
      begin
        Report.do_ ; e <-- output ; f <-- get_class_element_st (Class e) (List.rev p) ;
        match f with
-       | Found {found_value;found_visible} -> begin
-           Report.do_ ; f' <-- get_class_element_st found_value (prefix::suffix) ;
+       (* TODO: fix for short-hand extends *)
+       | Found {found_value=Replaceable _} | FoundReplaceable _ -> Report.do_ ; log{level=Error;where=none;what="Cannot inherit replaceable class.\n"};fail
+
+       | Found {found_value=(SimpleType st | Level2Type {l2_type=st}) ; found_visible} -> begin
+           Report.do_ ; f' <-- get_class_element_st st (prefix::suffix) ;
            match f' with
            | NothingFound _ -> lookup prefix suffix srcs
            | PrefixFound pf -> return (PrefixFound pf)
@@ -258,7 +278,7 @@ and lookup prefix suffix = function
        match f with
        | Found {found_visible=false} -> Report.do_ ; log{level=Error;where=prefix.loc;what=Printf.sprintf "%s (= %s) is protected." prefix.txt (name2str p)} ; fail
        | Found {found_value} -> begin
-           Report.do_ ; f' <-- get_class_element_st found_value suffix ;
+           Report.do_ ; f' <-- get_class_element found_value suffix ;
            
            match f' with
              NothingFound _ -> return (PrefixFound { found = [prefix]; not_found = suffix })
@@ -295,7 +315,7 @@ let rec find_static_name lexical_def acc = function
                            None -> begin
                              match StrMap.Exceptionless.find x.txt protected.class_members  with
                                None -> None
-                             | Some e -> find_static_name e (Deque.snoc acc (PublicClass x.txt)) r
+                             | Some e -> find_static_name e (Deque.snoc acc (ProtectedClass x.txt)) r
                            end
                          | Some e -> find_static_name e (Deque.snoc acc (PublicClass x.txt)) r
                        end
@@ -340,7 +360,7 @@ let rec apply_merge (os:Normalized.object_struct) = function
      return {os with public = {os.public with class_members = StrMap.add tip_name cv os.public.class_members}}
 
   | ProtectedTip {tip_name; tip_value} when StrMap.mem tip_name os.protected.class_members ->
-     Report.do_ ; cv <-- merge_classes (StrMap.find tip_name os.public.class_members) tip_value ;
+     Report.do_ ; cv <-- merge_classes (StrMap.find tip_name os.protected.class_members) tip_value ;
      (* we only pick the dynamic/static fields, types are already present *)
      return {os with protected = {os.protected with class_members = StrMap.add tip_name cv os.protected.class_members}}
             
@@ -449,7 +469,7 @@ let eval_label scope = function
            v <-- get_class_element_st (Class global) r ;
            
            match v with
-             Found {found_value; found_visible} -> add (PublicSuperClass found_value) lexical_path
+             Found {found_value=SimpleType st; found_visible=true} -> add (PublicSuperClass st) lexical_path
            | Found (_) -> Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "Illegal inheritance redeclaration of '%s' in %s" extended.txt (name2str parent)}; fail
            | _ -> Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "Unknown superclass '%s' in %s" extended.txt (name2str parent)}; fail
          end
@@ -530,7 +550,7 @@ let rec prepare_recursive scopes = function
                         add tip ptr ;
                         prepare_recursive scopes r
                                           
-                     | _ -> log{level=Error;where=none;what=Printf.sprintf "Expansion of '%s' failed." (name2str q)}; fail
+                     | _ -> Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "Expansion of '%s' failed." (name2str q)}; fail
                                                           
 
 let rec do_normalize all count scopes r = function
