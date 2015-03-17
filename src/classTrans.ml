@@ -39,27 +39,30 @@ open Batteries
        
 let attach_sort ct sort = PSort { rhs = ct ; defined_sort = sort }
 
+let make_replaceable {type_options} ct = if type_options.type_replaceable then PReplaceable ct else ct
+                                
 let empty_class_hierarchy = { class_members = StrMap.empty ; fields = StrMap.empty ; super = [] }
                                 
 let rec translate_tds = function
-  | Short tds -> (tds.td_name.txt, attach_sort (translate_texp tds.type_exp) tds.sort )
+  | Short tds -> (tds.td_name.txt, make_replaceable tds (attach_sort (translate_texp tds.type_exp) tds.sort ))
                                
-  | Composition tds -> (tds.td_name.txt, translate_comp tds.sort tds.type_exp)
+  | Composition tds -> (tds.td_name.txt, make_replaceable tds (translate_comp tds.sort tds.type_exp))
                             
-  | Enumeration tds -> (tds.td_name.txt, attach_sort (PEnumeration (StrSet.of_list (List.map (fun {commented} -> commented) tds.type_exp))) tds.sort)
-  | OpenEnumeration tds -> (tds.td_name.txt, attach_sort (PEnumeration (StrSet.empty)) tds.sort)
-  | DerSpec tds -> (tds.td_name.txt, attach_sort (PDer tds.type_exp) tds.sort)
+  | Enumeration tds -> let ct = attach_sort (PEnumeration (StrSet.of_list (List.map (fun {commented} -> commented) tds.type_exp))) tds.sort in (tds.td_name.txt, make_replaceable tds ct)
+  | OpenEnumeration tds -> let ct = attach_sort (PEnumeration (StrSet.empty)) tds.sort in (tds.td_name.txt, make_replaceable tds ct)
+  | DerSpec tds -> let ct = attach_sort (PDer tds.type_exp) tds.sort in (tds.td_name.txt, make_replaceable tds ct)
   | Extension tds ->
      let comp,mo = tds.type_exp in
      let ct = translate_comp tds.sort comp in
-     match mo with Some m -> 
-                   (tds.td_name.txt, translate_strict_redeclarations ct m)
-                 | None -> (tds.td_name.txt, ct)
+     let ct' = match mo with Some m -> translate_strict_redeclarations ct m
+                           | None -> ct
+     in
+     (tds.td_name.txt, PReplaceable ct')
 
 and translate_topdefs tds = PClass {public = {class_members = StrMap.of_enum (Enum.map translate_typedef (List.enum tds)); super=[]; fields=StrMap.empty}; protected = empty_class_hierarchy ; class_sort=Package}
                                    
 and translate_typedef td = translate_tds td.commented
-                                   
+                                  
 and translate_extends {ext_type} = translate_texp ext_type
 
 and translate_def_struct 

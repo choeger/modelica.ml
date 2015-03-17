@@ -100,7 +100,7 @@ module Normalized = struct
      and object_struct = { object_sort : sort ; public : elements_struct ; protected : elements_struct }
                                                                  
      and elements_struct = { class_members : type_annotation StrMap.t ; super : class_value list ;
-                             dynamic_fields : type_annotation StrMap.t ; static_fields : class_value StrMap.t }
+                             dynamic_fields : type_annotation StrMap.t ; static_fields : type_annotation StrMap.t }
                              
      and function_struct = { inputs : (string * class_value) StrMap.t ; outputs : class_value list }
 
@@ -131,6 +131,23 @@ module Normalized = struct
     let external_object = ProtoExternalObject
 
     let external_object_ta = SimpleType external_object
+
+    let rec invalidate_replaceable_elements {class_members; super; dynamic_fields; static_fields} =
+      {super = List.map invalidate_replaceables super ;
+       class_members = StrMap.map invalidate_replaceables_ta class_members ;
+       dynamic_fields = StrMap.map invalidate_replaceables_ta dynamic_fields ;
+       static_fields = StrMap.map invalidate_replaceables_ta static_fields }
+
+    and invalidate_replaceables_os os = {os with public = invalidate_replaceable_elements os.public ; protected = invalidate_replaceable_elements os.protected}
+        
+    and invalidate_replaceables = function
+        Class os -> Class (invalidate_replaceables_os os)
+      | p -> p
+
+    and invalidate_replaceables_ta = function
+        Replaceable r -> Replaceable {r with current = UnknownType}
+      | ta -> ta
+               
   end
                                                                                            
 

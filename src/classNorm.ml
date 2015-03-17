@@ -48,7 +48,7 @@ let show_prefix_found {found; not_found} = "No element named " ^ (name2str not_f
                       
 type found_class = { found_value : Normalized.type_annotation ; found_visible : bool }
 
-type found_replaceable = { fr_self : Normalized.object_struct ; fr_visible : bool ; fr_def : class_term ; fr_scope : scope ; fr_current : Normalized.type_annotation }
+type found_replaceable = { fr_path : name ; fr_current : Normalized.type_annotation }
                      
 type lookup_result = Found of found_class
                    | FoundReplaceable of found_replaceable
@@ -65,8 +65,9 @@ exception EvaluationException of string
 exception UnresolvedDependency of unresolved_dependency
                                     
 let result2str = function Found _ -> "OK"
-               | PrefixFound pf -> show_prefix_found pf 
-               | NothingFound name -> "No path to " ^ (name2str name)
+                        | FoundReplaceable {fr_path} -> "(indirectly) replaceable " ^ (name2str fr_path)
+                        | PrefixFound pf -> show_prefix_found pf 
+                        | NothingFound name -> "No path to " ^ (name2str name)
                                                         
 let unfolding = ref 0 
 
@@ -74,8 +75,8 @@ exception UnfoldingException
 
 let rec filter_static = let open Normalized in function
     [] -> []
-  | (k,SimpleType (Function f))::ts -> (k,Function f) :: (filter_static ts)
-  | (k,Level2Type t)::ts when t.l2_variability = Constant -> (k,t.l2_type) :: (filter_static ts)
+  | (k,SimpleType (Function f))::ts -> (k, SimpleType (Function f)) :: (filter_static ts)
+  | (k,Level2Type t)::ts when t.l2_variability = Constant -> (k, SimpleType t.l2_type) :: (filter_static ts)
   | (k,v)::ts -> (filter_static ts)
 
 let simplify =
@@ -90,14 +91,10 @@ let simplify =
      if_ (l2_causality != Acausal) (log {level=Warning;where=none;what="Causality ignored in inheritance."});
      if_ (l2_connectivity != Potential) (log {level=Warning;where=none;what="Connectivity ignored in inheritance."});
      return l2_type
-
-let value_of = function
-  | Found{found_value} -> return found_value
-  | _ as f -> Report.do_ ; log{where=none;level=Error;what=result2str f}; fail
             
 (* TODO: guard against circular evaluation/repeat until value *)
 let rec unfold {Normalized.environment; expression; def_label} = Report.do_ ;
-                                                                 v <-- eval Normalized.empty_class_body environment expression ;
+                                                                 v <-- eval Normalized.empty_class environment expression ;
                                                                  return v                                                      
     
 and eval_elements self scope {fields} = Report.do_ ;
@@ -116,7 +113,37 @@ and eval_flagged self scope f flagged =
                | SimpleType t -> 
                   return (Level2Type (f (default_level2 t)))
   end                                         
-                                                                               
+
+and update_replaceable_elements self scope {Normalized.class_members; super; dynamic_fields ; static_fields} =
+  let upd = update_replaceables self scope in
+  let open Normalized in
+  Report.do_ ;
+  class_members <-- on_strMap_values upd class_members ;
+  super <-- on_sequence (update_replaceable_cv self scope) super ;
+  dynamic_fields <-- on_strMap_values upd dynamic_fields ;
+  static_fields <-- on_strMap_values upd static_fields ;  
+  return {class_members ; super ; dynamic_fields ; static_fields }   
+
+and update_replaceable_cv self scope =
+  let open Normalized in
+  function    
+    Class os ->
+     Report.do_;
+     public <-- update_replaceable_elements self scope os.public;
+     protected <-- update_replaceable_elements self scope os.protected;
+     return (Class {os with public ; protected })
+  | p -> return p
+           
+and update_replaceables self scope =
+  let open Normalized in
+  function
+  | Replaceable r -> Report.do_ ; current <-- eval self r.replaceable_env r.replaceable_body ; return (Replaceable {r with current})
+  | SimpleType cv ->
+     Report.do_;
+     v <-- update_replaceable_cv self scope cv ;
+     return (SimpleType v)            
+  | p -> return p
+    
 and eval self scope = function
   | PClass {class_sort; public; protected} -> Report.do_ ;
                                               protected <-- eval_elements self scope protected ;
@@ -130,16 +157,44 @@ and eval self scope = function
   | Reference [{txt="StateSelect"}] -> return (Normalized.state_select_ta)
   | Reference [{txt="ExternalObject"}] -> return (Normalized.external_object_ta)
 
+  | Reference (x::xs) ->
+     (* take into account lexical and dynamical ('self') scope *)
+     Report.do_ ;
+     (* dynamical lookup *)
+     f <-- get_class_element_st self (x::xs) ;
+     begin
+       let open Normalized in
+       match f with
+       | Found {found_value=Replaceable {current=UnknownType; replaceable_body; replaceable_env}} -> eval self replaceable_env replaceable_body
+       | Found {found_value=Replaceable {current}} -> return current
+       | FoundReplaceable {fr_path;fr_current=UnknownType} -> eval self scope (Reference fr_path)
+       | FoundReplaceable {fr_current} -> return fr_current                                               
+       | NothingFound _ -> Report.do_ ; f <-- start_lookup scope x xs ; begin
+                               (* lexical lookup *)
+                               match f with                               
+                               | FoundReplaceable {fr_current; fr_path} -> return (Replaceable {current=fr_current; replaceable_body=Reference fr_path; replaceable_env=scope})
+                               | Found{found_value} -> return found_value
+                               | _ -> Report.do_ ; log{where=none;what=result2str f; level=Error}; fail
+                             end
+       | Found{found_value} -> return found_value
+     end
+       
+  | RootReference n -> Report.do_ ;
+                       g <-- output ; 
+                       f <-- get_class_element_st (Normalized.Class g) n ;
+                       begin
+                         (* do not care about global replaceables, there is no way to redeclare them *)
+                         match f with
+                         | Found {found_value=Replaceable {current}} -> return current
+                         | FoundReplaceable {fr_current} -> return fr_current                                               
+                         | Found{found_value} -> return found_value
+                         | _ -> Report.do_ ; log{where=none;what=result2str f; level=Error}; fail
+                       end
                       
   | PInt -> return (Normalized.SimpleType Int)
   | PReal -> return (Normalized.SimpleType Real)
   | PString -> return (Normalized.SimpleType String)
   | PBool -> return (Normalized.SimpleType Bool)
-  | Reference (x::xs) -> Report.do_ ; f <-- start_lookup scope x xs ; value_of f
-  | RootReference n -> Report.do_ ;
-                       g <-- output ; 
-                       f <-- get_class_element_st (Normalized.Class g) n ;
-                       value_of f
 
   | PExternalObject -> return (Normalized.SimpleType ProtoExternalObject)
 
@@ -193,6 +248,30 @@ and eval self scope = function
   (* ignore empty redeclarations *)
   | StrictRedeclaration {rd_lhs; rds = []} -> eval self scope rd_lhs
   | Redeclaration {rd_lhs; rds = []} -> eval self scope rd_lhs
+
+  | Redeclaration {rd_lhs; rds} ->
+     (* A redeclaration is handled as follows: First, the left-hand-side is evaluated,
+        second, the redeclared element has to be found (not yet implemented). Third, the replaceable elements are invalidated 
+        (possible optimization: Only invalidate dependencies). Finally, all replaceable elements are
+        updated again *)
+     let open Normalized in
+     let append os = function         
+         ClassMember {rd_name; rd_rhs} -> {os with public = {os.public with class_members = StrMap.add rd_name (Replaceable {current=UnknownType; replaceable_env = scope; replaceable_body=rd_rhs}) os.public.class_members}}
+       | Field {rd_name; rd_rhs} -> {os with public = {os.public with dynamic_fields = StrMap.add rd_name (Replaceable {current=UnknownType; replaceable_env = scope; replaceable_body=rd_rhs}) os.public.dynamic_fields}}
+     in
+     
+     Report.do_ ;
+     v <-- eval self scope rd_lhs ;     
+     begin match v with
+             SimpleType (Class os) ->             
+             (* add redeclarations to class body *)
+             let os' = List.fold_left append (invalidate_replaceables_os os) rds in
+             Report.do_ ;
+             cv <-- update_replaceable_cv (Class os') scope (Class os') ;
+             return (SimpleType cv)
+                                      
+           | _ -> Report.do_; log{where=none;level=Error;what="Cannot redeclare element in non-class"}; fail
+     end
                                         
   | _ as e -> Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "'%s' not yet implemented" (show_class_term e)}; fail
 
@@ -203,6 +282,10 @@ and get_class_element_in {Normalized.class_members; super; static_fields; dynami
       match r with
         NothingFound name -> return (PrefixFound {not_found=name; found = [x]})
       | PrefixFound p -> return (PrefixFound {p with found = x::p.found})
+      | Found {found_value=Replaceable r; found_visible} -> return (FoundReplaceable {fr_current=r.current; fr_path = x::xs})
+      | FoundReplaceable {fr_current} ->
+         BatLog.logf "Lifting a replaceable value to %s\n" (name2str (x::xs));
+         return (FoundReplaceable {fr_current; fr_path = x::xs})
       | r -> return r
     end
   else
@@ -211,6 +294,16 @@ and get_class_element_in {Normalized.class_members; super; static_fields; dynami
 and get_class_element e p =
   let open Normalized in 
   match e with
+  | Replaceable {current} ->
+     Report.do_;
+     f <-- get_class_element current p ;
+     begin
+     match f with
+     | Found {found_value} -> BatLog.logf "Found a replaceable value at: %s\n" (name2str p) ; return (FoundReplaceable {fr_current = found_value; fr_path = p})
+     | FoundReplaceable {fr_current} -> return (FoundReplaceable {fr_current; fr_path = p})
+     | _ -> return f
+     end
+       
   | UnknownType -> Report.do_ ; log {level=Error;where=none;what=Printf.sprintf "Cannot resolve type '%s'" (name2str p)} ; fail
   | Level2Type _ as found_value when p = [] -> return (Found {found_value; found_visible=true})
   | Level2Type _ -> Report.do_ ; log {level=Error;where=none;what=Printf.sprintf "Cannot resolve type '%s' from a level-2 type." (name2str p)} ; fail 
@@ -220,13 +313,12 @@ and get_class_element_st e = function
     [] -> return (Found {found_value = SimpleType e; found_visible=true})
   | x::xs -> begin
       match e with
-      | Class ({protected;public} as fr_self) ->
+      | Class {protected;public} ->
          Report.do_ ;
-         f <--  get_class_element_in public x xs ;
+         f <-- get_class_element_in public x xs ;
          begin
            match f with
              NothingFound _ -> get_class_element_in protected x xs
-           | Found {found_value=Replaceable r; found_visible} -> return (FoundReplaceable {fr_self; fr_current=r.current; fr_visible=found_visible; fr_scope=r.replaceable_env; fr_def=r.replaceable_body})
            | _ as r -> return r
          end
       | Delayed d -> begin
@@ -288,6 +380,7 @@ and lookup prefix suffix = function
            match f' with
              NothingFound _ -> return (PrefixFound { found = [prefix]; not_found = suffix })
            | PrefixFound {found; not_found} -> return (PrefixFound {found = prefix::found ; not_found})
+           | FoundReplaceable {fr_current} -> return (FoundReplaceable {fr_current; fr_path=prefix::suffix})
            | r -> return r
          end
        | PrefixFound partial_result -> fail_unresolved { searching = prefix::suffix ; partial_result ; dependency = Path p }
@@ -340,10 +433,11 @@ type merge_ptr = VoidTip
 
 and merge_class = { class_name : string ; current_value : Normalized.object_struct [@opaque] ; next : merge_ptr } [@@deriving show]
 
-let structure = let open Normalized in
-                function    
-                | SimpleType (Class os) -> return os
-                | _ -> log{where=none;level=Error;what="Merge failed in non-structure"}; fail
+let rec structure = let open Normalized in
+                    function    
+                    | SimpleType (Class os) -> return os
+                    | Replaceable {current} -> (structure current)
+                    | _ -> Report.do_; log{where=none;level=Error;what="Merge failed in non-structure"}; fail
 
 let merge_classes cv_old cv_new =
   let open Normalized in 
@@ -433,8 +527,9 @@ let add tip ptr =
              
 let rec lexical_class_body = function
     (StrictRedeclaration {rd_lhs} | Redeclaration {rd_lhs}) -> lexical_class_body rd_lhs
+  | PReplaceable c -> lexical_class_body c
   | PClass b -> return b
-  | _ -> log{level=Error;where=none;what="Internal error. Got superclass but cannot find class body."};fail
+  | c -> Report.do_ ; log{level=Error;where=none;what="Internal error. Got superclass but cannot find class body. Instead: " ^ (show_class_term c)};fail
              
 let eval_label scope = function
     Path(x::p) ->
@@ -448,7 +543,7 @@ let eval_label scope = function
       | Some {lexical_path; lexical_def} ->
          Report.do_ ;
          (* if the body is a hierarchy, it is an empty one and we only have to add the name *)
-         tip_value <-- eval Normalized.empty_class_body scope lexical_def ;
+         tip_value <-- eval Normalized.empty_class scope lexical_def ;
          (rest,tip) <-- begin
              match Deque.rear lexical_path with Some (r, PublicClass tip_name) -> return (r, PublicTip {tip_name;tip_value})
                                               | Some (r, ProtectedClass tip_name) -> return (r, ProtectedTip {tip_name;tip_value})
@@ -496,17 +591,18 @@ let eval_label scope = function
 
              let eval_public_super s =
                Report.do_ ; 
-               v <-- eval Normalized.empty_class_body scope s ;
+               v <-- eval Normalized.empty_class scope s ;
                s <-- simplify v;
                let tip = PublicSuperClass s in
                add tip lexical_path
              in
 
-             let eval_protected_super s = Report.do_ ; 
-                                          v <-- eval Normalized.empty_class_body scope s ;
-                                          s <-- simplify v ;
-                                          let tip = ProtectedSuperClass s in
-                                          add tip lexical_path
+             let eval_protected_super s =
+               Report.do_ ; 
+               v <-- eval Normalized.empty_class scope s ;
+               s <-- simplify v ;
+               let tip = ProtectedSuperClass s in
+               add tip lexical_path
              in
 
              miter eval_public_super public.super ;
