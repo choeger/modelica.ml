@@ -396,6 +396,8 @@ let test_cases = [
                                               comment = unannotated ( Some (nl "comment") ) ;
                                             } );
   
+  typedef "record A end A" (uncommented (Composition {empty_typedef with td_name =nl"A" ; sort=Record; type_exp = empty_composition})) ;
+  
   typedef "partial model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                type_exp = empty_composition;
                                                                                sort = Model ;

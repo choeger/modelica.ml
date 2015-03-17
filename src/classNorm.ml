@@ -348,8 +348,11 @@ let merge_classes cv_old cv_new =
   Report.do_ ;
   os' <-- structure cv_new ;
   os'' <-- structure cv_old ;
-  return (SimpleType (Class {os'' with public = {os''.public with static_fields = os'.public.static_fields ; dynamic_fields = os'.public.dynamic_fields } ;
-                                       protected = {os''.protected with static_fields = os'.protected.static_fields ; dynamic_fields = os'.protected.dynamic_fields }
+  (* we only pick the dynamic/static fields and sort, types and superclasses are already present *)
+  return (SimpleType (Class {os'' with
+                              object_sort = os'.object_sort ;
+                              public = {os''.public with static_fields = os'.public.static_fields ; dynamic_fields = os'.public.dynamic_fields } ;
+                              protected = {os''.protected with static_fields = os'.protected.static_fields ; dynamic_fields = os'.protected.dynamic_fields }
                             }))
                                                                                            
 let rec apply_merge (os:Normalized.object_struct) = function
@@ -359,13 +362,11 @@ let rec apply_merge (os:Normalized.object_struct) = function
   (* merge tips when already present *)
   | PublicTip {tip_name; tip_value} when StrMap.mem tip_name os.public.class_members ->
      Report.do_ ; cv <-- merge_classes (StrMap.find tip_name os.public.class_members) tip_value ;
-     (* we only pick the dynamic/static fields, types are already present *)
      return {os with public = {os.public with class_members = StrMap.add tip_name cv os.public.class_members}}
 
   | ProtectedTip {tip_name; tip_value} when StrMap.mem tip_name os.protected.class_members ->
      Report.do_ ; cv <-- merge_classes (StrMap.find tip_name os.protected.class_members) tip_value ;
-     (* we only pick the dynamic/static fields, types are already present *)
-     return {os with protected = {os.protected with class_members = StrMap.add tip_name cv os.protected.class_members}}
+     return {os with  protected = {os.protected with class_members = StrMap.add tip_name cv os.protected.class_members}}
             
   (* Direct overwrite every other tip *)
   | PublicTip {tip_name; tip_value} -> return {os with public = {os.public with class_members = StrMap.add tip_name tip_value os.public.class_members}}

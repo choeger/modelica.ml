@@ -70,7 +70,7 @@ let test_cases = [
     class_ "class M Real x; end M" {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "M" class_M}} ;
     class_ "class A class M Real x; end M; end A" {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "A" class_with_public_M}} ;
     class_ "class A protected class M Real x; end M; end A" {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "A" class_with_protected_M}} ;
-
+    class_ "record A end A" {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "A" (SimpleType (Class {empty_class_body with object_sort = Ast.Flags.Record})) }} ;
   ]
                                                 
 let suite = "Normalization" >::: test_cases
