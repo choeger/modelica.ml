@@ -127,6 +127,10 @@ module Normalized = struct
     let state_select = Enumeration (StrSet.of_list ["never";"default";"avoid";"prefer";"always"])
 
     let state_select_ta = SimpleType state_select 
+
+    let external_object = ProtoExternalObject
+
+    let external_object_ta = SimpleType external_object
   end
                                                                                            
 

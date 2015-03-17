@@ -97,18 +97,18 @@ let value_of = function
             
 (* TODO: guard against circular evaluation/repeat until value *)
 let rec unfold {Normalized.environment; expression; def_label} = Report.do_ ;
-                                                                 v <-- eval environment expression ;
+                                                                 v <-- eval Normalized.empty_class_body environment expression ;
                                                                  return v                                                      
     
-and eval_elements scope {fields} = Report.do_ ;
-                                   (* only evaluate the fields, local and superclasses have been handled by the label-evaluation *)
-                                   dynamic_fields <-- Report.on_strMap_values (eval scope) fields ;
-                                   let static_fields = StrMap.of_list (filter_static (StrMap.bindings dynamic_fields)) in
-                                   return {Normalized.class_members = StrMap.empty; super = []; dynamic_fields; static_fields}
+and eval_elements self scope {fields} = Report.do_ ;
+                                        (* only evaluate the fields, local and superclasses have been handled by the label-evaluation *)
+                                        dynamic_fields <-- Report.on_strMap_values (eval self scope) fields ;
+                                        let static_fields = StrMap.of_list (filter_static (StrMap.bindings dynamic_fields)) in
+                                        return {Normalized.class_members = StrMap.empty; super = []; dynamic_fields; static_fields}
 
-and eval_flagged scope f flagged =
+and eval_flagged self scope f flagged =
   Report.do_ ;
-  v <-- eval scope flagged ;
+  v <-- eval self scope flagged ;
   let open Normalized in
   begin
     match v with UnknownType -> return UnknownType
@@ -117,10 +117,10 @@ and eval_flagged scope f flagged =
                   return (Level2Type (f (default_level2 t)))
   end                                         
                                                                                
-and eval scope = function
+and eval self scope = function
   | PClass {class_sort; public; protected} -> Report.do_ ;
-                                              protected <-- eval_elements scope protected ;
-                                              public <-- eval_elements scope public ;
+                                              protected <-- eval_elements self scope protected ;
+                                              public <-- eval_elements self scope public ;
                                               let open Normalized in
                                               return (SimpleType (Class {object_sort = class_sort ; public ; protected }))
 
@@ -128,6 +128,7 @@ and eval scope = function
                     log {where=none; level=Error ; what="Empty name found. Probably a bug."} ;
                     fail
   | Reference [{txt="StateSelect"}] -> return (Normalized.state_select_ta)
+  | Reference [{txt="ExternalObject"}] -> return (Normalized.external_object_ta)
 
                       
   | PInt -> return (Normalized.SimpleType Int)
@@ -150,17 +151,17 @@ and eval scope = function
            | Level2Type l2 -> Level2Type {l2 with l2_type = Array {element = l2.l2_type; dimensions}}
            | Replaceable r -> Replaceable {r with current = array_of_ta r.current}
      in
-     Report.do_ ; v <-- eval scope array_arg ;
+     Report.do_ ; v <-- eval self scope array_arg ;
      return (array_of_ta v)
 
   | PEnumeration es -> return (Normalized.SimpleType (Normalized.Enumeration es))
 
-  | PCau {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_causality = Normalized.cau_from_ast flag}) flagged
-  | PCon {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_connectivity = Normalized.con_from_ast flag}) flagged                            
-  | PVar {flag;flagged} -> eval_flagged scope (fun l2 -> {l2 with l2_variability = Normalized.var_from_ast flag}) flagged
+  | PCau {flag;flagged} -> eval_flagged self scope (fun l2 -> {l2 with l2_causality = Normalized.cau_from_ast flag}) flagged
+  | PCon {flag;flagged} -> eval_flagged self scope (fun l2 -> {l2 with l2_connectivity = Normalized.con_from_ast flag}) flagged                            
+  | PVar {flag;flagged} -> eval_flagged self scope (fun l2 -> {l2 with l2_variability = Normalized.var_from_ast flag}) flagged
 
   | PSort {defined_sort=Connector; rhs} -> Report.do_ ;
-                                           v <-- eval scope rhs ;
+                                           v <-- eval self scope rhs ;
                                            let open Normalized in
                                            begin
                                              match v with
@@ -170,7 +171,7 @@ and eval scope = function
                                            end
                                              
   | PSort {defined_sort; rhs} -> Report.do_ ;
-                                 v <-- eval scope rhs ;
+                                 v <-- eval self scope rhs ;
                                  let open Normalized in
                                  begin
                                    match v with
@@ -180,8 +181,9 @@ and eval scope = function
                                    | _ when defined_sort = Type -> return v
                                    | _ ->  Report.do_ ; log{level=Error; where=none; what=Printf.sprintf "Sort mismatch. This is not a %s but a type." (show_sort defined_sort)}; fail
                                  end
+
   | PReplaceable t -> Report.do_ ;
-                      v <-- eval scope t ;
+                      v <-- eval self scope t ;
                       begin
                         let open Normalized in
                         match v with
@@ -189,8 +191,8 @@ and eval scope = function
                         | (SimpleType _ | Level2Type _) as current -> return (Replaceable {current; replaceable_body=t; replaceable_env=scope})
                       end             
   (* ignore empty redeclarations *)
-  | StrictRedeclaration {rd_lhs; rds = []} -> eval scope rd_lhs
-  | Redeclaration {rd_lhs; rds = []} -> eval scope rd_lhs
+  | StrictRedeclaration {rd_lhs; rds = []} -> eval self scope rd_lhs
+  | Redeclaration {rd_lhs; rds = []} -> eval self scope rd_lhs
                                         
   | _ as e -> Report.do_ ; log{level=Error;where=none;what=Printf.sprintf "'%s' not yet implemented" (show_class_term e)}; fail
 
@@ -446,7 +448,7 @@ let eval_label scope = function
       | Some {lexical_path; lexical_def} ->
          Report.do_ ;
          (* if the body is a hierarchy, it is an empty one and we only have to add the name *)
-         tip_value <-- eval scope lexical_def ;
+         tip_value <-- eval Normalized.empty_class_body scope lexical_def ;
          (rest,tip) <-- begin
              match Deque.rear lexical_path with Some (r, PublicClass tip_name) -> return (r, PublicTip {tip_name;tip_value})
                                               | Some (r, ProtectedClass tip_name) -> return (r, ProtectedTip {tip_name;tip_value})
@@ -492,15 +494,16 @@ let eval_label scope = function
              add VoidTip lexical_path ;                          
              {public;protected} <-- lexical_class_body lexical_def ;
 
-             let eval_public_super v = Report.do_ ; 
-                                       v <-- eval scope lexical_def ;
-                                       s <-- simplify v;
-                                       let tip = PublicSuperClass s in
-                                       add tip lexical_path
+             let eval_public_super s =
+               Report.do_ ; 
+               v <-- eval Normalized.empty_class_body scope s ;
+               s <-- simplify v;
+               let tip = PublicSuperClass s in
+               add tip lexical_path
              in
 
-             let eval_protected_super v = Report.do_ ; 
-                                          v <-- eval scope lexical_def ;
+             let eval_protected_super s = Report.do_ ; 
+                                          v <-- eval Normalized.empty_class_body scope s ;
                                           s <-- simplify v ;
                                           let tip = ProtectedSuperClass s in
                                           add tip lexical_path
