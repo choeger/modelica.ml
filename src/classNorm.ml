@@ -141,14 +141,17 @@ and eval scope = function
                        value_of f
 
   | PExternalObject -> return (Normalized.SimpleType ProtoExternalObject)
+
   | PArray {array_arg; dimensions} ->
-     Report.do_ ; v <-- eval scope array_arg ;
      let open Normalized in
-     begin match v with
-             UnknownType -> return UnknownType
-           | SimpleType t -> return (SimpleType (Array {element= t; dimensions}))
-           | Level2Type l2 -> return (Level2Type {l2 with l2_type = Array {element = l2.l2_type; dimensions}})
-     end
+     let rec array_of_ta = function
+             UnknownType -> UnknownType
+           | SimpleType t -> SimpleType (Array {element= t; dimensions})
+           | Level2Type l2 -> Level2Type {l2 with l2_type = Array {element = l2.l2_type; dimensions}}
+           | Replaceable r -> Replaceable {r with current = array_of_ta r.current}
+     in
+     Report.do_ ; v <-- eval scope array_arg ;
+     return (array_of_ta v)
 
   | PEnumeration es -> return (Normalized.SimpleType (Normalized.Enumeration es))
 
