@@ -29,31 +29,20 @@
 open Sys
 open FileSystem
 open Pprint_modelica
-open Stats
 open Syntax
-open Class_deps
-open ClassNorm
-open Motypes
-open Report
 open Utils
 open Batteries
 open Location
+open ClassTrans       
+open ClassNorm
        
-let stats u =
-  let {def_count; type_count} = generate_stats u in
-  Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
-                                             
-let normalize u = ClassNorm.normalize u.toplevel_defs
-                                      
-let print_message msg = Printf.printf "%s\n" (show_message msg)
-  
 let _ =
   Format.pp_set_margin Format.str_formatter (140);
   match (scan_root argv.(1)) with
-  | {root_files = []; root_packages = []} -> Printf.eprintf "'%s' seems to contain no Modelica content.\n" argv.(1) ; 1
-  | root ->  let hier = normalize (merge_root root) in
-             Printf.printf "%d messages.\n" (List.length hier.final_messages) ;
-             List.iter print_message hier.final_messages ;                                              
-             0
+  | {root_units = []; root_packages = []} -> Printf.eprintf "'%s' seems to contain no Modelica content.\n" argv.(1) ; 1
+  | root -> begin match parse_root root with
+              Some root -> norm_pkg_root (translate_pkg_root root) ; 0
+            | None -> Printf.eprintf "Syntax Error\n" ; 1
+            end                                        
               
                   

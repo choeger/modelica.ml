@@ -28,36 +28,35 @@
 
 (** Filesystem related types and functions *)
 
-type package
+type scanned = string
+type parsed = {scanned : scanned ; parsed : Syntax.unit_}
 
-type pkg_root = {
-    root_files : string list ;
-    root_packages : package list;
+type 'stage package = {
+  pkg_name : string list;
+  sub_packages : ('stage package) list ;
+  external_units : 'stage list;
+  package_unit : 'stage;
+}
+            
+type 'stage pkg_root = {
+    root_units : 'stage list ;
+    root_packages : 'stage package list;
   }
 
-val scan_root : string -> pkg_root
+val parse : string -> Syntax.unit_ option
+(** Parse a Modelica source file *)
+                                   
+val scan_root : string -> scanned pkg_root
 (** Tries to scan the whole package root path *)
 
-val merge_root : pkg_root -> Syntax.unit_
-(** Parse the whole package root *)
-                            
-val package_name : package -> string list
-(** Yields the assumed name of the package.mo file *)
-       
-val package_mo : package -> string
-(** Yields the full path of the package.mo file *)
-
-val sub_packages : package -> package list
-(** Yields the (possibly empty) list of sub-packages *)                                      
-
-val source_files : package -> string list
-(** Yields the (possibly empty) list of included source files *)                               
-                                      
-val scan : string list -> string -> package option
+val parse_root : scanned pkg_root -> parsed pkg_root option
+(** Attempt to parse all source files in a package root *)
+                                  
+val parse_package : scanned package -> parsed package option
+(** Attempt to parse all source files in a package *)
+                                                                  
+val scan : string list -> string -> scanned package option
 (** Try to parse the diven directory as a Modelica package 
     Does not parse any files.
 *)
-                           
-val merge : package -> Syntax.unit_ option
-(** Create a virtual stored-definition from the package, containing all files and sub-packages *)
-    
+                               

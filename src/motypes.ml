@@ -30,124 +30,131 @@
 (**
  Modelica 3.x normalized types
  *)
+module StdFormat = Format
+open Batteries
+module Format = StdFormat
 open Utils
 open Ast.Flags
-
 module DS = Syntax
 
-type ('f,'e) flagged_struct = { flag : 'f; flagged : 'e } [@@deriving show,yojson]
-                                                                                                                                                                                    
-type class_term = Reference of DS.name
-                | RootReference of DS.name
-                | PReplaceable of class_term
-                | Redeclaration of redeclaration
-                | StrictRedeclaration of redeclaration
-                | PInt | PReal | PString | PBool | PExternalObject
-                | PArray of constr_array
-                | PClass of constr_class
-                | PEnumeration of StrSet.t
-                | PDer of DS.der_spec
-                | PSort of sort_defined_struct
-                | PVar of (variability, class_term) flagged_struct
-                | PCau of (causality, class_term) flagged_struct
-                | PCon of (connectivity, class_term) flagged_struct
-                                                     [@@deriving yojson,show]
+module Name = struct         
+  type t = string DQ.t [@@deriving show, yojson]
+                                                                                        
+  let str_compare a b = String.compare a b 
 
- and redeclaration = { rd_lhs : class_term ; rds : redeclared_element list }
-
- and redeclared_element = ClassMember of redecl_struct | Field of redecl_struct
-                       
- and redecl_struct = { rd_name : string ; rd_rhs : class_term }
-                       
- and sort_defined_struct = { defined_sort : sort ; rhs : class_term }
-                                                     
- and constr_class = { class_sort : sort ; public : hierarchy ; protected : hierarchy }
-                                                       
- and constr_array = { array_arg : class_term ; dimensions : int } 
-                                              
- and hierarchy = { class_members : class_term StrMap.t ; super : class_term list ; fields : class_term StrMap.t }                               
-
-module Normalized = struct
-
-    type variability = Constant | Discrete | Parameter | Continuous [@@deriving show,yojson]
-    type causality = Input | Output | Acausal [@@deriving show,yojson]
-    type connectivity = Flow | Stream | Potential [@@deriving show,yojson]                                                     
-
-    let cau_from_ast =
-      function Ast.Flags.Input -> Input
-             | Ast.Flags.Output -> Output
-    let var_from_ast =
-      function Ast.Flags.Constant -> Constant
-             | Ast.Flags.Parameter -> Parameter
-             | Ast.Flags.Discrete -> Discrete
-    let con_from_ast =
-      function Ast.Flags.Flow -> Flow
-             | Ast.Flags.Stream -> Stream
-    
-    type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
-                       | Array of array_struct
-                       | ExternalObject of class_value StrMap.t
-                       | Enumeration of StrSet.t
-                       | Function of function_struct
-                       | Class of object_struct
-                       | Delayed of delayed_value
-                                      [@@deriving show,yojson]
-
-     and delayed_value = { environment : Class_deps.scope [@opaque] ; expression : class_term [@opaque]; def_label : DS.name }
-                                  
-     and array_struct = { element : class_value ; dimensions : int } 
-
-     and object_struct = { object_sort : sort ; public : elements_struct ; protected : elements_struct }
-                                                                 
-     and elements_struct = { class_members : type_annotation StrMap.t ; super : class_value list ;
-                             dynamic_fields : type_annotation StrMap.t ; static_fields : type_annotation StrMap.t }
-                             
-     and function_struct = { inputs : (string * class_value) StrMap.t ; outputs : class_value list }
-
-     and level2_type = { l2_variability : variability ;
-                         l2_causality : causality ;
-                         l2_connectivity : connectivity ;
-                         l2_type : class_value }
-                        
-     and type_annotation = SimpleType of class_value | Level2Type of level2_type | UnknownType | Replaceable of replaceable_value
-                           
-     and replaceable_value = { current : type_annotation ; replaceable_body : class_term ; replaceable_env : Class_deps.scope [@opaque] }
-                                           
-
-    let default_level2 l2_type = {l2_variability=Constant; l2_causality=Acausal; l2_connectivity=Potential; l2_type}
-                                                                                     
-    let empty_elements = {class_members = StrMap.empty ; super = []; dynamic_fields=StrMap.empty ;static_fields=StrMap.empty}
-
-    let empty_class_body = {public=empty_elements;protected=empty_elements;object_sort=Class}
-                           
-    let empty_class = Class empty_class_body
-
-    let empty_class_ta = SimpleType empty_class
-
-    let state_select = Enumeration (StrSet.of_list ["never";"default";"avoid";"prefer";"always"])
-
-    let state_select_ta = SimpleType state_select 
-
-    let external_object = ProtoExternalObject
-
-    let external_object_ta = SimpleType external_object
-
-    let rec invalidate_replaceable_elements {class_members; super; dynamic_fields; static_fields} =
-      {super = List.map invalidate_replaceables super ;
-       class_members = StrMap.map invalidate_replaceables_ta class_members ;
-       dynamic_fields = StrMap.map invalidate_replaceables_ta dynamic_fields ;
-       static_fields = StrMap.map invalidate_replaceables_ta static_fields }
-
-    and invalidate_replaceables_os os = {os with public = invalidate_replaceable_elements os.public ; protected = invalidate_replaceable_elements os.protected}
-        
-    and invalidate_replaceables = function
-        Class os -> Class (invalidate_replaceables_os os)
-      | p -> p
-
-    and invalidate_replaceables_ta = function
-        Replaceable r -> Replaceable {r with current = UnknownType}
-      | ta -> ta
+  let compare a b = Enum.compare str_compare (DQ.enum a) (DQ.enum b)
+                                 
+  let hash = Hashtbl.hash
                
+  let equal a b = compare a b = 0
+                                  
+  let empty = DQ.empty
+
+  let is_empty = DQ.is_empty
+                
+  let of_list = DQ.of_list
+
+  let rec scope_of_ptr_ tmp dq = match DQ.front dq with
+    | None -> tmp
+    | Some ((`Field _ | `Any _ | `SuperClass _ ), _) -> tmp
+    | Some (`Protected, r) -> scope_of_ptr_ tmp r
+    | Some ((`ClassMember x), r) -> scope_of_ptr_ (DQ.snoc tmp x) r
+
+  let scope_of_ptr dq = match (DQ.rear dq) with
+      Some(xs,`ClassMember x) -> (scope_of_ptr_ DQ.empty xs)
+    | _ -> (scope_of_ptr_ DQ.empty dq)
+                  
+  let rec of_ptr_ tmp dq = match DQ.front dq with
+    | None -> tmp
+    | Some ((`SuperClass _  | `Protected), r) -> of_ptr_ tmp r
+    | Some ((`ClassMember x | `Field x | `Any x), r) -> of_ptr_ (DQ.snoc tmp x) r
+                  
+  let of_ptr dq = of_ptr_ DQ.empty dq
+                                                                        
+end
+
+module NameMap = Map.Make(Name)
+              
+type constr =  CArray of int
+             | CSort of sort
+             | CRepl
+             | CVar of variability
+             | CCau of causality
+             | CCon of connectivity
+             | CDer of string list
+                         [@@deriving yojson,eq,show]
+
+type class_path_elem = [`Protected | `ClassMember of string | `Field of string | `SuperClass of int] [@@deriving eq,show,yojson]
+
+type class_path = class_path_elem DQ.t [@@deriving eq,show,yojson]
+                                                                                                     
+type class_ptr_elem = [class_path_elem | `Any of string] [@@deriving eq,show,yojson]
+
+type class_ptr = class_ptr_elem DQ.t [@@deriving eq,show,yojson]
+                         
+type class_term = Reference of DS.name
+                | RedeclareExtends
+                | Empty of sort
+                | Close
+                | RootReference of DS.name
+                | PInt | PReal | PString | PBool | PExternalObject
+                | PEnumeration of StrSet.t
+                | Constr of class_constr
+                | Delay of class_term
+                    [@@deriving yojson,eq,show]
+
+and  class_constr = { constr : constr ; arg : class_term }
+                      
+type class_stmt = {lhs : class_ptr ; rhs : class_term} [@@deriving eq,show,yojson]
+                                                       
+type class_program = class_stmt list [@@deriving show,yojson]
+      
+module Normalized = struct
+    
+    type constr =  Array of int
+                 | Sort of sort
+                 | Var of variability
+                 | Cau of causality
+                 | Con of connectivity
+                 | Der of string list
+                                 [@@deriving yojson,show,eq]                                 
+
+    let norm_constr = function
+        CArray i -> Array i
+      | CSort s -> Sort s
+      | CVar v -> Var v
+      | CCau c -> Cau c
+      | CCon c -> Con c
+      | CDer d -> Der d
+      | CRepl -> raise (Invalid_argument "'replaceable' is not a normlized constructor")
+                                              
+    type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
+                       | Enumeration of StrSet.t
+                       | Constr of constr_value
+                       | Class of object_struct
+                       | Replaceable of class_value
+                       | GlobalReference of Name.t
+                       | Recursive of rec_term
+                                        [@@deriving eq,show,yojson]
+
+     and rec_term = { rec_lhs : class_path; rec_rhs : class_term }
+                                        
+     and constr_value = { arg : class_value ; constr : constr }
+                                 
+     and object_struct = { object_sort : sort ;
+                           public : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }];
+                           protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }]}
+                                                                 
+     and elements_struct = { class_members : class_value StrMap.t [@default StrMap.empty];
+                             super : class_value IntMap.t [@default IntMap.empty];
+                             fields : class_value StrMap.t [@default StrMap.empty] }
+                             
+
+    let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
+    let empty_object_struct = {object_sort=Class; public=empty_elements; protected=empty_elements}
+
+    let empty_class = Class empty_object_struct 
+
   end
                                                                                            
 

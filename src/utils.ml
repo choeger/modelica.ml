@@ -61,6 +61,18 @@ type token =
 module StdFormat = Format
 open Batteries
 
+module IntMap = struct include Map.Make(Int)
+                       let compare (k,v) (k',v') = Int.compare k k'
+                       let to_yojson a m = `List (List.map (fun (k,v) -> a v) (List.sort compare (bindings m)))
+                       let of_yojson js f = (`Error "Not yet implemented")
+                       let of_list bs = of_enum (List.enum bs)
+                       open StdFormat 
+                       let pp pp_v fmt s =
+                         let pp_comma fmt () = fprintf fmt "," in
+                         let pp_pair fmt (k,v) = fprintf fmt "%d@ =@ %a" k pp_v v in
+                         fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
+                end
+
 module StrMap = struct include Map.Make(String)
                        let union m1 m2 = Enum.fold (fun m (k,v) -> add k v m) m1 (enum m2)
                        let find_or_else v x m = if mem x m then find x m else v
@@ -79,15 +91,23 @@ module StrSet = struct include Set.Make(String)
                        open StdFormat
                        let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_print_string) (elements s)
                 end
-
-module Deque = struct include Deque
-                      open StdFormat
-                      let pp pp_v fmt dq = let pp_comma fmt () = fprintf fmt "," in
-                                           fprintf fmt "@[%a@]" (pp_print_list ~pp_sep:pp_comma pp_v) (to_list dq)
-               end
                   
 module List = List
 
+module DQ = struct include BatDeque
+
+                   let compare f a b = Enum.compare f (enum a) (enum b)
+                                 
+                   let equal f a b = Enum.equal f (enum a) (enum b)
+                                  
+                   let singleton x = cons x empty
+
+                   open StdFormat
+                   let pp pp_v fmt dq = let pp_comma fmt () = fprintf fmt "," in
+                                        fprintf fmt "@[%a@]" (pp_print_list ~pp_sep:pp_comma pp_v) (to_list dq)
+                   let to_yojson a dq = `List (List.map a (to_list dq))
+                   let of_yojson js f = (`Error "Not yet implemented")
+            end
 
 let unloc {Location.txt} = txt
 

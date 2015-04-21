@@ -32,17 +32,20 @@ open Modelica_parser
 open Syntax
 open Sys
 open Utils
+
+type scanned = string
+type parsed = {scanned : scanned ; parsed : Syntax.unit_}
        
-type package = {
+type 'stage package = {
   pkg_name : string list;
-  sub_packages : package list ;
-  source_files : string list;
-  package_mo : string;
+  sub_packages : ('stage package) list ;
+  external_units : 'stage list;
+  package_unit : 'stage;
 }
 
-type pkg_root = {
-    root_files : string list ;
-    root_packages : package list;
+type 'stage pkg_root = {
+    root_units : 'stage list ;
+    root_packages : 'stage package list;
   }
                  
 let parse file =
@@ -65,16 +68,7 @@ let parse file =
                              None
 
   end
-
                  
-let package_name { pkg_name } = pkg_name
-                 
-let package_mo { package_mo } = package_mo
-                                  
-let sub_packages { sub_packages } = sub_packages
-                                      
-let source_files { source_files } = source_files
-
 let is_source_file file = String.ends_with (Filename.basename file) ".mo" 
 
 let is_package_mo file = (Filename.basename file) = "package.mo" 
@@ -87,13 +81,13 @@ let rec scan prefix dir =
     (* we could do this as well in one fold over the content of the directory, but this is more readable *)
     if List.exists is_package_mo contents then 
 
-      let package_mo = List.find is_package_mo contents in
+      let package_unit = List.find is_package_mo contents in
       let collect_sub_pkg pkgs file = match scan pkg_name file with None -> pkgs | Some pkg -> pkg::pkgs in
       let collect_source_files files file = if (is_source_file file) && not (is_package_mo file) then file::files else files in
         
       let sub_packages = List.fold_left collect_sub_pkg [] contents in
-      let source_files = List.fold_left collect_source_files [] contents in      
-      Some { package_mo ; pkg_name ; sub_packages ; source_files }
+      let external_units = List.fold_left collect_source_files [] contents in      
+      Some { package_unit ; pkg_name ; sub_packages ; external_units }
     else None
     
   else None
@@ -106,32 +100,42 @@ let scan_root dir =
     let collect_source_files files file = if (is_source_file file) && not (is_package_mo file) then file::files else files in
 
     let root_packages = List.fold_left collect_sub_pkg [] contents in
-    let root_files = List.fold_left collect_source_files [] contents in
-    {root_files; root_packages}
-  else {root_files = []; root_packages = []}
+    let root_units = List.fold_left collect_source_files [] contents in
+    {root_units; root_packages}
+  else {root_units = []; root_packages = []}
 
-let merge_source_file tds file =
-  match parse file with
-  | Some { within ; toplevel_defs = tl::_ } -> tl::tds 
-  | _ -> tds
-         
-let rec merge { package_mo ; source_files ; sub_packages } =
- 
-  match parse package_mo with
-    Some { within ; toplevel_defs = {commented=Composition (comp as p); comment}::_ } ->
-    let tds = comp.type_exp.public.typedefs in
-    let tds' = List.fold_left merge_source_file tds source_files in
-    let tds'' = List.fold_left merge_sub_pkg tds' sub_packages in
-    let p' = {p with type_exp = {p.type_exp with public = {p.type_exp.public with typedefs = tds''}}} in
-    Some { within ; toplevel_defs = [{commented=Composition p';comment}]} 
-  | _ -> None
-
-and merge_sub_pkg tds pkg =
-  match merge pkg with
-    Some { within ; toplevel_defs = p::_ } -> p::tds
-  | _ -> tds
-
-let rec merge_root {root_files; root_packages} =
-  let pkg_tds = List.fold_left merge_sub_pkg [] root_packages in
-  let toplevel_defs = List.fold_left merge_source_file pkg_tds root_files in
-  { within = None ; toplevel_defs }
+let rec parse_externals done_ = function
+    [] -> Some done_
+  | scanned::fs -> begin match parse scanned with
+                         | Some parsed -> parse_externals ({scanned;parsed}::done_) fs
+                         | None -> None
+                   end
+    
+let rec parse_package {pkg_name; package_unit=scanned; external_units; sub_packages } =
+  match parse_packages [] sub_packages with
+    Some sub_packages -> begin
+      match parse_externals [] external_units with
+        Some external_units -> begin
+          match parse scanned with
+            Some parsed -> Some {pkg_name; package_unit={scanned; parsed}; external_units; sub_packages}
+          | None -> None
+        end
+      | None -> None
+    end
+  | None -> None
+  
+and parse_packages done_ = function
+    [] -> Some done_
+  | pkg::pkgs -> begin 
+      match parse_package pkg with Some pkg -> parse_packages (pkg::done_) pkgs
+                                 | None -> None
+    end
+    
+let rec parse_root {root_units; root_packages} =  
+  match parse_packages [] root_packages with
+    Some root_packages -> begin match parse_externals [] root_units with
+                                  Some root_units -> Some {root_units; root_packages}
+                                | None -> None
+                          end
+  | None -> None
+                                              

@@ -39,6 +39,7 @@ open Parser_tests
 open Report
 open Motypes
 open ClassNorm
+open ClassTrans
 open OUnit2
        
 let assert_result = function
@@ -48,61 +49,73 @@ let assert_result = function
 let show_messages msgs =
   let s = IO.output_string () in
   Report.print_messages s msgs ; IO.close_out s
-                        
-let assert_normalization expected ast =
-  let {final_messages; final_result} = normalize [ast] in
+
+                                             
+let assert_normalization expected td =  
+  let parsed = {within = Some []; toplevel_defs = [td] } in
+  let {final_messages; final_result} =  run (norm_pkg_root (translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=Normalized.empty_elements} in
   IO.flush (!BatLog.output) ;
   let () = assert_equal ~msg:"No warnings and errors expected" ~printer:show_messages [] final_messages in (* TODO: filter warnings / errors *)
   let cv = assert_result final_result in
   expected cv 
 
+open Normalized
+       
 let eq expected got = 
-  assert_equal ~msg:"equality of normalization result" ~printer:Normalized.show_object_struct expected got
-
-let eq_ta expected got = 
-  assert_equal ~msg:"equality of normalization result" ~printer:Normalized.show_type_annotation expected got
+  assert_equal ~cmp:equal_class_value ~msg:(Printf.sprintf "equality of normalization result = %b" (expected = got)) ~printer:show_class_value expected got
+               
+let eq_val name expected normalized = eq expected (StrMap.find name normalized.class_members)
 
 let should_be_replaceable expected got =
-  let open Normalized in
   match got with
-    Replaceable {current} -> (expected current)
-  | _ -> assert_failure ("Expected a replaceable type, got: " ^ (show_type_annotation got))
-               
-let lookup name f got =
-  let m = get_class_element_st (Class got) (List.map (fun x -> mknoloc x) name) in
-  let {final_result;final_messages} = run m {messages=[]; input=Reference[]; output=Normalized.empty_class_body} in
-  let () = assert_equal ~msg:"No warnings and errors expected" ~printer:show_messages [] final_messages in (* TODO: filter warnings / errors *)  
-  match final_result with
-  | Ok (Found {found_value}) -> f found_value
-  | Ok (FoundReplaceable {fr_current; fr_path}) -> f (Replaceable {current=fr_current; replaceable_body=Reference fr_path; replaceable_env=[]})
-  | _ -> assert_failure "Could not find test-path." 
+    Replaceable v -> (expected v)
+  | _ -> assert_failure ("Expected a replaceable type, got: " ^ (show_class_value got))
+                        
+let lookup x xs f got =
+  let m = get_class_element_in got Name.empty got x (Name.of_list xs) in
+  match m with
+  | `Found {found_value} -> f found_value
+  | _ as result -> assert_failure (Printf.sprintf "Could not find test-path.\n%s\n %s\n" (show_search_result result) (show_elements_struct got)) 
 
 let class_ input expected =
   (Printf.sprintf "Normalize '%s'" input) >:: (parse_test td_parser input (assert_normalization expected))
 
-open Normalized
+let class_M = Class {empty_object_struct with public = {empty_elements with fields = StrMap.singleton "x" Real}}
+let class_with_public_M = Class {empty_object_struct with public = {empty_elements with class_members = StrMap.singleton "M" class_M}}
+let class_with_protected_M = Class {empty_object_struct with protected = {empty_elements with class_members = StrMap.singleton "M" class_M}}
 
-let class_M = SimpleType (Class {empty_class_body with public = {empty_elements with dynamic_fields = StrMap.singleton "x" (SimpleType Real)}})
-let class_with_public_M = SimpleType (Class {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "M" class_M}})
-let class_with_protected_M = SimpleType (Class {empty_class_body with protected = {empty_elements with class_members = StrMap.singleton "M" class_M}})
-                                   
+let type_ arg = Constr {constr=Sort Type; arg}
+let real = type_ Real
+                 
 let test_cases = [
-    class_ "type T = Real" (eq {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "T" (SimpleType Real)}}) ;
-    class_ "class M Real x; end M" (eq {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "M" class_M}}) ;
-    class_ "class A class M Real x; end M; end A" (eq {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "A" class_with_public_M}}) ;
-    class_ "class A protected class M Real x; end M; end A" (eq {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "A" class_with_protected_M}}) ;
-    class_ "record A end A" (eq {empty_class_body with public = {empty_elements with class_members = StrMap.singleton "A" (SimpleType (Class {empty_class_body with object_sort = Ast.Flags.Record})) }}) ;
+    class_ "type T = Real" (eq_val "T" real) ;
+    class_ "class M Real x; end M" (eq_val "M" class_M);
+    class_ "class A class M Real x; end M; end A" (eq_val "A" class_with_public_M) ;
+    class_ "class A protected class M Real x; end M; end A" (eq_val "A" class_with_protected_M) ;
 
-    class_ "class A class B replaceable type T = Real; end B; type T = B.T ; end A" (lookup ["A"; "T"] (should_be_replaceable (eq_ta (SimpleType Real)))) ;
+    class_ "record A end A" (eq_val "A" (Class {empty_object_struct with object_sort = Ast.Flags.Record})) ;
 
+    class_ "class A class B replaceable type T = Real; end B; type T = B.T ; end A" (lookup "A" ["B"; "T"] (should_be_replaceable (eq real))) ;
+
+    class_ "class A class B replaceable type T = Real; end B; type T = B.T ; end A" (lookup "A" ["T"] (eq (type_ (GlobalReference (Name.of_list ["A";"B";"T"]))))) ;
+
+    
+    class_ "class A type B = Real; class C type S = B; end C; end A" (lookup "A" ["C";"S"] (eq (type_ real))) ;
+
+    class_ "class A type B = Real; class C import D = A.B; class E type F = D; end E; end C; end A" (lookup "A" ["C"; "E";"F"] (eq (type_ real)));
+
+    class_ "class A class B1 type T = Real; end B1; extends B1; end A" (lookup "A" ["T"] (eq (real)));
+    
     class_ "class A 
-              class B 
-                replaceable type T = Real; 
-              end B; 
-              class C = B(redeclare type T = Integer); 
-              type T = C.T ; 
+              class B2 
+                replaceable type T2 = Real; 
+              end B2; 
+              class C = B2(redeclare type T2 = Integer); 
+              type T = C.T2 ; 
             end A"
-           (lookup ["A"; "T"] (should_be_replaceable (eq_ta (SimpleType Int)))) ;
+           (lookup "A" ["T"] (eq (type_ (GlobalReference (Name.of_list ["A";"C";"T2"]))))) ;
+
+    class_ "class A3 model B3 replaceable type T3 = Integer; end B3; model C3 type T3 = Real; model D3 = B3(redeclare type T3 = T3); end C3; end A3" (lookup "A3" ["C3";"D3";"T3"] (eq (type_ real))) ; 
   ]
                                                 
 let suite = "Normalization" >::: test_cases

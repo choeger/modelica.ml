@@ -26,17 +26,36 @@
  *
  *)
 
-open OUnit2
-		  
-let suite = "Modelica Frontend" >:::
-	      [
-		(* Lexer_tests.suite ; *)
-		Parser_tests.suite ;
-                (* Class_tests.suite ; *)
-                Class_tests.suite ;
-	      ]
-		
+open Sys
+open FileSystem
+open Pprint_modelica
+open Stats
+open Syntax
+open Motypes
+open Utils
+open Batteries
+open ClassTrans
+open ClassDeps
+open ClassNorm
+open Report
+open Location
+       
+let print_message msg = BatLog.logf "%s\n" (show_message msg)
+
+open Normalized
+
 let _ =
-  Format.pp_set_margin Format.str_formatter (240);
-  run_test_tt_main suite
-                   
+  StdFormat.pp_set_margin StdFormat.str_formatter (240);
+  match (scan_root argv.(1)) with
+  | {root_units = []; root_packages = []} -> Printf.eprintf "'%s' seems to contain no Modelica content.\n" argv.(1) ; 1
+  | root -> begin match parse_root root with
+                    Some root -> begin 
+                      let tr = translate_pkg_root root in
+                      let o = run (norm_pkg_root tr) {messages=[]; output=empty_elements} in
+                      List.iter print_message o.final_messages ;
+                      match o.final_result with
+                        Ok o -> BatLog.logf "Normalization Ok.\n" ; 0
+                      | Failed -> BatLog.logf "Normalization Error\n" ; 1 
+                    end 
+                  | None -> BatLog.logf "Syntax Error\n" ; 1
+            end            

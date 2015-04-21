@@ -37,15 +37,15 @@ open Utils
  *)
        
 module Flags = struct
-    type scope = Inner | Outer | InnerOuter | Local [@@deriving show,yojson]
+    type scope = Inner | Outer | InnerOuter | Local [@@deriving show,yojson,eq]
     type sort = Package | Class | Model | Block | Connector | ExpandableConnector | Record
-                | Function | Type | Operator | OperatorRecord | OperatorFunction [@@deriving show,yojson]
+                | Function | Type | Operator | OperatorRecord | OperatorFunction [@@deriving show,yojson,eq]
 
-    type connectivity = Flow | Stream [@@deriving show,yojson]
+    type connectivity = Flow | Stream [@@deriving show,yojson,eq]
                                 
-    type variability = Constant | Parameter | Discrete [@@deriving show,yojson]
+    type variability = Constant | Parameter | Discrete [@@deriving show,yojson,eq]
                                                 
-    type causality = Input | Output [@@deriving show,yojson]
+    type causality = Input | Output [@@deriving show,yojson,eq]
   end
 
 module type S = sig
@@ -61,7 +61,7 @@ module type S = sig
     (*let pp_str fmt {txt} = Format.pp_print_string fmt txt           *)
                       
     (** A type-name is a list of strings separated by dots, e.g. Modelica.Icons.Example *)
-    type name = str list [@@deriving show,yojson]
+    type name = str list [@@deriving show,eq,yojson]
                     
     (** Partial derivative specification, see section 12.7.2 *)
     type der_spec = { der_name : name ; idents : str list } [@@deriving show,yojson]
@@ -303,12 +303,14 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
     type attr = Attr.t
     type str = string loc [@@deriving yojson]
 
+    let equal_str a b = a.txt = b.txt
+                      
     open Flags
                       
     let pp_str fmt {txt} = Format.pp_print_string fmt txt           
                       
     (** A type-name is a list of strings separated by dots, e.g. Modelica.Icons.Example *)
-    type name = str list [@@deriving show,yojson]
+    type name = str list [@@deriving show,eq,yojson]
                     
     (** Partial derivative specification, see section 12.7.2 *)
     type der_spec = { der_name : name ; idents : str list } [@@deriving show,yojson]

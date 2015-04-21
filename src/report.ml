@@ -45,7 +45,7 @@ let print_message o msg = IO.nwrite o (show_message msg)
 
 let print_messages o msgs = List.print ~sep:"\n" print_message o msgs
                                   
-type state = { messages : message list; input : class_term ; output : Normalized.object_struct }
+type state = { messages : message list; output : Normalized.elements_struct }
                  
 type 'a report = { result : 'a result ; state : state }
 
@@ -77,8 +77,6 @@ let on_strMap_values f map = do_ ;
                              xs <-- on_sequence (on_kv_pair f) (StrMap.bindings map) ;
                              return (StrMap.of_list xs)
                                   
-let input ({input} as state) = {result = Ok input; state }
-                                           
 let output ({output} as state) = {result = Ok output; state }
 
 let set_output output state = {result = Ok (); state={state with output}}

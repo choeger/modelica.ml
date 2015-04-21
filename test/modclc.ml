@@ -26,17 +26,28 @@
  *
  *)
 
-open OUnit2
-		  
-let suite = "Modelica Frontend" >:::
-	      [
-		(* Lexer_tests.suite ; *)
-		Parser_tests.suite ;
-                (* Class_tests.suite ; *)
-                Class_tests.suite ;
-	      ]
-		
+open Sys
+open FileSystem
+open Pprint_modelica
+open Stats
+open Syntax
+open Motypes
+open Utils
+open Batteries
+open ClassTrans
+open ClassDeps
+open Location
+       
+let stats u =
+  let {def_count; type_count} = generate_stats u in
+  Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
+  
 let _ =
-  Format.pp_set_margin Format.str_formatter (240);
-  run_test_tt_main suite
-                   
+  Format.pp_set_margin Format.str_formatter (140);
+  match (parse argv.(1)) with
+  | None -> Printf.eprintf "'%s' seems to contain no Modelica content.\n" argv.(1) ; 1
+  | Some parsed ->
+     let tu = translate_unit StrMap.empty {scanned=argv.(1); parsed} in
+     let js = translated_unit_to_yojson tu in
+     Printf.printf "%s\n" (Yojson.Safe.pretty_to_string js)  ;
+     0
