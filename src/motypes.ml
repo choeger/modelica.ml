@@ -131,7 +131,8 @@ module Normalized = struct
       | CCon c -> Con c
       | CDer d -> Der d
       | CRepl -> raise (Invalid_argument "'replaceable' is not a normlized constructor")
-                                              
+
+                       
     type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                        | Enumeration of StrSet.t
                        | Constr of constr_value
@@ -160,6 +161,19 @@ module Normalized = struct
 
     let empty_class = Class empty_object_struct 
 
+    let rec compress = function
+        Class os -> Class {os with public = compress_elements os.public; protected = compress_elements os.protected }
+      | Constr {constr; arg} -> Constr {constr; arg = compress arg}
+      | Replaceable v -> Replaceable (compress v)
+      | v -> v
+               
+    and compress_elements es = {es with fields = StrMap.map pack_class es.fields; super = IntMap.map pack_class es.super; class_members = StrMap.map compress es.class_members }
+
+    and pack_class = function
+        Class os -> GlobalReference os.source_name
+      | Constr {constr; arg} -> Constr {constr; arg = pack_class arg}
+      | Replaceable v -> Replaceable (pack_class v)
+      | v -> v
   end
                                                                                            
 

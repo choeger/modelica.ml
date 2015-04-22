@@ -111,6 +111,7 @@ and get_class_element global found_path e p =
                  Some(x,xs) ->
                  begin match get_class_element_in global DQ.empty global x xs with
                        | `Found {found_value} -> get_class_element global found_path found_value p
+                       | `Recursion _ as r -> r
                        | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not follow (probably recursive) %s\n" (Name.show g); result
                  end
                | None -> raise EmptyName
@@ -242,12 +243,16 @@ let rec norm_recursive {rec_term; search_state} = let name = (DQ.append (Name.of
                                                   Report.do_ ;                                                  
                                                   n <-- norm lhs rec_term.rec_rhs ;
                                                   o <-- output ;
+                                                  value <-- begin
                                                   match get_class_element o search_state.found n search_state.not_found with
                                                     `Found {found_value = Replaceable v} -> return (GlobalReference name)
                                                   | `Found {found_value} -> return found_value
                                                   | `NothingFound | `PrefixFound _ as result -> fail_unresolved {searching=name; result}
                                                   | `Recursion r -> norm_recursive r
-                                                                                                                
+                                                  end ;
+                                                  set_output (update lhs value o) ;
+                                                  return value
+                                                  
 and norm lhs =
                                                               
   let open Normalized in
@@ -259,6 +264,7 @@ and norm lhs =
      let name = Name.of_ptr lhs in
      Report.do_ ; o <-- output ; begin match lookup o name with
                                          `Found {found_value} -> return found_value
+                                       | `Recursion _ -> BatLog.logf "Internal error. Trying to close a recursive element.\n"; fail
                                        | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find closed scope\n"; fail_unresolved {searching=name; result}
                                  end
 
@@ -268,6 +274,7 @@ and norm lhs =
                                                                                                            let name = (Name.of_ptr parent) in
                                                                                                            begin match lookup o name with
                                                                                                                  | `Found {found_value} -> return found_value
+                                                                                                                 | `Recursion _ -> BatLog.logf "Internal error. Trying to extend from a recursive element.\n"; fail
                                                                                                                  | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find redeclared base class %s\n" id; fail_unresolved {searching=name; result}     
                                                                                                            end
                                                                      | _ ->  BatLog.logf "Illegal redeclare extends\n"; fail
@@ -315,7 +322,8 @@ and norm lhs =
   | PString -> return String
   | PExternalObject -> return ProtoExternalObject
   | PEnumeration ids -> return (Enumeration ids)
-                                              
+
+       
 let rec norm_prog i p =
     Report.do_ ;
     o <-- output;
@@ -333,7 +341,7 @@ open ClassDeps
 
                                                    
 open FileSystem
-       
+
 
 let link_unit linkage {ClassTrans.class_code} = linkage @ class_code
 
@@ -343,9 +351,103 @@ let rec link_package linkage {sub_packages; external_units; package_unit} =
 let link_root {root_units; root_packages} =
   List.fold_left link_package (List.fold_left link_unit [] root_units) root_packages
                  
+type open_term = { open_lhs : class_path ;
+                   open_rhs : rec_term }
+
+
+let rec resolve_recursive {rec_term; search_state} = let name = (DQ.append (Name.of_ptr search_state.found) search_state.not_found) in
+                                                     let lhs = rec_term.rec_lhs in
+                                                     BatLog.logf "Recursively unfolding %s\n" (show_class_term rec_term.rec_rhs) ;
+                                                     Report.do_ ;                                                  
+                                                     n <-- norm lhs rec_term.rec_rhs ;
+                                                     o <-- output ;                                                       
+                                                     match get_class_element o search_state.found n search_state.not_found with
+                                                     | `Found {found_path} -> return found_path
+                                                     | `NothingFound | `PrefixFound _ as result -> fail_unresolved {searching=name; result}
+                                                     | `Recursion r -> resolve_recursive r
+
+                               
+and resolve lhs n =
+     let ctxt = Name.scope_of_ptr lhs in
+     let name = Name.of_list (lunloc n) in
+     let previous = `NothingFound in
+     begin match DQ.front name with
+             Some(x, xs) ->
+             Report.do_ ; o <-- output ;
+             begin match find_lexical o previous DQ.empty ctxt x (Class {empty_object_struct with public = o}) with
+                   | `Recursion r -> resolve_recursive {r with search_state = {r.search_state with not_found = xs}}
+                   | `Found {found_value;found_path} -> begin match get_class_element o found_path found_value xs with
+                                                              | `Recursion r -> resolve_recursive r
+                                                              | `Found {found_path} -> return found_path
+                                                              | `NothingFound | `PrefixFound _ as result -> BatLog.logf "Could not find suffix\n"; fail_unresolved {searching=name; result}
+                                                        end
+                   | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find prefix\n"; fail_unresolved {searching=name; result}
+             end
+           | None -> Report.do_; log{level=Error; where=none; what=Printf.sprintf "Empty name when evaluating %s. Most likely an internal bug." (show_class_ptr lhs)} ; fail
+     end
+
+let rec close_term lhs = function
+  | RedeclareExtends | Empty _ | Delay _ | Close -> Report.do_ ; Report.log {what=Printf.sprintf "Error closing %s. Cannot close artificial class-statements." (show_class_ptr lhs);level=Error;where=none}; fail
+
+
+  | RootReference n -> return (GlobalReference (Name.of_list (lunloc n)))
+
+  | Reference n -> Report.do_ ; p <--resolve lhs n ; return (GlobalReference (Name.of_ptr p))
+
+  | Constr {constr=CRepl; arg} -> Report.do_ ;
+                                  argv <-- close_term lhs arg ;
+                                  return (Replaceable argv) 
+                                   
+  | Constr {constr; arg} -> Report.do_ ;
+                            argv <-- close_term lhs arg ;
+                            begin match argv with
+                                    Replaceable arg -> return (Replaceable (Constr {arg;constr=norm_constr constr})) 
+                                  | arg -> return (Constr {arg; constr = norm_constr constr})
+                            end
+
+  | PInt -> return Int
+  | PBool -> return Bool
+  | PReal -> return Real
+  | PString -> return String
+  | PExternalObject -> return ProtoExternalObject
+  | PEnumeration ids -> return (Enumeration ids) 
+
+let rec collect_recursive_terms p rts = function
+    Class os -> let rts' =
+                  elements_collect_recursive_terms p rts os.public in
+                elements_collect_recursive_terms (DQ.snoc p `Protected) rts' os.protected
+
+  | Constr {arg} -> collect_recursive_terms p rts arg
+  | Replaceable v -> collect_recursive_terms p rts v
+  | Recursive open_rhs -> {open_lhs = p; open_rhs}::rts
+  | v -> rts
+
+and elements_collect_recursive_terms p rts {class_members; fields;} =
+  let rts' = StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`ClassMember k)) rts v) class_members rts in
+  StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`Field k)) rts v) fields rts'               
+                                  
+let rec close_terms i p =
+    Report.do_ ;
+    o <-- output;
+    if i >= Array.length p then return o
+    else
+      let {open_lhs;open_rhs} = p.(i) in
+      Report.do_ ;
+      let () = BatLog.logf "Close [%d / %d] %s := %s\n" i (Array.length p) (show_class_ptr open_lhs) (show_class_term open_rhs.rec_rhs) in      
+      closed <-- close_term open_rhs.rec_lhs open_rhs.rec_rhs;
+      set_output (update open_lhs closed o) ;
+      close_terms (i+1) p
+
+
 let norm_pkg_root root =
   let linkage = link_root root in
   let cc = preprocess linkage in
-  norm_prog 0 cc
-  
-  
+  Report.do_ ;
+  o <-- norm_prog 0 cc ;
+  let c = compress_elements o in
+  let ct = Array.of_list (elements_collect_recursive_terms DQ.empty [] c) in
+  let () = BatLog.logf "Closing %d possibly recursive terms.\n" (Array.length ct) in
+  close_terms 0 ct
+                  
+                   
+                  

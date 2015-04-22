@@ -222,9 +222,10 @@ let topological_order w r a =
   in
 
   let rec append_scc prog = function [] -> prog
-                                   | i::scc when (is_super a.(i)) -> append_scc prog scc
-                                   | i::scc -> append_scc (a.(i)::prog) scc in
-
+                                   | i::scc when (is_closer a.(i).rhs) -> append_scc (a.(i)::prog) scc
+                                   | i::scc -> append_scc prog scc
+  in
+  
   let rec append_superclasses prog = function [] -> prog
                                             | i::scc when (is_super a.(i)) -> append_superclasses (a.(i)::prog) scc
                                             | i::scc -> append_superclasses prog scc
