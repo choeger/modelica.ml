@@ -54,6 +54,8 @@ module Name = struct
                 
   let of_list = DQ.of_list
 
+  let singleton = DQ.singleton
+                  
   let rec scope_of_ptr_ tmp dq = match DQ.front dq with
     | None -> tmp
     | Some ((`Field _ | `Any _ | `SuperClass _ ), _) -> tmp
@@ -94,7 +96,7 @@ type class_ptr = class_ptr_elem DQ.t [@@deriving eq,show,yojson]
                          
 type class_term = Reference of DS.name
                 | RedeclareExtends
-                | Empty of sort
+                | Empty of open_class
                 | Close
                 | RootReference of DS.name
                 | PInt | PReal | PString | PBool | PExternalObject
@@ -103,6 +105,8 @@ type class_term = Reference of DS.name
                 | Delay of class_term
                     [@@deriving yojson,eq,show]
 
+and open_class = { class_sort : sort ; class_name : Name.t }
+                    
 and  class_constr = { constr : constr ; arg : class_term }
                       
 type class_stmt = {lhs : class_ptr ; rhs : class_term} [@@deriving eq,show,yojson]
@@ -142,6 +146,7 @@ module Normalized = struct
      and constr_value = { arg : class_value ; constr : constr }
                                  
      and object_struct = { object_sort : sort ;
+                           source_name : Name.t;
                            public : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }];
                            protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }]}
                                                                  
@@ -151,7 +156,7 @@ module Normalized = struct
                              
 
     let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
-    let empty_object_struct = {object_sort=Class; public=empty_elements; protected=empty_elements}
+    let empty_object_struct = {object_sort=Class; source_name=Name.empty; public=empty_elements; protected=empty_elements}
 
     let empty_class = Class empty_object_struct 
 

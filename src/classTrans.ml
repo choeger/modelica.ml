@@ -68,7 +68,7 @@ let rec translate_tds env p (prog : class_stmt list) = function
   | Composition tds ->
      let env' = (List.fold_left add_import env tds.type_exp.imports) in
      let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-     let rhs = repl tds.type_options (Empty (tds.sort)) in
+     let rhs = repl tds.type_options (Empty {class_sort = tds.sort; class_name = (Name.of_ptr p')}) in
      let prog' = {lhs=p'; rhs=Close}::{lhs=p'; rhs}::prog in
      let public = translate_elements env' p' prog' tds.type_exp.public in
      let p'' = (DQ.snoc p' `Protected) in
@@ -94,7 +94,7 @@ let rec translate_tds env p (prog : class_stmt list) = function
      let (cmp, _) = tds.type_exp in
      let env' = (List.fold_left add_import env cmp.imports) in
      let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-     let rhs = repl tds.type_options (Empty (tds.sort)) in
+     let rhs = repl tds.type_options (Empty {class_name = Name.of_ptr p'; class_sort = tds.sort}) in
      let prog' = {lhs=p'; rhs=Close}::{lhs=p'; rhs}::prog in
      let public = translate_elements env' p' prog' cmp.public in
 
@@ -158,7 +158,7 @@ and translate_texp env p (prog : class_stmt list) f =
      let prog' = translate_modification env p prog modification in
      (* order does not matter here: will be found by dependency analysis *)
      if prog' == prog then translate_texp env p prog f mod_type else
-       translate_texp env (DQ.snoc p (`SuperClass 0)) ({lhs=p; rhs=Close}::{lhs=p; rhs=Empty Class}::prog') f mod_type
+       translate_texp env (DQ.snoc p (`SuperClass 0)) ({lhs=p; rhs=Close}::{lhs=p; rhs=Empty {class_sort=Class;class_name=Name.of_ptr p}}::prog') f mod_type
 
 and translate_type_redeclaration env p prog {redecl_type} =
   let tds = redecl_type.commented in

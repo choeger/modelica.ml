@@ -133,7 +133,6 @@ let topological_order w r a =
       [] -> g
 
     | (true, {source_name})::_ ->
-       BatLog.logf "Found refined: %s\n" (Name.show source_name) ;
        let ws = NameMap.find source_name w in
        let c = find_close ws in
        (* depend on the refinement being normalized *)
@@ -143,7 +142,6 @@ let topological_order w r a =
     | (false, {source_name})::srcs when source_name=DQ.empty -> add_local_deps src g srcs
                          
     | (false, {source_name})::srcs ->
-       BatLog.logf "Possible match in unrefined: %s\n" (Name.show source_name) ;
        let ws = NameMap.find source_name w in
        (* no refinement found in that scope, just depend on the superclasses *)
        add_local_deps src (add_lookup_dependencies src g (find_super_classes ws)) srcs
@@ -217,11 +215,10 @@ let topological_order w r a =
   BatLog.logf "Got %d vertices and %d edges in %d strongly connected components in the dependency graph out of %d statements\n"
               (DepGraph.nb_vertex g) (DepGraph.nb_edges g) (List.length sccs) (Array.length a) ;
 
-  let rec prepare_scc prog = function [] -> BatLog.logf "scc done\n" ; prog
+  let rec prepare_scc prog = function [] -> prog
                                     | i::scc when (is_super a.(i)) -> prepare_scc prog scc
-                                    | i::scc when not (is_closer a.(i).rhs) -> BatLog.logf "Adding %s to scc\n" (show_class_stmt a.(i)) ;
-                                                                               prepare_scc ({lhs=a.(i).lhs; rhs=Delay a.(i).rhs}::prog) scc
-                                    | i::scc -> BatLog.logf "Not adding %s to scc. Not a leaf.\n" (show_class_stmt a.(i)) ; prepare_scc prog scc
+                                    | i::scc when not (is_closer a.(i).rhs) -> prepare_scc ({lhs=a.(i).lhs; rhs=Delay a.(i).rhs}::prog) scc
+                                    | i::scc -> prepare_scc prog scc
   in
 
   let rec append_scc prog = function [] -> prog

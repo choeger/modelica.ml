@@ -64,7 +64,7 @@ open Normalized
 let eq expected got = 
   assert_equal ~cmp:equal_class_value ~msg:(Printf.sprintf "equality of normalization result = %b" (expected = got)) ~printer:show_class_value expected got
                
-let eq_val name expected normalized = eq expected (StrMap.find name normalized.class_members)
+let eq_val name expected normalized = eq (expected (Name.singleton name)) (StrMap.find name normalized.class_members)
 
 let should_be_replaceable expected got =
   match got with
@@ -80,20 +80,22 @@ let lookup x xs f got =
 let class_ input expected =
   (Printf.sprintf "Normalize '%s'" input) >:: (parse_test td_parser input (assert_normalization expected))
 
-let class_M = Class {empty_object_struct with public = {empty_elements with fields = StrMap.singleton "x" Real}}
-let class_with_public_M = Class {empty_object_struct with public = {empty_elements with class_members = StrMap.singleton "M" class_M}}
-let class_with_protected_M = Class {empty_object_struct with protected = {empty_elements with class_members = StrMap.singleton "M" class_M}}
+let class_M source_name = Class {empty_object_struct with source_name; public = {empty_elements with fields = StrMap.singleton "x" Real}}
+let class_with_public_M source_name = Class {empty_object_struct with source_name ; public = {empty_elements with class_members = StrMap.singleton "M" (class_M (DQ.snoc source_name "M"))}}
+let class_with_protected_M source_name = Class {empty_object_struct with source_name ; protected = {empty_elements with class_members = StrMap.singleton "M" (class_M (DQ.snoc source_name "M"))}}
 
+let empty object_sort source_name = (Class {empty_object_struct with object_sort; source_name })                                               
 let type_ arg = Constr {constr=Sort Type; arg}
 let real = type_ Real
+let real_t x = real
                  
 let test_cases = [
-    class_ "type T = Real" (eq_val "T" real) ;
+    class_ "type T = Real" (eq_val "T" real_t ) ;
     class_ "class M Real x; end M" (eq_val "M" class_M);
     class_ "class A class M Real x; end M; end A" (eq_val "A" class_with_public_M) ;
     class_ "class A protected class M Real x; end M; end A" (eq_val "A" class_with_protected_M) ;
 
-    class_ "record A end A" (eq_val "A" (Class {empty_object_struct with object_sort = Ast.Flags.Record})) ;
+    class_ "record A end A" (eq_val "A" (empty Record)) ;
 
     class_ "class A class B replaceable type T = Real; end B; type T = B.T ; end A" (lookup "A" ["B"; "T"] (should_be_replaceable (eq real))) ;
 

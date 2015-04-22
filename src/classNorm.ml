@@ -224,18 +224,16 @@ let rec find_lexical global previous path ctxt x current =
       | _ -> previous
     end
   | Some(y, p) ->
-     BatLog.logf "searching %s in %s\n" x (show_class_path path) ;
      let previous' = 
        match get_class_element global path current (DQ.singleton x) with
         (`Found _ | `Recursion _) as f -> f                                                                                                 
        | _ -> previous
      in
-     BatLog.logf "searching further in %s\n" y ;
      match get_class_element global path current (DQ.singleton y) with
        `Found {found_value;found_path} ->       
        find_lexical global previous' found_path p x found_value
      | `Recursion _ -> raise NonLeafRecursion
-     | _ -> BatLog.logf "Found nothing to look into for %s in %s\n" y (Normalized.show_class_value current) ; previous'
+     | _ -> previous'
 
                                                                                                                 
 let rec norm_recursive {rec_term; search_state} = let name = (DQ.append (Name.of_ptr search_state.found) search_state.not_found) in
@@ -254,7 +252,7 @@ and norm lhs =
                                                               
   let open Normalized in
   function
-    Empty object_sort -> return (Class {empty_object_struct with object_sort})
+    Empty {class_sort; class_name} -> return (Class {empty_object_struct with object_sort = class_sort ; source_name = class_name})
   | Delay rec_rhs -> return (Recursive {rec_lhs=lhs;rec_rhs})
 
   | Close ->

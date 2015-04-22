@@ -54,7 +54,7 @@ let _ =
                       let o = run (norm_pkg_root tr) {messages=[]; output=empty_elements} in
                       List.iter print_message o.final_messages ;
                       match o.final_result with
-                        Ok o -> BatLog.logf "Normalization Ok.\n" ; 0
+                        Ok o -> BatLog.logf "Normalization Ok.\n" ;  0
                       | Failed -> BatLog.logf "Normalization Error\n" ; 1 
                     end 
                   | None -> BatLog.logf "Syntax Error\n" ; 1
