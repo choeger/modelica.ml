@@ -88,6 +88,7 @@ let empty object_sort source_name = (Class {empty_object_struct with object_sort
 let type_ arg = Constr {constr=Sort Type; arg}
 let real = type_ Real
 let real_t x = real
+let replaceable t = Replaceable t
                  
 let test_cases = [
     class_ "type T = Real" (eq_val "T" real_t ) ;
@@ -117,7 +118,7 @@ let test_cases = [
             end A"
            (lookup "A" ["T"] (eq (type_ (GlobalReference (Name.of_list ["A";"C";"T2"]))))) ;
 
-    class_ "class A3 model B3 replaceable type T3 = Integer; end B3; model C3 type T3 = Real; model D3 = B3(redeclare type T3 = T3); end C3; end A3" (lookup "A3" ["C3";"D3";"T3"] (eq (type_ real))) ; 
+    class_ "class A3 model B3 replaceable type T3 = Integer; end B3; model C3 type T3 = Real; model D3 = B3(redeclare type T3 = T3); end C3; end A3" (lookup "A3" ["C3";"D3";"T3"] (eq (replaceable (type_ real)))) ; 
   ]
                                                 
 let suite = "Normalization" >::: test_cases

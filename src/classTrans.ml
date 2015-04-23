@@ -60,6 +60,9 @@ let sort sort arg = if sort = Class then arg else Constr {arg; constr = CSort so
 let repl opts arg = match opts with {type_replaceable=true} -> Constr {arg; constr = CRepl}
                                   | _ -> arg
 
+let final opts arg = match opts with {type_final=false} -> Constr {arg; constr=CRepl}
+                                   | _ -> arg
+                                           
 let rec translate_tds env p (prog : class_stmt list) = function
   | Short tds ->
      let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
@@ -163,7 +166,7 @@ and translate_texp env p (prog : class_stmt list) f =
 and translate_type_redeclaration env p prog {redecl_type} =
   let tds = redecl_type.commented in
   let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-  translate_texp env p' prog (repl tds.type_options %> sort tds.sort) tds.type_exp
+  translate_texp env p' prog (final tds.type_options %> sort tds.sort) tds.type_exp
                             
 and translate_modification env p prog {types; components; modifications} =
   let rts = List.fold_left (translate_type_redeclaration env p) prog types in
