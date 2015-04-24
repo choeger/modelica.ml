@@ -64,20 +64,48 @@ open Batteries
 module IntMap = struct include Map.Make(Int)
                        let compare (k,v) (k',v') = Int.compare k k'
                        let to_yojson a m = `List (List.map (fun (k,v) -> a v) (List.sort compare (bindings m)))
-                       let of_yojson js f = (`Error "Not yet implemented")
+
+                       let of_yojson f js =
+                         let rec h mr v =
+                           match mr with
+                             `Ok m -> begin
+                               match f v with
+                                 `Error _ as e -> e
+                               | `Ok v' -> `Ok (add (cardinal m) v' m)
+                             end
+                           | `Error _ as e -> e
+                         in
+                         match js with `List ls -> List.fold_left h (`Ok empty) ls
+                                     | _ -> `Error "expected a json-list"                                             
+
                        let of_list bs = of_enum (List.enum bs)
                        open StdFormat 
                        let pp pp_v fmt s =
                          let pp_comma fmt () = fprintf fmt "," in
                          let pp_pair fmt (k,v) = fprintf fmt "%d@ =@ %a" k pp_v v in
                          fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
+
                 end
 
 module StrMap = struct include Map.Make(String)
                        let union m1 m2 = Enum.fold (fun m (k,v) -> add k v m) m1 (enum m2)
                        let find_or_else v x m = if mem x m then find x m else v
-                       let to_yojson a m = `Assoc (List.map (fun (k,v) -> (k,a v)) (bindings m))
-                       let of_yojson js f = (`Error "Not yet implemented")
+                       let to_yojson a m = `Assoc (List.map (fun (k,v) -> (k,a v)) (bindings m))                                            
+
+                       let of_yojson f js =
+                         let rec h mr (k,v) =
+                           match mr with
+                             `Ok m -> begin
+                               match f v with
+                                 `Error _ as e -> e
+                               | `Ok v' -> `Ok (add k v' m)
+                             end
+                           | `Error _ as e -> e
+                         in
+                         match js with `Assoc ls -> List.fold_left h (`Ok empty) ls
+                                     | _ -> `Error "expected a json-object"                                             
+
+                                       
                        let of_list bs = of_enum (List.enum bs)
                        open StdFormat 
                        let pp pp_v fmt s =
@@ -87,7 +115,20 @@ module StrMap = struct include Map.Make(String)
                 end
 module StrSet = struct include Set.Make(String) 
                        let to_yojson s = `List (List.map (fun e -> `String e) (elements s))
-                       let of_yojson js = (`Error "Not yet implemented")
+
+                       let of_yojson js =
+                         let rec h sr v =
+                           match sr with
+                             `Ok s -> begin
+                               match v with
+                               | `String v' -> `Ok (add v' s)
+                               | _ as e -> `Error "Expected a json-string"
+                             end
+                           | `Error _ as e -> e
+                         in
+                         match js with `List ls -> List.fold_left h (`Ok empty) ls
+                                     | _ -> `Error "expected a json-list"                                             
+
                        open StdFormat
                        let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_print_string) (elements s)
                 end
@@ -106,7 +147,19 @@ module DQ = struct include BatDeque
                    let pp pp_v fmt dq = let pp_comma fmt () = fprintf fmt "," in
                                         fprintf fmt "@[%a@]" (pp_print_list ~pp_sep:pp_comma pp_v) (to_list dq)
                    let to_yojson a dq = `List (List.map a (to_list dq))
-                   let of_yojson js f = (`Error "Not yet implemented")
+
+                   let of_yojson f js =
+                     let rec h sr v =
+                       match sr with
+                         `Ok s -> begin
+                           match f v with
+                             `Error _ as e -> e
+                           | `Ok v' -> `Ok (snoc s v')
+                         end
+                       | `Error _ as e -> e
+                     in
+                     match js with `List ls -> List.fold_left h (`Ok empty) ls
+                                 | _ -> `Error "expected a json-list"                                             
             end
 
 let unloc {Location.txt} = txt

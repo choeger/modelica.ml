@@ -76,7 +76,12 @@ let on_kv_pair f (k,v) = do_ ; v' <-- f v ; return (k,v')
 let on_strMap_values f map = do_ ;
                              xs <-- on_sequence (on_kv_pair f) (StrMap.bindings map) ;
                              return (StrMap.of_list xs)
-                                  
+
+let on_intMap_values f map = do_ ;
+                             xs <-- on_sequence (on_kv_pair f) (IntMap.bindings map) ;
+                             return (IntMap.of_list xs)
+
+                                    
 let output ({output} as state) = {result = Ok output; state }
 
 let set_output output state = {result = Ok (); state={state with output}}

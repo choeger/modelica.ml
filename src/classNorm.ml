@@ -57,7 +57,7 @@ let fail_unresolved {searching; result} = Report.do_ ; log{level=Error;where=non
                                                                                                       (show_search_error result)} ; fail
 
 exception EmptyName
-                                                                                                                                      
+
 let rec get_class_element_in global current_path {Normalized.class_members; super; fields} x xs =
   if StrMap.mem x class_members then begin
       let found = (DQ.snoc current_path (`ClassMember x)) in
@@ -73,8 +73,8 @@ let rec get_class_element_in global current_path {Normalized.class_members; supe
         `NothingFound -> (`PrefixFound {not_found=xs; found})      
       | r -> r
     end
-  else
-    pickfirst_class global 0 current_path (DQ.snoc xs x) (IntMap.bindings super)
+  else (
+    pickfirst_class global 0 current_path (DQ.snoc xs x) (IntMap.bindings super) )
 
 and pickfirst_class global n current_path name = function
     [] -> `NothingFound
@@ -100,13 +100,12 @@ and get_class_element global found_path e p =
            | _ as r -> r
          end
 
+           
       (* we might encounter recursive elements *)
       | Recursive rec_term -> `Recursion {rec_term; search_state={found = found_path; not_found = p}}
            
-      (* we might encounter a global reference due to the scc resolution *)
+      (* follow global references through self to implement redeclarations *)
       | GlobalReference g ->
-         BatIO.flush (!BatLog.output);
-         BatLog.logf "Following %s in search for %s\n" (Name.show g) (Name.show p);
          begin match DQ.front g with
                  Some(x,xs) ->
                  begin match get_class_element_in global DQ.empty global x xs with
@@ -116,7 +115,9 @@ and get_class_element global found_path e p =
                  end
                | None -> raise EmptyName
          end
-                               
+
+      (* Replaceable/Constr means to look into it *)
+      | Replaceable v -> get_class_element global found_path v p    
       | Constr {arg} -> get_class_element global found_path arg p
       | _ -> `NothingFound
     end    
@@ -220,7 +221,8 @@ let stratify_ptr ptr =
 let rec find_lexical global previous path ctxt x current =
   match DQ.front ctxt with
     None -> begin
-      match get_class_element global path current (DQ.singleton x) with
+      let r = get_class_element global path current (DQ.singleton x) in
+      match r with
         (`Found _ | `Recursion _) as f -> f                                                                                                 
       | _ -> previous
     end
@@ -235,11 +237,10 @@ let rec find_lexical global previous path ctxt x current =
        find_lexical global previous' found_path p x found_value
      | `Recursion _ -> raise NonLeafRecursion
      | _ -> previous'
-
                                                                                                                 
 let rec norm_recursive {rec_term; search_state} = let name = (DQ.append (Name.of_ptr search_state.found) search_state.not_found) in
                                                   let lhs = rec_term.rec_lhs in
-                                                  BatLog.logf "Recursively unfolding %s\n" (show_class_term rec_term.rec_rhs) ;
+                                                  (* BatLog.logf "Recursively unfolding %s\n" (show_class_term rec_term.rec_rhs) ; *)
                                                   Report.do_ ;                                                  
                                                   n <-- norm lhs rec_term.rec_rhs ;
                                                   o <-- output ;
@@ -257,7 +258,9 @@ and norm lhs =
                                                               
   let open Normalized in
   function
-    Empty {class_sort; class_name} -> return (Class {empty_object_struct with object_sort = class_sort ; source_name = class_name})
+    Empty {class_sort; class_name} -> (if DQ.is_empty class_name then BatLog.logf "Empty class name for %s!\n" (show_class_path lhs) else ()) ;
+  
+                                      return (Class {empty_object_struct with object_sort = class_sort ; source_name = class_name})
   | Delay rec_rhs -> return (Recursive {rec_lhs=lhs;rec_rhs})
 
   | Close ->
@@ -271,11 +274,30 @@ and norm lhs =
   | RedeclareExtends -> begin match DQ.rear lhs with
                                 Some(parent, `SuperClass _) -> begin match DQ.rear parent with
                                                                        Some(enclosing, `ClassMember id) -> Report.do_ ; o <-- output ;
-                                                                                                           let name = (Name.of_ptr parent) in
+                                                                                                           let name = (Name.of_ptr enclosing) in
                                                                                                            begin match lookup o name with
-                                                                                                                 | `Found {found_value} -> return found_value
-                                                                                                                 | `Recursion _ -> BatLog.logf "Internal error. Trying to extend from a recursive element.\n"; fail
-                                                                                                                 | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find redeclared base class %s\n" id; fail_unresolved {searching=name; result}     
+                                                                                                                 | `Found {found_value=Class os} ->
+                                                                                                                    begin
+                                                                                                                      BatLog.logf "Enclosing class source name: %s\n" (Name.show os.source_name) ;
+                                                                                                                      let base_only = Class {os with public = {empty_elements with super = os.public.super};
+                                                                                                                                                     protected = {empty_elements with super = os.protected.super}} in
+
+                                                                                                                      match get_class_element o enclosing base_only (DQ.singleton id) with
+                                                                                                                       
+                                                                                                                        `Found {found_value;found_path} -> BatLog.logf "Found redeclare-base (%s): \n%s\n" id (show_class_value found_value); return found_value
+                                                                                                                                                      
+                                                                                                                      | `Recursion _ -> Report.do_ ;
+                                                                                                                                        log{where=none;level=Error;what="Trying to extend from recursive element."};
+                                                                                                                                        fail
+
+                                                                                                                      | `NothingFound | `PrefixFound _ as result ->
+                                                                                                                                         Report.do_ ;
+                                                                                                                                         log{where=none;level=Error;
+                                                                                                                                             what=Printf.sprintf "Could not find redeclared base class %s\n" id};
+                                                                                                                                         fail_unresolved {searching=name; result}
+                                                                                                                    end
+                                                                                                                 | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find parent of redeclared base class %s\n" id; fail_unresolved {searching=name; result}     
+                                                                                                                 | _ -> BatLog.logf "Internal error. Parent of redeclare-extends is not a class.\n"; fail
                                                                                                            end
                                                                      | _ ->  BatLog.logf "Illegal redeclare extends\n"; fail
                                                                end
@@ -300,7 +322,7 @@ and norm lhs =
                                                               | `Found {found_value} -> return found_value
                                                               | `NothingFound | `PrefixFound _ as result -> BatLog.logf "Could not find suffix\n"; fail_unresolved {searching=name; result}
                                                         end
-                   | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find prefix\n"; fail_unresolved {searching=name; result}
+                   | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find prefix %s in %s\n" x (Name.show ctxt) ; fail_unresolved {searching=name; result}
              end
            | None -> Report.do_; log{level=Error; where=none; what=Printf.sprintf "Empty name when evaluating %s. Most likely an internal bug." (show_class_ptr lhs)} ; fail
      end
@@ -323,7 +345,19 @@ and norm lhs =
   | PExternalObject -> return ProtoExternalObject
   | PEnumeration ids -> return (Enumeration ids)
 
-       
+exception Check
+                               
+let rec check = function
+    Class os -> if os.source_name = empty_object_struct.source_name then raise Check else
+                  begin
+                    el_check os.public ;
+                    el_check os.protected
+                  end
+  | Constr {arg} -> check arg
+  | _ -> ()               
+
+and el_check {class_members} = StrMap.iter (fun k v -> check v) class_members
+           
 let rec norm_prog i p =
     Report.do_ ;
     o <-- output;
@@ -332,9 +366,10 @@ let rec norm_prog i p =
       let {lhs;rhs} = p.(i) in
       Report.do_ ;
       lhs <-- stratify_ptr lhs ;
-      let () = BatLog.logf "[%d / %d] %s := %s\n" i (Array.length p) (show_class_ptr lhs) (show_class_term rhs) in      
+      let () = BatLog.logf "[%d / %d]\n" i (Array.length p) in
       norm <-- norm lhs rhs;
-      set_output (update lhs norm o) ;
+      let o' = update lhs norm o in
+      set_output (o') ;
       norm_prog (i+1) p
 
 open ClassDeps
@@ -357,7 +392,7 @@ type open_term = { open_lhs : class_path ;
 
 let rec resolve_recursive {rec_term; search_state} = let name = (DQ.append (Name.of_ptr search_state.found) search_state.not_found) in
                                                      let lhs = rec_term.rec_lhs in
-                                                     BatLog.logf "Recursively unfolding %s\n" (show_class_term rec_term.rec_rhs) ;
+                                                     (*BatLog.logf "Recursively unfolding %s\n" (show_class_term rec_term.rec_rhs) ;*)
                                                      Report.do_ ;                                                  
                                                      n <-- norm lhs rec_term.rec_rhs ;
                                                      o <-- output ;                                                       
@@ -448,6 +483,93 @@ let norm_pkg_root root =
   let ct = Array.of_list (elements_collect_recursive_terms DQ.empty [] c) in
   let () = BatLog.logf "Closing %d possibly recursive terms.\n" (Array.length ct) in
   close_terms 0 ct
-                  
-                   
-                  
+
+type decompression = {
+    parent_class : class_path ;
+    superclass_nr : int;
+    superclass_name : Name.t ;
+  }
+              
+let rec decompressions p dcs = function
+    Class os -> let dcs' = elements_decompressions p dcs os.public in
+                elements_decompressions (DQ.snoc p `Protected) dcs' os.protected
+  | _ -> dcs
+
+and superclass_to_decompress parent_class superclass_nr dcs = function
+    GlobalReference superclass_name -> {parent_class; superclass_nr ; superclass_name}::dcs
+  | Constr {arg} -> superclass_to_decompress parent_class superclass_nr dcs arg
+  | _ -> dcs
+           
+and elements_decompressions p dcs es =
+  let dcs' = IntMap.fold (fun k v dcs -> superclass_to_decompress p k dcs v) es.super dcs in
+  StrMap.fold (fun k v dcs -> decompressions (DQ.snoc p (`ClassMember k)) dcs v) es.class_members dcs'
+                            
+let rec do_decompression i dcs =
+  if i >= Array.length dcs then (Report.do_ ; log{where=none;level=Info;what="Finished Decompression"} ; output) else
+    let n = dcs.(i).superclass_name in
+    match DQ.front n with
+    None -> Report.do_ ; log {where=none; level=Error; what="Inconsistent normal form: Empty superclass name."} ; fail
+  | Some (x,xs) ->
+     BatLog.logf "[%d/%d] Superclass %d of %s = %s\n" i (Array.length dcs) dcs.(i).superclass_nr (show_class_path dcs.(i).parent_class) (Name.show n);
+     Report.do_ ;
+     o <-- output ;
+     match get_class_element_in o DQ.empty o x xs with
+       `Recursion _ -> Report.do_ ; log {where=none; level=Error; what="Inconsistent normal form: Recursive Entry found."} ; fail
+
+     | `Found {found_value; found_path} ->
+        Report.do_ ;
+        set_output (update (DQ.snoc dcs.(i).parent_class (`SuperClass dcs.(i).superclass_nr)) found_value o) ;
+        do_decompression (i+1) dcs 
+
+     | `PrefixFound _ | `NothingFound as result -> fail_unresolved {searching=n; result}
+
+
+module GInt = struct include Int let hash i = i end                                  
+module DepGraph = Graph.Persistent.Digraph.Concrete(GInt)
+module Scc = Graph.Components.Make(DepGraph)
+
+
+(* record all decompressions required for a class-name *)                                  
+let decompress_map dcm i {parent_class} =
+  let name = Name.of_ptr parent_class in
+  if NameMap.mem name dcm then    
+    NameMap.add name (i::(NameMap.find name dcm)) dcm
+  else
+    NameMap.add name [i] dcm
+
+let decompress_dep dcm g i {superclass_name} =
+  if NameMap.mem superclass_name dcm then
+    List.fold_left (fun g j -> DepGraph.add_edge g i j) g (NameMap.find superclass_name dcm)
+  else
+    DepGraph.add_vertex g i
+                
+let load_from_json js =
+  let cv = elements_struct_of_yojson js in
+      
+  match cv with
+    `Error err -> Report.do_; log{where=none; level=Error; what=err} ; fail
+  | `Ok es ->
+     let dcs = Array.of_list (elements_decompressions DQ.empty [] es) in
+     BatLog.logf "Decompressing %d superclass-references\n" (Array.length dcs) ;
+     let dcm = Array.fold_lefti decompress_map NameMap.empty dcs in
+     let dcg = Array.fold_lefti (decompress_dep dcm) DepGraph.empty dcs in
+     let sccs = Scc.scc_list dcg in
+     
+     let rec reorder_sccs = function
+       | [] -> return []
+       | []::sccs -> reorder_sccs sccs
+       | [i]::sccs -> Report.do_ ;
+                      sccs' <-- (reorder_sccs sccs) ;
+                      return (dcs.(i)::sccs')
+
+       | (i::is)::sccs -> let what = Printf.sprintf "Recursive inheritance involving %s" (Name.show dcs.(i).superclass_name) in
+                          Report.do_ ;
+                          log {level=Error;what;where=none}; fail
+     in  
+
+     Report.do_ ;              
+     set_output es ;     
+     dcs <-- reorder_sccs sccs;
+     do_decompression 0 (Array.of_list dcs)
+                         
+           

@@ -76,7 +76,8 @@ module Name = struct
 end
 
 module NameMap = Map.Make(Name)
-              
+module NameSet = Set.Make(Name)
+                         
 type constr =  CArray of int
              | CSort of sort
              | CRepl
@@ -157,7 +158,7 @@ module Normalized = struct
                              
 
     let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
-    let empty_object_struct = {object_sort=Class; source_name=Name.empty; public=empty_elements; protected=empty_elements}
+    let empty_object_struct = {object_sort=Class; source_name=Name.singleton "EMPTY"; public=empty_elements; protected=empty_elements}
 
     let empty_class = Class empty_object_struct 
 
@@ -174,6 +175,34 @@ module Normalized = struct
       | Constr {constr; arg} -> Constr {constr; arg = pack_class arg}
       | Replaceable v -> Replaceable (pack_class v)
       | v -> v
+
+    type type_environment = { classes : class_value StrMap.t ;
+                              values : class_value StrMap.t } [@@deriving show]
+
+    let empty_env = { classes = StrMap.empty; values = StrMap.empty }
+
+    let env_merge a b = {classes = StrMap.union a.classes b.classes; values = StrMap.union a.values b.values}
+                      
+    type environment = {outside : type_environment ;
+                        inside : type_environment } [@@deriving show]
+               
+    let rec elements_env inside {class_members; super; fields} =
+      let inside = IntMap.fold (fun k v e -> inherit_env e v) super inside in
+      let add_class k v c = {c with classes = StrMap.add k v c.classes} in
+      let add_field k v c = {c with values = StrMap.add k v c.values} in
+      let env' = StrMap.fold add_class class_members inside in
+      StrMap.fold add_field fields env'
+
+    and inherit_env env = function
+        Class os -> elements_env (elements_env empty_env os.public) os.protected
+      | _ -> empty_env
+        
+    and lexical_env outside xs v =
+      let inside = inherit_env empty_env v in
+      match DQ.front xs with
+        Some(y,ys) -> lexical_env (env_merge inside outside) ys (StrMap.find y inside.classes)
+      | None -> {inside; outside}
+                                
   end
                                                                                            
 

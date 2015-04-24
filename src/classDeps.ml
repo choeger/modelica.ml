@@ -41,6 +41,10 @@ let writes w i {lhs;rhs} =
 let writesMap prog =
   Array.fold_lefti writes NameMap.empty prog
 
+let is_super {lhs} = match DQ.rear lhs with
+    Some(_, `SuperClass _) -> true
+  | _ -> false
+                   
 type first_of = { what : Name.t ; sources : Name.t list } [@@deriving show, yojson]
                    
 type dependency_source = {
@@ -68,13 +72,7 @@ exception IllegalRedeclaration
                                         
 let rec reads r i {lhs; rhs} =  
   match rhs with
-  | RedeclareExtends -> begin match DQ.rear lhs with
-                              | Some (scope, `SuperClass _) -> begin match DQ.rear scope with
-                                                                     | Some (parent, _) -> add_reads i (Precisely (Name.of_ptr parent)) r
-                                                                     | _ -> raise IllegalRedeclaration
-                                                               end
-                              | _ -> raise IllegalRedeclaration
-                        end
+  | RedeclareExtends -> r (* does not "read" a name, but depends on superclass-statements. needs to be handled later *) 
   | PInt | PReal | PString | PBool | PExternalObject | Empty _ -> r
   | PEnumeration _ -> r
   | Constr {arg} ->  reads r i {lhs; rhs=arg}
@@ -98,10 +96,7 @@ exception NoClose
                                   
 let topological_order w r a =
 
-  let is_super {lhs} = match DQ.rear lhs with
-      Some(_, `SuperClass _) -> true
-    | _ -> false
-  in
+  let add_edge g from to_ = (*BatLog.logf "%s depends on %s\n" (show_class_stmt a.(from)) (show_class_stmt a.(to_)) ;*) DepGraph.add_edge g to_ from in
 
   let find_super_classes =
     List.filter (fun j -> is_super a.(j)) 
@@ -127,7 +122,7 @@ let topological_order w r a =
   
   let refine s = refine_ false s in
 
-  let add_lookup_dependencies src g = List.fold_left (fun g dest -> DepGraph.add_edge g dest src) g in
+  let add_lookup_dependencies src g = List.fold_left (fun g dest -> add_edge g src dest) g in
   
   let rec add_local_deps src g = function
       [] -> g
@@ -136,22 +131,24 @@ let topological_order w r a =
        let ws = NameMap.find source_name w in
        let c = find_close ws in
        (* depend on the refinement being normalized *)
-       DepGraph.add_edge g c src                         
+       (*BatLog.logf "%s can depend on %s\n" (show_class_stmt a.(src)) (show_class_stmt a.(c)) ;*)
+       add_edge g src c                         
 
     (* when the empty source name could not be refined, it will not match, since the root-package is never tainted *)
     | (false, {source_name})::srcs when source_name=DQ.empty -> add_local_deps src g srcs
                          
     | (false, {source_name})::srcs ->
        let ws = NameMap.find source_name w in
+       (* BatLog.logf "%s can depend on superclasses of %s\n" (show_class_stmt a.(src)) (Name.show source_name) ; *)   
        (* no refinement found in that scope, just depend on the superclasses *)
        add_local_deps src (add_lookup_dependencies src g (find_super_classes ws)) srcs
   in
 
-  let add_dep i g d =    
+  let add_dep i g d =
     match d with
     | Precisely n -> let (refined, source) = refine {source_name=DQ.empty; required=n} in
                      add_local_deps i g [(refined, source)]
-                                                                          
+                                    
     | FirstOf ({what ; sources } as fo) ->
        let srcs = List.map (fun source_name -> {source_name; required=what}) sources in
        let refined = List.map refine srcs in       
@@ -172,7 +169,7 @@ let topological_order w r a =
     | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_empty_creator g i xs | None -> g end 
 
     (* In case of multiple writers there needs to be a Empty statement *)
-    | js -> let j = List.find (fun j -> is_empty a.(j).rhs) js in DepGraph.add_edge g j i
+    | js -> let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
     else (BatLog.logf "Could not add %s to open-statement, no such statement found.\n" (Name.show lhs) ; g)
   in
 
@@ -183,8 +180,14 @@ let topological_order w r a =
       [] -> raise NoClose
     | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_to_closer g i xs | None -> g end
     | ws -> let c = find_close ws in
-            DepGraph.add_edge g i c
+            add_edge g c i
     else (BatLog.logf "Could not add %s to close-statement, no such statement found.\n" (Name.show lhs) ; g)
+  in
+
+  let rec opens_scope = function
+      Empty _ -> true
+    | Constr {arg} -> opens_scope arg
+    | _ -> false
   in
   
   (* add all the "upwards" dependencies to ensure the scope chain is properly setup 
@@ -193,10 +196,14 @@ let topological_order w r a =
     | Some(q, _) when NameMap.mem lhs w ->
        let g' = add_empty_creator g i lhs in
        let g'' = add_to_closer g' i lhs in
-       (* If this is a close statement, add a reverse dependency to the parent's close statement *)
        begin match rhs with               
+               (* If this is a close statement, add a reverse dependency to the parent's close statement *)
                Close when NameMap.mem q w -> add_to_closer g'' i q
-             | Empty _ when NameMap.mem q w -> add_empty_creator g'' i q
+             | t when (opens_scope t) && (NameMap.mem q w) -> add_empty_creator g'' i q
+             | RedeclareExtends ->
+                    let ws = NameMap.find q w in
+                    let supers = List.filter (fun i -> is_super a.(i)) ws in
+                    List.fold_left (fun g super -> add_edge g i super) g'' supers 
              | _ -> g''
        end
     | _ -> g
@@ -204,7 +211,8 @@ let topological_order w r a =
                              
   let add_deps g (i, ds) = List.fold_left (add_dep i) g ds in
 
-  let add_scope_deps g i {lhs;rhs} = scope_deps (DepGraph.add_vertex g i) i (Name.of_ptr lhs) rhs in
+  let add_scope_deps g i {lhs;rhs} =    
+    scope_deps (DepGraph.add_vertex g i) i (Name.of_ptr lhs) rhs in
   
   let g = Array.fold_lefti add_scope_deps DepGraph.empty a in
       
@@ -232,17 +240,20 @@ let topological_order w r a =
   in
   
   let handle_scc prog scc =
+    let log_scc i = BatLog.logf "  %s\n" (show_class_stmt a.(i)) in
+    List.iter log_scc scc ;
     prepare_scc (append_scc (append_superclasses prog scc) scc) scc 
   in
       
   let rec reorder_sccs prog = function
     | [] -> prog 
     | [i]::sccs -> reorder_sccs (a.(i)::prog) sccs                                
-    | scc::sccs -> reorder_sccs (handle_scc prog scc) sccs
+    | scc::sccs -> BatLog.logf "Begin SCC\n" ; reorder_sccs (handle_scc prog scc) sccs
   in
   
   reorder_sccs [] sccs
  
 let preprocess prog =
   let a = Array.of_list prog in
-  (Array.of_list (topological_order (writesMap a) (readsMap a) a))
+  let wm = writesMap a in
+  (Array.of_list (topological_order wm (readsMap a) a))

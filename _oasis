@@ -56,6 +56,13 @@ Executable modcl
   BuildTools: ocamlbuild
   MainIs:     modcl.ml
 
+Executable modclread
+  Path:    test
+  CompiledObject: best
+  BuildDepends: modelica_ml
+  BuildTools: ocamlbuild
+  MainIs:     modclread.ml
+
 Document "modelica.ml-api"
   Title: API reference for modelica.ml
   Type: ocamlbuild (0.3)

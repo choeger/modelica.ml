@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: f1aa3b3fb79f251f9ce8ae1806d81d5d)
+# DO NOT EDIT (digest: 9e88e538034c146392259f74ad766c1d)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -91,6 +91,18 @@ true: annot, bin_annot
 <test/modcl.{native,byte}>: pkg_ppx_monadic
 <test/modcl.{native,byte}>: pkg_sedlex
 <test/modcl.{native,byte}>: use_modelica_ml
+# Executable modclread
+<test/modclread.{native,byte}>: pkg_batteries
+<test/modclread.{native,byte}>: pkg_compiler-libs.common
+<test/modclread.{native,byte}>: pkg_menhirLib
+<test/modclread.{native,byte}>: pkg_ocamlgraph
+<test/modclread.{native,byte}>: pkg_ppx_deriving.eq
+<test/modclread.{native,byte}>: pkg_ppx_deriving.show
+<test/modclread.{native,byte}>: pkg_ppx_deriving_yojson
+<test/modclread.{native,byte}>: pkg_ppx_import
+<test/modclread.{native,byte}>: pkg_ppx_monadic
+<test/modclread.{native,byte}>: pkg_sedlex
+<test/modclread.{native,byte}>: use_modelica_ml
 <test/*.ml{,i,y}>: pkg_batteries
 <test/*.ml{,i,y}>: pkg_compiler-libs.common
 <test/*.ml{,i,y}>: pkg_menhirLib

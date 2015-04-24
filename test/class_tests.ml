@@ -103,7 +103,7 @@ let test_cases = [
     class_ "class A class B replaceable type T = Real; end B; type T = B.T ; end A" (lookup "A" ["T"] (eq (type_ (GlobalReference (Name.of_list ["A";"B";"T"]))))) ;
 
     
-    class_ "class A type B = Real; class C type S = B; end C; end A" (lookup "A" ["C";"S"] (eq (type_ real))) ;
+    class_ "class A type B = Real; class C type S = B; end C; end A" (lookup "A" ["C";"S"] (eq (real))) ;
 
     class_ "class A type B = Real; class C import D = A.B; class E type F = D; end E; end C; end A" (lookup "A" ["C"; "E";"F"] (eq (type_ real)));
 
