@@ -38,6 +38,7 @@ open Batteries
 open ClassDeps
        
 exception UnqualifiedImportNotSupported
+exception NothingModified
             
 type import_env = DS.name StrMap.t
             
@@ -158,10 +159,21 @@ and translate_texp env p (prog : class_stmt list) f =
   | TCau {flag;flagged} -> appl flagged (CCau flag)
 
   | TMod {mod_type; modification} ->
-     let prog' = translate_modification env p prog modification in
      (* order does not matter here: will be found by dependency analysis *)
-     if prog' == prog then translate_texp env p prog f mod_type else
-       translate_texp env (DQ.snoc p (`SuperClass 0)) ({lhs=p; rhs=Close}::{lhs=p; rhs=Empty {class_sort=Class;class_name=Name.of_ptr p}}::prog') f mod_type
+     begin match DQ.rear p with
+             None -> raise NothingModified (* cannot happen *)
+           (* In case of inheritance, we do not need to handle redeclarations special from normal declarations *)
+           | Some(parent, `SuperClass _) ->
+              let prog' = translate_modification env parent prog modification in
+              translate_texp env p prog' f mod_type
+           (* This is a little bit wonky: Actually there should be a fresh class name generated here ... *)
+           | _ ->
+              let prog' = translate_modification env p prog modification in
+              if (prog == prog') then
+                translate_texp env p prog f mod_type
+              else
+                translate_texp env (DQ.snoc p (`SuperClass 0)) ({lhs=p; rhs=Close}::{lhs=p; rhs=Empty {class_sort=Class;class_name=Name.of_ptr p}}::prog') f mod_type
+       end
 
 and translate_type_redeclaration env p prog {redecl_type} =
   let tds = redecl_type.commented in

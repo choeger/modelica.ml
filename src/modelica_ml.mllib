@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 900b0d6c45ad0c8f58ef78d17010b03a)
+# DO NOT EDIT (digest: 26a91a7102ce63b3aa4abf0abad816c3)
 Modelica_parser
 Modelica_lexer
 Pprint_modelica
@@ -14,6 +14,8 @@ Stats
 ClassTrans
 Motypes
 ClassDeps
-Generated_parser
 Utils
+Report
+ClassNorm
+Generated_parser
 # OASIS_STOP

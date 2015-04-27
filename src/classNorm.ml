@@ -366,7 +366,7 @@ let rec norm_prog i p =
       let {lhs;rhs} = p.(i) in
       Report.do_ ;
       lhs <-- stratify_ptr lhs ;
-      let () = BatLog.logf "[%d / %d]\n" i (Array.length p) in
+      let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in
       norm <-- norm lhs rhs;
       let o' = update lhs norm o in
       set_output (o') ;
