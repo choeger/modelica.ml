@@ -1,28 +1,35 @@
 opam-version: "1.2"
-name: "modelica_ml"
+name: "modelica.ml"
 version: "0.2.0"
-maintainer: "Christoph Höger <christoph.hoeger@tu-berlin.de>"
-authors: "Christoph Höger <christoph.hoeger@tu-berlin.de>"
+maintainer: "\"Christoph Höger <christoph.hoeger@tu-berlin.de>\""
+authors: [ "\"Christoph Höger <christoph.hoeger@tu-berlin.de>\"" ]
 license: "BSD-3-clause"
-dev-repo:"https://github.com/choeger/modelica.ml.git"
-homepage:"https://github.com/choeger/modelica.ml"
-bug-reports: "https://github.com/choeger/modelica.ml/issues"
+homepage: "http://github.com/choeger/modelica.ml"
 build: [
   ["ocaml" "setup.ml" "-configure" "--prefix" prefix]
   ["ocaml" "setup.ml" "-build"]
 ]
-install: [
-  ["ocaml" "setup.ml" "-install"]
+install: ["ocaml" "setup.ml" "-install"]
+remove: [
+  ["ocamlfind" "remove" "modelica_ml"]
 ]
-build-doc: ["ocaml" "setup.ml" "-doc"]
-remove: ["ocamlfind" "remove" "modelica_ml"]
+build-doc: [ "ocaml" "setup.ml" "-doc" ]
 depends: [
   "ANSITerminal"
   "batteries"
   "menhir"
   "ocamlfind"
-  "ppx_deriving" {>= "1.1"}
+  "ocamlgraph"
+  "ppx_deriving" {= "1.0"}
+  "ppx_deriving_yojson" {= "2.0"}
+  "ppx_import"
+  "ppx_monadic"
   "sedlex"
 ]
-depopts: "ounit"
-available: [ocaml-version >= "4.02.1"]
+depopts: [
+  "ounit"
+]
+conflicts: [
+  "modelica_ml" {= "0.1.1"}
+]
+ocaml-version: [ >= ""4.02.1"" ]
