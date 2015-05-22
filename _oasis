@@ -39,40 +39,26 @@ Executable modelica_frontend_tests
   BuildTools: ocamlbuild
   MainIs:     modelica_frontend_tests.ml
 
-Executable parse_modelica
-  Path:    test
-  CompiledObject: best
-  BuildDepends: modelica_ml, ANSITerminal
-  BuildTools: ocamlbuild
-  MainIs:     parse_modelica.ml
-
-Executable parse_pkg
-  Path:    test
-  CompiledObject: best
-  BuildDepends: modelica_ml, ANSITerminal
-  BuildTools: ocamlbuild
-  MainIs:     parse_package.ml
-
-Executable modclc
+Executable modml_clc
   Path:    test
   CompiledObject: best
   BuildDepends: modelica_ml
   BuildTools: ocamlbuild
-  MainIs:     modclc.ml
+  MainIs:     modml_clc.ml
 
-Executable modcl
+Executable modml_cl
   Path:    test
   CompiledObject: best
   BuildDepends: modelica_ml
   BuildTools: ocamlbuild
-  MainIs:     modcl.ml
+  MainIs:     modml_cl.ml
 
-Executable modclread
+Executable modml_clread
   Path:    test
   CompiledObject: best
   BuildDepends: modelica_ml
   BuildTools: ocamlbuild
-  MainIs:     modclread.ml
+  MainIs:     modml_clread.ml
 
 Document "modelica.ml-api"
   Title: API reference for modelica.ml
