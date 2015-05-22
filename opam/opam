@@ -32,4 +32,4 @@ depopts: [
 conflicts: [
   "modelica_ml" {= "0.1.1"}
 ]
-ocaml-version: [ >= ""4.02.1"" ]
+ocaml-version: [ >= "4.02.1" ]
