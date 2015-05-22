@@ -1,5 +1,5 @@
 opam-version: "1.2"
-name: "modelica.ml"
+name: "modelica_ml"
 version: "0.2.0"
 maintainer: "\"Christoph Höger <christoph.hoeger@tu-berlin.de>\""
 authors: [ "\"Christoph Höger <christoph.hoeger@tu-berlin.de>\"" ]
@@ -28,8 +28,5 @@ depends: [
 ]
 depopts: [
   "ounit"
-]
-conflicts: [
-  "modelica_ml" {= "0.1.1"}
 ]
 ocaml-version: [ >= "4.02.1" ]

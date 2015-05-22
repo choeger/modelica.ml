@@ -1,5 +1,5 @@
 OASISFormat: 0.4
-Name:        modelica.ml
+Name:        modelica_ml
 Version:     0.2.0
 Synopsis:    Modelica abstract syntax and parser
 Authors:     Christoph Höger <christoph.hoeger@tu-berlin.de>
@@ -10,7 +10,7 @@ Authors:     "Christoph Höger <christoph.hoeger@tu-berlin.de>"
 Homepage:    http://github.com/choeger/modelica.ml
 OCamlVersion:  >= 4.02.1
 Description: Modelica abstract syntax and parser
-             Modelica.ml is a Modelica frontend implemented in OCaml.
+             Modelica_ml is a Modelica frontend implemented in OCaml.
              It is written with compilation in mind, but should also be
              useful for other applications.
              Modelica.ml currently supports, abstract syntax, parsing,
