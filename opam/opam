@@ -15,7 +15,6 @@ remove: [
 ]
 build-doc: [ "ocaml" "setup.ml" "-doc" ]
 depends: [
-  "ANSITerminal"
   "batteries"
   "menhir"
   "ocamlfind"
