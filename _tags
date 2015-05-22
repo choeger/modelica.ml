@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 221ad256e7e678a66a0aee8528e1281f)
+# DO NOT EDIT (digest: 66db618d0aababfea082f88f7d12a2c9)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -39,46 +39,10 @@ true: annot, bin_annot
 <test/modelica_frontend_tests.{native,byte}>: package(ppx_monadic)
 <test/modelica_frontend_tests.{native,byte}>: package(sedlex)
 <test/modelica_frontend_tests.{native,byte}>: use_modelica_ml
-<test/*.ml{,i,y}>: package(oUnit)
-# Executable modml_clc
-<test/modml_clc.{native,byte}>: package(batteries)
-<test/modml_clc.{native,byte}>: package(compiler-libs.common)
-<test/modml_clc.{native,byte}>: package(menhirLib)
-<test/modml_clc.{native,byte}>: package(ocamlgraph)
-<test/modml_clc.{native,byte}>: package(ppx_deriving.eq)
-<test/modml_clc.{native,byte}>: package(ppx_deriving.show)
-<test/modml_clc.{native,byte}>: package(ppx_deriving_yojson)
-<test/modml_clc.{native,byte}>: package(ppx_import)
-<test/modml_clc.{native,byte}>: package(ppx_monadic)
-<test/modml_clc.{native,byte}>: package(sedlex)
-<test/modml_clc.{native,byte}>: use_modelica_ml
-# Executable modml_cl
-<test/modml_cl.{native,byte}>: package(batteries)
-<test/modml_cl.{native,byte}>: package(compiler-libs.common)
-<test/modml_cl.{native,byte}>: package(menhirLib)
-<test/modml_cl.{native,byte}>: package(ocamlgraph)
-<test/modml_cl.{native,byte}>: package(ppx_deriving.eq)
-<test/modml_cl.{native,byte}>: package(ppx_deriving.show)
-<test/modml_cl.{native,byte}>: package(ppx_deriving_yojson)
-<test/modml_cl.{native,byte}>: package(ppx_import)
-<test/modml_cl.{native,byte}>: package(ppx_monadic)
-<test/modml_cl.{native,byte}>: package(sedlex)
-<test/modml_cl.{native,byte}>: use_modelica_ml
-# Executable modml_clread
-<test/modml_clread.{native,byte}>: package(batteries)
-<test/modml_clread.{native,byte}>: package(compiler-libs.common)
-<test/modml_clread.{native,byte}>: package(menhirLib)
-<test/modml_clread.{native,byte}>: package(ocamlgraph)
-<test/modml_clread.{native,byte}>: package(ppx_deriving.eq)
-<test/modml_clread.{native,byte}>: package(ppx_deriving.show)
-<test/modml_clread.{native,byte}>: package(ppx_deriving_yojson)
-<test/modml_clread.{native,byte}>: package(ppx_import)
-<test/modml_clread.{native,byte}>: package(ppx_monadic)
-<test/modml_clread.{native,byte}>: package(sedlex)
-<test/modml_clread.{native,byte}>: use_modelica_ml
 <test/*.ml{,i,y}>: package(batteries)
 <test/*.ml{,i,y}>: package(compiler-libs.common)
 <test/*.ml{,i,y}>: package(menhirLib)
+<test/*.ml{,i,y}>: package(oUnit)
 <test/*.ml{,i,y}>: package(ocamlgraph)
 <test/*.ml{,i,y}>: package(ppx_deriving.eq)
 <test/*.ml{,i,y}>: package(ppx_deriving.show)
@@ -87,5 +51,52 @@ true: annot, bin_annot
 <test/*.ml{,i,y}>: package(ppx_monadic)
 <test/*.ml{,i,y}>: package(sedlex)
 <test/*.ml{,i,y}>: use_modelica_ml
+# Executable modml_clc
+<examples/modml_clc.{native,byte}>: package(batteries)
+<examples/modml_clc.{native,byte}>: package(compiler-libs.common)
+<examples/modml_clc.{native,byte}>: package(menhirLib)
+<examples/modml_clc.{native,byte}>: package(ocamlgraph)
+<examples/modml_clc.{native,byte}>: package(ppx_deriving.eq)
+<examples/modml_clc.{native,byte}>: package(ppx_deriving.show)
+<examples/modml_clc.{native,byte}>: package(ppx_deriving_yojson)
+<examples/modml_clc.{native,byte}>: package(ppx_import)
+<examples/modml_clc.{native,byte}>: package(ppx_monadic)
+<examples/modml_clc.{native,byte}>: package(sedlex)
+<examples/modml_clc.{native,byte}>: use_modelica_ml
+# Executable modml_cl
+<examples/modml_cl.{native,byte}>: package(batteries)
+<examples/modml_cl.{native,byte}>: package(compiler-libs.common)
+<examples/modml_cl.{native,byte}>: package(menhirLib)
+<examples/modml_cl.{native,byte}>: package(ocamlgraph)
+<examples/modml_cl.{native,byte}>: package(ppx_deriving.eq)
+<examples/modml_cl.{native,byte}>: package(ppx_deriving.show)
+<examples/modml_cl.{native,byte}>: package(ppx_deriving_yojson)
+<examples/modml_cl.{native,byte}>: package(ppx_import)
+<examples/modml_cl.{native,byte}>: package(ppx_monadic)
+<examples/modml_cl.{native,byte}>: package(sedlex)
+<examples/modml_cl.{native,byte}>: use_modelica_ml
+# Executable modml_clread
+<examples/modml_clread.{native,byte}>: package(batteries)
+<examples/modml_clread.{native,byte}>: package(compiler-libs.common)
+<examples/modml_clread.{native,byte}>: package(menhirLib)
+<examples/modml_clread.{native,byte}>: package(ocamlgraph)
+<examples/modml_clread.{native,byte}>: package(ppx_deriving.eq)
+<examples/modml_clread.{native,byte}>: package(ppx_deriving.show)
+<examples/modml_clread.{native,byte}>: package(ppx_deriving_yojson)
+<examples/modml_clread.{native,byte}>: package(ppx_import)
+<examples/modml_clread.{native,byte}>: package(ppx_monadic)
+<examples/modml_clread.{native,byte}>: package(sedlex)
+<examples/modml_clread.{native,byte}>: use_modelica_ml
+<examples/*.ml{,i,y}>: package(batteries)
+<examples/*.ml{,i,y}>: package(compiler-libs.common)
+<examples/*.ml{,i,y}>: package(menhirLib)
+<examples/*.ml{,i,y}>: package(ocamlgraph)
+<examples/*.ml{,i,y}>: package(ppx_deriving.eq)
+<examples/*.ml{,i,y}>: package(ppx_deriving.show)
+<examples/*.ml{,i,y}>: package(ppx_deriving_yojson)
+<examples/*.ml{,i,y}>: package(ppx_import)
+<examples/*.ml{,i,y}>: package(ppx_monadic)
+<examples/*.ml{,i,y}>: package(sedlex)
+<examples/*.ml{,i,y}>: use_modelica_ml
 # OASIS_STOP
 true: use_menhir

@@ -40,21 +40,21 @@ Executable modelica_frontend_tests
   MainIs:     modelica_frontend_tests.ml
 
 Executable modml_clc
-  Path:    test
+  Path:    examples
   CompiledObject: best
   BuildDepends: modelica_ml
   BuildTools: ocamlbuild
   MainIs:     modml_clc.ml
 
 Executable modml_cl
-  Path:    test
+  Path:    examples
   CompiledObject: best
   BuildDepends: modelica_ml
   BuildTools: ocamlbuild
   MainIs:     modml_cl.ml
 
 Executable modml_clread
-  Path:    test
+  Path:    examples
   CompiledObject: best
   BuildDepends: modelica_ml
   BuildTools: ocamlbuild
