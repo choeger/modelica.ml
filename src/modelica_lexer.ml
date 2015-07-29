@@ -32,7 +32,7 @@ open Sedlexing
 open Batteries
 open Utils       
 type cursor = Location.t
-
+             
 open Location
 
 type 'a loc = 'a Location.loc = {
@@ -290,7 +290,7 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | "/*" -> terminate_comment ()
 
     | (id_start | '_'), Star ( id_continue ) -> ident_or_kw () 
-    | any -> failwith (Printf.sprintf "Unexpected character '%s'" (Sedlexing.Utf8.lexeme buf))
+    | any -> failwith (Printf.sprintf "Unexpected character '%s' (%d)" (Sedlexing.Utf8.lexeme buf) (Sedlexing.lexeme_char buf 0)) 
     | _ -> failwith "no match on 'any'. This cannot happen"
 					  
   and terminate_comment () = 

@@ -54,8 +54,7 @@ type dependency_source = {
 
 type external_dependency = dependency_source list [@@deriving show, yojson]
 
-type external_dependencies = external_dependency list [@@deriving show, yojson]
-
+type external_dependencies = external_dependency list [@@deriving show, yojson]						
                                              
 type read_dep = Precisely of Name.t
               | FirstOf of first_of
@@ -138,6 +137,7 @@ let topological_order w r a =
     | (false, {source_name})::srcs when source_name=DQ.empty -> add_local_deps src g srcs
                          
     | (false, {source_name})::srcs ->
+       BatLog.logf "Searching writer of %s\n" (Name.show source_name) ;
        let ws = NameMap.find source_name w in
        (* BatLog.logf "%s can depend on superclasses of %s\n" (show_class_stmt a.(src)) (Name.show source_name) ; *)   
        (* no refinement found in that scope, just depend on the superclasses *)
@@ -169,7 +169,8 @@ let topological_order w r a =
     | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_empty_creator g i xs | None -> g end 
 
     (* In case of multiple writers there needs to be a Empty statement *)
-    | js -> let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
+    | js -> BatLog.logf "searching opener for: %s\n%!" (Name.show lhs) ;
+	    let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
     else (BatLog.logf "Could not add %s to open-statement, no such statement found.\n" (Name.show lhs) ; g)
   in
 
@@ -179,8 +180,10 @@ let topological_order w r a =
     match NameMap.find lhs w with
       [] -> raise NoClose
     | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_to_closer g i xs | None -> g end
-    | ws -> let c = find_close ws in
-            add_edge g c i
+    | ws ->
+       BatLog.logf "searching closer for: %s\n%!" (Name.show lhs) ;
+       let c = find_close ws in
+       add_edge g c i
     else (BatLog.logf "Could not add %s to close-statement, no such statement found.\n" (Name.show lhs) ; g)
   in
 

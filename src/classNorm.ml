@@ -74,7 +74,7 @@ let rec get_class_element_in global current_path {Normalized.class_members; supe
       | r -> r
     end
   else (
-    pickfirst_class global 0 current_path (DQ.snoc xs x) (IntMap.bindings super) )
+    pickfirst_class global 0 current_path (DQ.cons x xs) (IntMap.bindings super) )
 
 and pickfirst_class global n current_path name = function
     [] -> `NothingFound
@@ -315,10 +315,10 @@ and norm lhs =
              Report.do_ ; o <-- output ;
              begin match find_lexical o previous DQ.empty ctxt x (Class {empty_object_struct with public = o}) with
                    | `Recursion r -> norm_recursive {r with search_state = {r.search_state with not_found = xs}}
-                   | `Found {found_value = Replaceable v ; found_path} -> return (GlobalReference (DQ.append (Name.of_ptr found_path) xs))
+                   | `Found {found_value = Replaceable v ; found_path} -> return (DynamicReference (DQ.append (Name.of_ptr found_path) xs))
                    | `Found {found_value;found_path} -> begin match get_class_element o found_path found_value xs with
                                                               | `Recursion r -> norm_recursive r
-                                                              | `Found {found_value = Replaceable v} -> return (GlobalReference (DQ.append (Name.of_ptr found_path) xs))
+                                                              | `Found {found_value = Replaceable v} -> return (DynamicReference (DQ.append (Name.of_ptr found_path) xs))
                                                               | `Found {found_value} -> return found_value
                                                               | `NothingFound | `PrefixFound _ as result -> BatLog.logf "Could not find suffix\n"; fail_unresolved {searching=name; result}
                                                         end
@@ -368,7 +368,7 @@ let rec norm_prog i p =
       lhs <-- stratify_ptr lhs ;
       let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in
       norm <-- norm lhs rhs;
-      let o' = update lhs norm o in
+      let o' = update lhs (norm_cv norm) o in
       set_output (o') ;
       norm_prog (i+1) p
 

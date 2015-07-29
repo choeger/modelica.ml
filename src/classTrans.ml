@@ -39,6 +39,7 @@ open ClassDeps
        
 exception UnqualifiedImportNotSupported
 exception NothingModified
+exception InconsistentHierarchy
             
 type import_env = DS.name StrMap.t
             
@@ -56,6 +57,7 @@ let add_import env import = match import.commented with
                         
     | UnqualifiedImport name -> raise UnqualifiedImportNotSupported
 
+				      
 let sort sort arg = if sort = Class then arg else Constr {arg; constr = CSort sort}
                                       
 let repl opts arg = match opts with {type_replaceable=true} -> Constr {arg; constr = CRepl}
@@ -63,8 +65,235 @@ let repl opts arg = match opts with {type_replaceable=true} -> Constr {arg; cons
 
 let final opts arg = match opts with {type_final=false} -> Constr {arg; constr=CRepl}
                                    | _ -> arg
-                                           
-let rec translate_tds env p (prog : class_stmt list) = function
+					    
+type translation_state = {
+    env : import_env ;
+    current_path : class_ptr ;
+    fresh_names : int ;
+    code : class_stmt list ;
+  }
+			   
+let rec add_imports imports state = match imports with
+    [] -> ((),state)
+  | i::imports -> add_imports imports {state with env = add_import state.env i}
+			   
+let return x = fun s -> (x, s)
+
+let bind ma f = fun s -> let (a, s') = ma s in
+			 (f a s') 
+
+let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; fresh_names = 0; code = []} in a
+
+let down pe state = ((), {state with current_path = DQ.snoc state.current_path pe})
+
+let within_path = function 
+    None -> return ()
+  | Some (ps) -> fun state -> ((), {state with current_path = DQ.of_list (List.map (fun str -> `ClassMember str.txt) ps)})
+		      		      
+let up state = ((), {state with current_path = match DQ.rear state.current_path with None -> DQ.empty | Some (xs,_) -> xs})
+		 
+let define rhs state = ((), {state with code = {lhs=state.current_path; rhs} :: state.code})
+
+let open_class sort post state = ((), {state with code =
+						    {lhs = state.current_path ;
+						     rhs = Close } ::
+						    {lhs = state.current_path;
+						     rhs = (post (Empty {class_sort = sort; class_name = (Name.of_ptr state.current_path)}))} :: state.code})
+
+let in_context m state =
+  let (x, s') = m state in
+  (x, {state with code = s'.code})
+
+let inside name m state =
+  let (x, s') = m {state with current_path = name} in
+  (x, {s' with current_path = state.current_path})
+
+let current_path state = (state.current_path, state)
+    
+let in_superclass state = match DQ.rear state.current_path with
+    Some(xs, `SuperClass _) -> (true, state)
+  | _ -> (false, state)
+    
+let rec mseqi_ i fm list state = match list with
+    [] -> ((), state)
+  | x::xs -> let (a', s) = fm i x state in
+	     mseqi_ (i+1) fm xs s
+
+let mseqi = mseqi_ 0
+		   
+let rec mseq fm list state = match list with
+    [] -> ((), state)
+  | x::xs -> let (a', s) = fm x state in
+	     mseq fm xs s
+
+let apply_import n state = match n with
+    | x::xs when StrMap.mem x.txt state.env -> ((StrMap.find x.txt state.env) @ xs, state)
+    | xs -> (xs, state)
+
+let get state = (state, state)
+
+let set state s = ((), state)
+
+let set_env env state = ((), {state with env})
+		    
+let mk_fresh_name state = (Printf.sprintf "fresh_%d" state.fresh_names, {state with fresh_names = state.fresh_names + 1})
+   			    
+let rec mtranslate_tds = function
+  | Short tds -> do_ ;
+		 (* new path is the definition *)
+		 down (`ClassMember tds.td_name.txt) ;
+		 (* Translate the rhs of the type-definition *)
+		 te <-- mtranslate_texp ((sort tds.sort) %> (repl tds.type_options)) tds.type_exp ;
+		 (* restore path *)
+		 up ;
+		 return ()
+
+  | Composition tds ->
+     do_ ;
+     in_context (
+	 do_ ;
+	 add_imports tds.type_exp.imports ;
+	 (* Class name *)
+	 down (`ClassMember tds.td_name.txt) ;
+	 (* Class skeleton *)
+	 open_class tds.sort (repl tds.type_options) ;
+	 (* Public elements *)
+	 mtranslate_elements tds.type_exp.public ;	 
+	 (* Protected elements *)
+	 down `Protected ;
+	 mtranslate_elements tds.type_exp.protected 
+       )     
+
+  | Enumeration tds ->
+     do_ ;
+     down (`ClassMember tds.td_name.txt) ;
+     define (repl tds.type_options (sort tds.sort (PEnumeration (StrSet.of_list (List.map (fun {commented} -> commented) tds.type_exp))))) ;
+     up
+       
+  | OpenEnumeration tds ->
+     do_ ;
+     down (`ClassMember tds.td_name.txt) ;
+     define (repl tds.type_options (sort tds.sort (PEnumeration StrSet.empty))) ;
+     up
+                          
+  | DerSpec tds ->
+     do_ ;
+     down (`ClassMember tds.td_name.txt) ;
+     define (repl tds.type_options (sort tds.sort (Constr {arg = Reference tds.type_exp.der_name ; constr = CDer (lunloc tds.type_exp.idents)}))) ;
+     up 
+
+  | Extension tds ->
+     let (cmp, _) = tds.type_exp in
+     in_context (
+	 do_ ;
+	 add_imports cmp.imports ;
+	 down (`ClassMember tds.td_name.txt) ;
+	 open_class tds.sort (repl tds.type_options) ;
+	 mtranslate_elements cmp.public ;
+	 down (`SuperClass (List.length cmp.public.extensions)) ;
+	 define RedeclareExtends ; up ;
+	 down `Protected ;
+	 mtranslate_elements cmp.protected
+       )
+		
+and mtranslate_texp post =
+  let appl ct constr = let f' = fun arg -> post (Constr {arg;constr}) in
+                       mtranslate_texp f' ct
+  in
+  function
+  | TName [{txt="ExternalObject"}] -> define (post PExternalObject)
+  | TName [{txt="StateSelect"}] -> define (post (PEnumeration (StrSet.of_list ["never";"default";"avoid";"prefer";"always"])))
+  | TName [{txt="Real"}] -> define (post PReal)
+  | TName [{txt="Integer"}] -> define (post PInt)
+  | TName [{txt="Boolean"}] -> define (post PBool)
+  | TName [{txt="String"}] -> define (post PString)
+
+  | TName n -> do_ ; r <-- apply_import n ;
+	       define (post (Reference r))
+  | TRootName n -> define (post (RootReference n))
+                                 
+  | TArray {base_type;dims} -> appl base_type (CArray (List.length dims))
+  | TVar {flag;flagged} -> appl flagged (CVar flag)                                
+  | TCon {flag;flagged} -> appl flagged (CCon flag)
+  | TCau {flag;flagged} -> appl flagged (CCau flag)
+
+  | TMod {mod_type; modification} ->
+     do_ ;
+     s <-- current_path ;
+     let src = match DQ.rear s with None -> raise InconsistentHierarchy | Some(xs,_) -> xs in
+     f <-- mk_fresh_name ;
+     let pullout = DQ.snoc src (`ClassMember f) in     
+     define (RootReference (List.map mknoloc (Name.to_list (Name.of_ptr pullout)))) ;
+     up ;
+     down (`ClassMember f) ;
+     open_class Class (fun x -> x) ;
+     down (`SuperClass 0) ;
+     mtranslate_texp (fun x -> x) mod_type ;
+     up ;     
+     mtranslate_modification src modification ;
+     
+and mtranslate_extends i {ext_type} =
+  do_ ;
+  down (`SuperClass i) ;
+  mtranslate_texp identity ext_type ;
+  up 
+		  
+and mtranslate_elements {extensions;typedefs;redeclared_types;defs;redeclared_defs} = 
+  do_ ;
+  mseqi mtranslate_extends extensions ;
+  mseq mtranslate_typedef typedefs ;
+  mseq mtranslate_def defs ;
+  mseq mtranslate_typedef redeclared_types ;
+  mseq mtranslate_def redeclared_defs
+
+and mtranslate_typedef td = mtranslate_tds td.commented
+
+and mtranslate_def def =
+  do_ ;
+  down (`Field def.commented.def_name) ;
+  mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type ;
+  up
+
+and mtranslate_type_redeclaration src {redecl_type} =
+  let tds = redecl_type.commented in
+  (* a redeclared type is resolved in the parent class scope *)
+  do_ ;
+  f <-- mk_fresh_name ;
+  let pullout = DQ.snoc src (`ClassMember f) in
+  inside pullout (mtranslate_texp (final tds.type_options %> sort tds.sort) tds.type_exp ) ;
+  down (`ClassMember tds.td_name.txt) ;  
+  define (RootReference (List.map mknoloc (Name.to_list (Name.of_ptr pullout)))) ;  
+  up 
+                            
+and mtranslate_modification src {types; components; modifications} =
+  do_ ;
+  mseq (mtranslate_type_redeclaration src) types ;
+  mseq (mtranslate_def_redeclaration src) components ; 
+  mseq (mtranslate_nested_modification src) modifications
+  
+and mtranslate_nested_modification src = function
+    {commented = {mod_name =  []; mod_value = Some (Nested nested | NestedRebind {nested}) }} ->    
+    mtranslate_modification src nested
+  | {commented = {mod_name =  x::xs; mod_value = Some (Nested nested | NestedRebind {nested}) }} ->
+     down (`Any x.txt) ;
+     open_class Class (fun x -> x) ;
+     down (`SuperClass 0) ;
+     define RedeclareExtends ;
+     up;
+     mtranslate_modification src nested
+  | _ -> return ()                                                                           
+
+and mtranslate_def_redeclaration src {def} = do_ ;
+					     (* a redeclared type is resolved in the parent class scope *)
+					     f <-- mk_fresh_name ;
+					     let pullout = DQ.snoc src (`ClassMember f) in
+					     inside pullout (mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type) ;
+					     down (`Field def.commented.def_name) ;
+					     define (RootReference (List.map mknoloc (Name.to_list (Name.of_ptr pullout)))) ;  
+					     up
+						    
+(*    
+let rec translate_tds fresh env p (prog : class_stmt list) = function
   | Short tds ->
      let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
      translate_texp env p' prog ((sort tds.sort) %> (repl tds.type_options)) tds.type_exp
@@ -110,10 +339,10 @@ let rec translate_tds env p (prog : class_stmt list) = function
      protected
 
                       
-and translate_extends env p (prog : class_stmt list) i {ext_type} =  
+and translate_extends fresh env p (prog : class_stmt list) i {ext_type} =  
   translate_texp env (DQ.snoc p (`SuperClass i)) prog identity ext_type
 
-and translate_elements env p prog {extensions;typedefs;redeclared_types;defs;redeclared_defs} = 
+and translate_elements fresh env p prog {extensions;typedefs;redeclared_types;defs;redeclared_defs} = 
   let super = List.fold_lefti (translate_extends env p) prog extensions in
   let class_members = List.fold_left (translate_typedef env p) super typedefs in
   let fields = List.fold_left (translate_def env p) class_members defs in  
@@ -121,10 +350,10 @@ and translate_elements env p prog {extensions;typedefs;redeclared_types;defs;red
   let field_redecls = List.fold_left (translate_def env p) type_redecls redeclared_defs in  
   field_redecls  
 
-and translate_typedef env p prog td = translate_tds env p prog td.commented
+and translate_typedef fresh env p prog td = translate_tds env p prog td.commented
                                                   
-and translate_def env p prog def = translate_texp env (DQ.snoc p (`Field def.commented.def_name)) prog
-                                                  (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable})
+and translate_def fresh env p prog def = translate_texp env (DQ.snoc p (`Field def.commented.def_name)) prog
+							(repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable})
                                                   def.commented.def_type 
                                                     
 (*
@@ -167,7 +396,7 @@ and translate_texp env p (prog : class_stmt list) f =
               let prog' = translate_modification env parent prog modification in
               translate_texp env p prog' f mod_type
            (* This is a little bit wonky: Actually there should be a fresh class name generated here ... *)
-           | _ ->
+           | _ ->	      
               let prog' = translate_modification env p prog modification in
               if (prog == prog') then
                 translate_texp env p prog f mod_type
@@ -197,11 +426,8 @@ let rec translate_typedefs env p (prog : class_stmt list) = function
     [] -> prog
   | td::typedefs -> let prog' = translate_tds env p prog td.commented in
                     translate_typedefs env p prog' typedefs
-                                       
-let within_path = function
-    None -> DQ.empty
-  | Some (ps) -> DQ.of_list (List.map (fun str -> `ClassMember str.txt) ps)
-
+ *)
+    							
 type translated_unit = {
     class_name : Name.t;
     class_code : class_stmt list;
@@ -216,14 +442,20 @@ let name_of = function
   | Extension tds -> tds.td_name
                          
 open FileSystem
-    
-let translate_unit env {scanned; parsed={within; toplevel_defs=td::_}} =
+
+let mtranslate_unit env {within; toplevel_defs=td::_} =
+  do_ ;
+  set_env env ;
+  within_path within ;
+  mtranslate_typedef td ;
+  down (`ClassMember (name_of td.commented).txt) ;
+  s <-- get ;
+  return {class_code=s.code; class_name=Name.of_ptr s.current_path}
+       
+let translate_unit env {scanned; parsed} =
   BatLog.logf "[modclc] %s\n" scanned ;
   BatIO.flush (!BatLog.output) ;
-  let p = within_path within in
-  let class_code = translate_typedef env p [] td in
-  let class_name = DQ.snoc (Name.of_ptr p) (name_of td.commented).txt in
-  {class_code; class_name}
+  run (mtranslate_unit env parsed)
 
 let rec translate_package env {pkg_name; package_unit; external_units; sub_packages} =  
   (* fetch the imports from the package.mo *)

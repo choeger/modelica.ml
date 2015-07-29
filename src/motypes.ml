@@ -54,6 +54,8 @@ module Name = struct
                 
   let of_list = DQ.of_list
 
+  let to_list = DQ.to_list
+		  
   let singleton = DQ.singleton
                   
   let rec scope_of_ptr_ tmp dq = match DQ.front dq with
@@ -123,7 +125,7 @@ module Normalized = struct
                  | Con of connectivity
                  | Der of string list
                                  [@@deriving yojson,show,eq]                                 
-
+				 
     let norm_constr = function
         CArray i -> Array i
       | CSort s -> Sort s
@@ -132,7 +134,6 @@ module Normalized = struct
       | CCon c -> Con c
       | CDer d -> Der d
       | CRepl -> raise (Invalid_argument "'replaceable' is not a normlized constructor")
-
                        
     type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                        | Enumeration of StrSet.t
@@ -141,7 +142,8 @@ module Normalized = struct
                        | Replaceable of class_value
                        | GlobalReference of Name.t
                        | Recursive of rec_term
-                                        [@@deriving eq,show,yojson]
+		       | DynamicReference of Name.t
+                                               [@@deriving eq,show,yojson]
 
      and rec_term = { rec_lhs : class_path; rec_rhs : class_term }
                                         
@@ -156,7 +158,42 @@ module Normalized = struct
                              super : class_value IntMap.t [@default IntMap.empty];
                              fields : class_value StrMap.t [@default StrMap.empty] }
                              
+    type flat_attributes = {
+	fa_sort : sort option [@default None] ;
+	fa_var : variability option [@default None];
+	fa_con : connectivity option [@default None];
+	fa_cau : causality option [@default None];
+      }	[@@deriving eq,show,yojson]		     
 
+    type flat_repr = {
+	flat_val : class_value ;
+	flat_attr : flat_attributes [@default {fa_sort=None;fa_var=None;fa_con=None;fa_cau=None}]
+      } [@@deriving eq,show,yojson]
+	
+    let rec flat_ fa = function
+      | Constr {arg; constr = Var v} when fa.fa_var = None -> flat_ {fa with fa_var = Some v} arg
+      | Constr {arg; constr = Con c} when fa.fa_con = None -> flat_ {fa with fa_con = Some c} arg
+      | Constr {arg; constr = Cau c} when fa.fa_cau = None -> flat_ {fa with fa_cau = Some c} arg
+      | Constr {arg; constr = Sort s} when fa.fa_sort = None -> flat_ {fa with fa_sort = Some s} arg
+      | Constr {arg; constr} -> flat_ fa arg
+      | Replaceable cv -> begin match flat_ fa cv with
+				  {flat_val = Replaceable cv ; flat_attr } as fv -> fv
+				| fv -> {fv with flat_val = Replaceable fv.flat_val}
+			  end
+      | flat_val -> {flat_val; flat_attr = fa}  
+
+    let flat = flat_ {fa_con = None; fa_cau = None; fa_sort = None; fa_var = None}
+		     
+    let rec unflat = function
+      | {flat_val = Replaceable flat_val} as fv -> Replaceable (unflat {fv with flat_val})
+      | {flat_val; flat_attr={fa_sort;fa_var;fa_cau;fa_con}} ->
+	 let unflat_sort s cv = match s with None -> cv | Some s -> Constr {arg=cv; constr=Sort s} in
+	 let unflat_cau c cv = match c with None -> cv | Some c -> Constr {arg=cv; constr=Cau c} in
+	 let unflat_con c cv = match c with None -> cv | Some c -> Constr {arg=cv; constr=Con c} in
+	 let unflat_var v cv = match v with None -> cv | Some v -> Constr {arg=cv; constr=Var v} in
+	 flat_val |> (unflat_sort fa_sort) |> (unflat_var fa_var) |> (unflat_con fa_con) |> (unflat_cau fa_cau)
+
+    let norm_cv = flat %> unflat											   												   
     let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
     let empty_object_struct = {object_sort=Class; source_name=Name.singleton "EMPTY"; public=empty_elements; protected=empty_elements}
 
@@ -168,7 +205,8 @@ module Normalized = struct
       | Replaceable v -> Replaceable (compress v)
       | v -> v
                
-    and compress_elements es = {es with fields = StrMap.map pack_class es.fields; super = IntMap.map pack_class es.super; class_members = StrMap.map compress es.class_members }
+    and compress_elements es = {es with fields = StrMap.map pack_class es.fields; super = IntMap.map pack_class es.super;
+					class_members = StrMap.map compress es.class_members }
 
     and pack_class = function
         Class os -> GlobalReference os.source_name
