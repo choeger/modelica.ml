@@ -75,7 +75,7 @@ let rec get_class_element_in global current_path {Normalized.class_members; supe
     end
   else (
     pickfirst_class global 0 current_path (DQ.cons x xs) (IntMap.bindings super) )
-
+		   
 and pickfirst_class global n current_path name = function
     [] -> `NothingFound
   | (k,v)::vs ->
@@ -92,14 +92,24 @@ and get_class_element global found_path e p =
     None -> (`Found {found_path ; found_value = e; found_visible=true})
   | Some (x, xs) -> begin
       match e with
-      | Class {protected;public} ->
-         let f = get_class_element_in global found_path public x xs in
-         begin
-           match f with
-             `NothingFound -> get_class_element_in global found_path protected x xs
-           | _ as r -> r
-         end
-
+      | Class {protected;public;anonymous} ->
+	 begin
+	 try
+	   (* lookup inside anonymous classes *)
+	   let a = Int.of_string x in
+	   if IntMap.mem a anonymous then
+	     get_class_element global (DQ.snoc found_path (`Anonymous a)) (IntMap.find a anonymous) xs
+	   else
+	     `PrefixFound {not_found=p; found=found_path}
+	 with	   
+	 | Failure _ -> 
+            let f = get_class_element_in global found_path public x xs in
+            begin
+              match f with
+		`NothingFound -> get_class_element_in global found_path protected x xs
+              | _ as r -> r
+            end
+	 end
            
       (* we might encounter recursive elements *)
       | Recursive rec_term -> `Recursion {rec_term; search_state={found = found_path; not_found = p}}
@@ -115,7 +125,19 @@ and get_class_element global found_path e p =
                  end
                | None -> raise EmptyName
          end
-
+      | GlobalPath ptr ->
+	 (* TODO: follow path directly, should increase performance *)
+	 let g = Name.of_ptr ptr in
+         begin match DQ.front g with
+                 Some(x,xs) ->
+                 begin match get_class_element_in global DQ.empty global x xs with
+                       | `Found {found_value} -> get_class_element global found_path found_value p
+                       | `Recursion _ as r -> r
+                       | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not follow (probably recursive) %s\n" (Name.show g); result
+                 end
+               | None -> raise EmptyName
+         end	 
+	   
       (* Replaceable/Constr means to look into it *)
       | Replaceable v -> get_class_element global found_path v p    
       | Constr {arg} -> get_class_element global found_path arg p
@@ -135,33 +157,46 @@ exception IllegalPathElement
                                     
 exception CannotUpdate of string * string * string
 
-let rec update (lhs:class_path) rhs ({class_members;fields;super} as elements) = match DQ.front lhs with
+let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) = match DQ.front lhs with
     None -> elements
-  | Some (`SuperClass i, r) -> {elements with super = update_super r rhs i super} 
+  | Some (`SuperClass i, r) -> {elements with super = update_intmap r rhs i super} 
   | Some (`Field x, r) -> {elements with fields = update_map r rhs x fields}
   | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
   | Some (`Protected,_) -> raise IllegalPathElement
-
+  | Some (`Anonymous _,_) -> raise IllegalPathElement
+				 
 and update_map lhs rhs x m =  
   StrMap.modify_def empty_class x (update_class_value lhs rhs) m
                                      
-and update_super lhs rhs i super =  
-  IntMap.modify_def empty_class i (update_class_value lhs rhs) super
+and update_intmap lhs rhs i map =  
+  IntMap.modify_def empty_class i (update_class_value lhs rhs) map
 
 and update_class_value lhs rhs = function
   | Constr {constr; arg} -> Constr {constr ; arg = (update_class_value lhs rhs arg)}
-  | Class ({public; protected} as os) -> begin match DQ.front lhs with
-                                                 None -> rhs
-                                               | Some(`Protected, q) -> Class {os with protected = update q rhs protected}
-                                               | Some _ -> Class {os with public = update lhs rhs public}
-                                         end
+  | Class ({public; protected;anonymous} as os) -> begin match DQ.front lhs with
+							   None -> rhs
+							 | Some(`Protected, q) -> Class {os with protected = update_ q rhs protected}
+							 | Some(`Anonymous a, q) -> Class {os with anonymous = update_intmap q rhs a anonymous} 
+							 | Some _ -> Class {os with public = update_ lhs rhs public}
+						   end
   | Replaceable cv -> Replaceable (update_class_value lhs rhs cv)
   | (Recursive _ | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _) as v ->
      begin match DQ.front lhs with
              None -> rhs
            | Some (x,xs) -> raise (CannotUpdate(show_class_path_elem x, show_class_path xs, show_class_value v))
      end
-                                       
+
+let rec norm_path normed path = match DQ.front path with
+    None -> normed
+  | Some (`Anonymous a, xs) -> begin match DQ.rear normed with
+				       (* remove protected element in case of anonymous class *)
+				       Some (ys, `Protected)  -> norm_path (DQ.snoc ys (`Anonymous a)) xs
+				     | _ -> norm_path (DQ.snoc normed (`Anonymous a)) xs
+			       end
+  | Some (x, xs) -> norm_path (DQ.snoc normed x) xs
+
+let update lhs rhs es = update_ (norm_path DQ.empty lhs) rhs es
+			      
 exception NonLeafRecursion
 
 exception Stratification of class_path * string
@@ -169,9 +204,9 @@ exception Stratification of class_path * string
 let rec stratify_non_existing done_ todo = match DQ.front todo with
     None -> done_
   | Some(`Any x, _) -> raise (Stratification (done_, x))
-  | Some((`Protected | `ClassMember _ | `Field _ | `SuperClass _) as x, xs) -> stratify_non_existing (DQ.snoc done_ x) xs
+  | Some((`Protected | `ClassMember _ | `Field _ | `SuperClass _ | `Anonymous _) as x, xs) -> stratify_non_existing (DQ.snoc done_ x) xs
     
-let rec stratify global c done_ (todo:class_ptr) =
+let rec stratify global c (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
     None -> done_
   | Some(`Any x,xs) -> begin match get_class_element global DQ.empty c (DQ.singleton x) with
@@ -181,6 +216,11 @@ let rec stratify global c done_ (todo:class_ptr) =
                                                                   end
                              | _ -> raise (Stratification (done_, x))
                        end
+
+  | Some(`Anonymous a, xs) -> begin match c with
+				      Class {anonymous} when IntMap.mem a anonymous -> stratify global (IntMap.find a anonymous) (DQ.snoc done_ (`Anonymous a)) xs
+				    | _ -> stratify_non_existing done_ todo
+			      end
   | Some(`Protected, xs) -> 
      begin match c with
              Class {protected} -> stratify_elements global protected (DQ.snoc done_ `Protected) xs
@@ -191,31 +231,31 @@ let rec stratify global c done_ (todo:class_ptr) =
                         | _ -> stratify_non_existing done_ todo
                   end
        
-and stratify_elements global ({class_members; super; fields} as es) done_ (todo:class_ptr) =
+and stratify_elements global ({class_members; super; fields} as es) (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
-    | None -> done_
-    | Some(`Field x, xs) when StrMap.mem x fields -> stratify global (StrMap.find x fields) (DQ.snoc done_ (`Field x)) xs 
-    | Some(`ClassMember x, xs) when StrMap.mem x class_members -> stratify global (StrMap.find x class_members) (DQ.snoc done_ (`ClassMember x)) xs 
-    | Some(`SuperClass i, xs) when IntMap.mem i super -> stratify global (IntMap.find i super) (DQ.snoc done_ (`SuperClass i)) xs
-
-    | Some (`Protected, xs) -> raise IllegalPathElement
-
-    | Some(`Any x, xs) -> begin match get_class_element_in global DQ.empty es x DQ.empty with
-                                  `Found {found_value;found_path} -> begin match DQ.front found_path with
-                                                                             None -> raise (Failure "internal error, succeeded lookup returned empty path") 
-                                                                           | Some (y, ys) -> stratify global found_value (DQ.snoc done_ y) xs
-                                                                    end
-                                | _ -> raise (Stratification (done_, x))
-                          end
-    | Some _ -> stratify_non_existing done_ todo
-
+  | None -> done_
+  | Some(`Field x, xs) when StrMap.mem x fields -> stratify global (StrMap.find x fields) (DQ.snoc done_ (`Field x)) xs 
+  | Some(`ClassMember x, xs) when StrMap.mem x class_members -> stratify global (StrMap.find x class_members) (DQ.snoc done_ (`ClassMember x)) xs 
+  | Some(`SuperClass i, xs) when IntMap.mem i super -> stratify global (IntMap.find i super) (DQ.snoc done_ (`SuperClass i)) xs
+								
+  | Some (`Protected, xs) -> raise IllegalPathElement
+				   
+  | Some(`Any x, xs) -> begin match get_class_element_in global DQ.empty es x DQ.empty with
+                                `Found {found_value;found_path} -> begin match DQ.front found_path with
+                                                                           None -> raise (Failure "internal error, succeeded lookup returned empty path") 
+                                                                         | Some (y, ys) -> stratify global found_value (DQ.snoc done_ y) xs
+                                                                   end
+                              | _ -> raise (Stratification (done_, x))
+                        end
+  | Some _ -> stratify_non_existing done_ todo
+				    
 let stratify_ptr ptr =
   Report.do_ ;
   o <-- output ;
   try return (stratify_elements o o DQ.empty ptr) with
   | Stratification (found, not_found) ->
      Report.do_ ;
-     log{level=Error;where=none;what=Printf.sprintf "Stratification error: No element %s in %s" not_found (show_class_ptr found)};fail
+     log{level=Error;where=none;what=Printf.sprintf "Stratification error: No element %s in %s" not_found (show_class_path found)};fail
 
             
 let rec find_lexical global previous path ctxt x current =
@@ -270,7 +310,7 @@ and norm lhs =
                                        | `Recursion _ -> BatLog.logf "Internal error. Trying to close a recursive element.\n"; fail
                                        | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find closed scope\n"; fail_unresolved {searching=name; result}
                                  end
-
+				   
   | RedeclareExtends -> begin match DQ.rear lhs with
                                 Some(parent, `SuperClass _) -> begin match DQ.rear parent with
                                                                        Some(enclosing, `ClassMember id) -> Report.do_ ; o <-- output ;
@@ -306,6 +346,10 @@ and norm lhs =
 
   | RootReference n -> return (GlobalReference (Name.of_list (lunloc n)))
 
+  | KnownPtr p -> Report.do_ ;
+		  path <-- stratify_ptr p ;
+		  return (GlobalPath path)
+			      
   | Reference n ->
      let ctxt = Name.scope_of_ptr lhs in
      let name = Name.of_list (lunloc n) in
@@ -324,7 +368,7 @@ and norm lhs =
                                                         end
                    | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find prefix %s in %s\n" x (Name.show ctxt) ; fail_unresolved {searching=name; result}
              end
-           | None -> Report.do_; log{level=Error; where=none; what=Printf.sprintf "Empty name when evaluating %s. Most likely an internal bug." (show_class_ptr lhs)} ; fail
+           | None -> Report.do_; log{level=Error; where=none; what=Printf.sprintf "Empty name when evaluating %s. Most likely an internal bug." (show_class_path lhs)} ; fail
      end
 
   | Constr {constr=CRepl; arg} -> Report.do_ ;
@@ -422,12 +466,16 @@ and resolve lhs n =
      end
 
 let rec close_term lhs = function
-  | RedeclareExtends | Empty _ | Delay _ | Close -> Report.do_ ; Report.log {what=Printf.sprintf "Error closing %s. Cannot close artificial class-statements." (show_class_ptr lhs);level=Error;where=none}; fail
+  | RedeclareExtends | Empty _ | Delay _ | Close -> Report.do_ ; Report.log {what=Printf.sprintf "Error closing %s. Cannot close artificial class-statements." (show_class_path lhs);level=Error;where=none}; fail
 
 
   | RootReference n -> return (GlobalReference (Name.of_list (lunloc n)))
+  | KnownPtr p ->
+     Report.do_ ;
+     path <-- stratify_ptr p ;		  
+     return (GlobalPath path)
 
-  | Reference n -> Report.do_ ; p <--resolve lhs n ; return (GlobalReference (Name.of_ptr p))
+  | Reference n -> Report.do_ ; p <--resolve (lhs :> class_ptr) n ; return (GlobalReference (Name.of_ptr p))
 
   | Constr {constr=CRepl; arg} -> Report.do_ ;
                                   argv <-- close_term lhs arg ;
@@ -468,7 +516,7 @@ let rec close_terms i p =
     else
       let {open_lhs;open_rhs} = p.(i) in
       Report.do_ ;
-      let () = BatLog.logf "Close [%d / %d] %s := %s\n" i (Array.length p) (show_class_ptr open_lhs) (show_class_term open_rhs.rec_rhs) in      
+      let () = BatLog.logf "Close [%d / %d] %s := %s\n" i (Array.length p) (show_class_path open_lhs) (show_class_term open_rhs.rec_rhs) in      
       closed <-- close_term open_rhs.rec_lhs open_rhs.rec_rhs;
       set_output (update open_lhs closed o) ;
       close_terms (i+1) p
@@ -482,8 +530,10 @@ let norm_pkg_root root =
   let c = compress_elements o in
   let ct = Array.of_list (elements_collect_recursive_terms DQ.empty [] c) in
   let () = BatLog.logf "Closing %d possibly recursive terms.\n" (Array.length ct) in
-  close_terms 0 ct
-
+  o <-- close_terms 0 ct ;
+  let () = BatLog.logf "Done.\n%!" in
+  return o
+   		      	    
 type decompression = {
     parent_class : class_path ;
     superclass_nr : int;

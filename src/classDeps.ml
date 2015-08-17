@@ -71,6 +71,7 @@ exception IllegalRedeclaration
                                         
 let rec reads r i {lhs; rhs} =  
   match rhs with
+  | KnownPtr ptr -> add_reads i (Precisely (Name.of_ptr ptr)) r
   | RedeclareExtends -> r (* does not "read" a name, but depends on superclass-statements. needs to be handled later *) 
   | PInt | PReal | PString | PBool | PExternalObject | Empty _ -> r
   | PEnumeration _ -> r
@@ -92,7 +93,8 @@ module DepGraph = Graph.Persistent.Digraph.Concrete(GInt)
 module Scc = Graph.Components.Make(DepGraph)
 
 exception NoClose
-                                  
+exception IllegalRecursion of string
+                                    
 let topological_order w r a =
 
   let add_edge g from to_ = (*BatLog.logf "%s depends on %s\n" (show_class_stmt a.(from)) (show_class_stmt a.(to_)) ;*) DepGraph.add_edge g to_ from in
@@ -137,7 +139,7 @@ let topological_order w r a =
     | (false, {source_name})::srcs when source_name=DQ.empty -> add_local_deps src g srcs
                          
     | (false, {source_name})::srcs ->
-       BatLog.logf "Searching writer of %s\n" (Name.show source_name) ;
+       (*BatLog.logf "Searching writer of %s\n" (Name.show source_name) ;*)
        let ws = NameMap.find source_name w in
        (* BatLog.logf "%s can depend on superclasses of %s\n" (show_class_stmt a.(src)) (Name.show source_name) ; *)   
        (* no refinement found in that scope, just depend on the superclasses *)
@@ -169,7 +171,7 @@ let topological_order w r a =
     | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_empty_creator g i xs | None -> g end 
 
     (* In case of multiple writers there needs to be a Empty statement *)
-    | js -> BatLog.logf "searching opener for: %s\n%!" (Name.show lhs) ;
+    | js -> (*BatLog.logf "searching opener for: %s\n%!" (Name.show lhs) ;*)
 	    let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
     else (BatLog.logf "Could not add %s to open-statement, no such statement found.\n" (Name.show lhs) ; g)
   in
@@ -181,7 +183,7 @@ let topological_order w r a =
       [] -> raise NoClose
     | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_to_closer g i xs | None -> g end
     | ws ->
-       BatLog.logf "searching closer for: %s\n%!" (Name.show lhs) ;
+       (*BatLog.logf "searching closer for: %s\n%!" (Name.show lhs) ;*)
        let c = find_close ws in
        add_edge g c i
     else (BatLog.logf "Could not add %s to close-statement, no such statement found.\n" (Name.show lhs) ; g)
@@ -226,34 +228,56 @@ let topological_order w r a =
   BatLog.logf "Got %d vertices and %d edges in %d strongly connected components in the dependency graph out of %d statements\n"
               (DepGraph.nb_vertex g) (DepGraph.nb_edges g) (List.length sccs) (Array.length a) ;
 
-  let rec prepare_scc prog = function [] -> prog
-                                    | i::scc when (is_super a.(i)) -> prepare_scc prog scc
-                                    | i::scc when not (is_closer a.(i).rhs) -> prepare_scc ({lhs=a.(i).lhs; rhs=Delay a.(i).rhs}::prog) scc
-                                    | i::scc -> prepare_scc prog scc
-  in
 
-  let rec append_scc prog = function [] -> prog
-                                   | i::scc when (is_closer a.(i).rhs) -> append_scc (a.(i)::prog) scc
-                                   | i::scc -> append_scc prog scc
-  in
-  
-  let rec append_superclasses prog = function [] -> prog
-                                            | i::scc when (is_super a.(i)) -> append_superclasses (a.(i)::prog) scc
-                                            | i::scc -> append_superclasses prog scc
-  in
-  
-  let handle_scc prog scc =
-    let log_scc i = BatLog.logf "  %s\n" (show_class_stmt a.(i)) in
-    List.iter log_scc scc ;
-    prepare_scc (append_scc (append_superclasses prog scc) scc) scc 
-  in
-      
-  let rec reorder_sccs prog = function
+  (* SCC processing:
+       * non-trivial SCC?
+       |
+       |__no__ : Ok, add singleton to prog
+       |
+       |__yes_ : * Superclasses contained?  
+                 |
+                 |__no__ : * For each statement:
+                 |         | Close-statement?
+                 |         |
+                 |         |__yes_ : Do nothing, just copy, all other statements won't unfold anything yet
+                 |         |
+                 |         |__no__ : Create Delay() statement
+                 |
+                 |__yes_ : * Remove incoming edges to (hierachically) highest superclass process subgraph
+   *)                           
+  let rec process_scc prog graph scc =
+    let superclasses = List.sort (fun i j -> Int.compare (DQ.size a.(i).lhs) (DQ.size a.(j).lhs)) (List.filter (fun i -> is_super a.(i)) scc) in
+    List.iter (fun i -> BatLog.logf "SCC superclass: %s\n" (show_class_ptr a.(i).lhs)) superclasses ;
+
+    match superclasses with
+      [] -> process_scc2 prog scc
+    | fst::_ -> begin
+	let vs = IntSet.of_list scc in
+	BatLog.logf "Breaking SCC with %d vertices.\n" (IntSet.cardinal vs);
+
+	let copy_edges v1 v2 g =
+	  (* copy edges from the subgraph, ignore incoming edges to the highest superclass *)
+	  if v1 != fst && IntSet.mem v1 vs && IntSet.mem v2 vs then
+	    (DepGraph.add_edge g v1 v2)
+	  else g
+	in
+
+	let subgraph = DepGraph.fold_edges copy_edges graph (List.fold_left DepGraph.add_vertex DepGraph.empty scc) in
+	let sccs' = Scc.scc_list subgraph in
+	reorder_sccs prog sccs'
+      end		  
+
+  and process_scc2 prog = function [] -> prog
+				 | i::scc when is_super a.(i) -> raise (IllegalRecursion (show_class_ptr (a.(i).lhs)))
+				 | i::scc when is_closer a.(i).rhs -> process_scc2 (a.(i)::prog) scc
+				 | i::scc -> process_scc2 ({lhs=a.(i).lhs; rhs=Delay a.(i).rhs}::prog) scc
+
+  and reorder_sccs prog = function
     | [] -> prog 
     | [i]::sccs -> reorder_sccs (a.(i)::prog) sccs                                
-    | scc::sccs -> BatLog.logf "Begin SCC\n" ; reorder_sccs (handle_scc prog scc) sccs
+    | scc::sccs -> BatLog.logf "Begin SCC\n" ; reorder_sccs (process_scc prog g scc) sccs
   in
-  
+        
   reorder_sccs [] sccs
  
 let preprocess prog =

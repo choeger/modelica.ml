@@ -69,7 +69,7 @@ let final opts arg = match opts with {type_final=false} -> Constr {arg; constr=C
 type translation_state = {
     env : import_env ;
     current_path : class_ptr ;
-    fresh_names : int ;
+    anons : int ;
     code : class_stmt list ;
   }
 			   
@@ -82,7 +82,7 @@ let return x = fun s -> (x, s)
 let bind ma f = fun s -> let (a, s') = ma s in
 			 (f a s') 
 
-let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; fresh_names = 0; code = []} in a
+let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; anons = 0; code = []} in a
 
 let down pe state = ((), {state with current_path = DQ.snoc state.current_path pe})
 
@@ -136,7 +136,7 @@ let set state s = ((), state)
 
 let set_env env state = ((), {state with env})
 		    
-let mk_fresh_name state = (Printf.sprintf "fresh_%d" state.fresh_names, {state with fresh_names = state.fresh_names + 1})
+let next_anon state = state.anons, {state with anons = state.anons + 1}
    			    
 let rec mtranslate_tds = function
   | Short tds -> do_ ;
@@ -221,11 +221,11 @@ and mtranslate_texp post =
      do_ ;
      s <-- current_path ;
      let src = match DQ.rear s with None -> raise InconsistentHierarchy | Some(xs,_) -> xs in
-     f <-- mk_fresh_name ;
-     let pullout = DQ.snoc src (`ClassMember f) in     
-     define (RootReference (List.map mknoloc (Name.to_list (Name.of_ptr pullout)))) ;
+     a <-- next_anon ;
+     let pullout = DQ.snoc src (`Anonymous a) in     
+     define (KnownPtr pullout) ;
      up ;
-     down (`ClassMember f) ;
+     down (`Anonymous a) ;
      open_class Class (fun x -> x) ;
      down (`SuperClass 0) ;
      mtranslate_texp (fun x -> x) mod_type ;
@@ -258,11 +258,11 @@ and mtranslate_type_redeclaration src {redecl_type} =
   let tds = redecl_type.commented in
   (* a redeclared type is resolved in the parent class scope *)
   do_ ;
-  f <-- mk_fresh_name ;
-  let pullout = DQ.snoc src (`ClassMember f) in
+  a <-- next_anon ;
+  let pullout = DQ.snoc src (`Anonymous a) in
   inside pullout (mtranslate_texp (final tds.type_options %> sort tds.sort) tds.type_exp ) ;
   down (`ClassMember tds.td_name.txt) ;  
-  define (RootReference (List.map mknoloc (Name.to_list (Name.of_ptr pullout)))) ;  
+  define (KnownPtr pullout) ;  
   up 
                             
 and mtranslate_modification src {types; components; modifications} =
@@ -285,11 +285,11 @@ and mtranslate_nested_modification src = function
 
 and mtranslate_def_redeclaration src {def} = do_ ;
 					     (* a redeclared type is resolved in the parent class scope *)
-					     f <-- mk_fresh_name ;
-					     let pullout = DQ.snoc src (`ClassMember f) in
+					     f <-- next_anon ;
+					     let pullout = DQ.snoc src (`Anonymous f) in
 					     inside pullout (mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type) ;
 					     down (`Field def.commented.def_name) ;
-					     define (RootReference (List.map mknoloc (Name.to_list (Name.of_ptr pullout)))) ;  
+					     define (KnownPtr pullout) ;  
 					     up
 						    
 (*    

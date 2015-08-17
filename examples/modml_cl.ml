@@ -54,9 +54,9 @@ let _ =
                       let o = run (norm_pkg_root tr) {messages=[]; output=empty_elements} in
                       List.iter print_message o.final_messages ;
                       match o.final_result with
-                        Ok o -> BatLog.logf "Normalization Ok.\n" ;
+                        Ok o -> BatLog.logf "Normalization Ok.\n%!" ;
                                 let c = compress_elements o in
-                                BatLog.logf "Compression Ok.\n" ;
+                                BatLog.logf "Compression Ok.\n%!" ;
                                 let js = elements_struct_to_yojson c in
                                 let dump = Yojson.Safe.pretty_to_string js in
                                 BatLog.logf "Dump (%d) Ok.\n" (String.length dump);

@@ -63,6 +63,7 @@ module Name = struct
     | Some ((`Field _ | `Any _ | `SuperClass _ ), _) -> tmp
     | Some (`Protected, r) -> scope_of_ptr_ tmp r
     | Some ((`ClassMember x), r) -> scope_of_ptr_ (DQ.snoc tmp x) r
+    | Some ((`Anonymous a), r) -> scope_of_ptr_ (DQ.snoc tmp (string_of_int a)) r
 
   let scope_of_ptr dq = match (DQ.rear dq) with
       Some(xs,`ClassMember x) -> (scope_of_ptr_ DQ.empty xs)
@@ -72,7 +73,8 @@ module Name = struct
     | None -> tmp
     | Some ((`SuperClass _  | `Protected), r) -> of_ptr_ tmp r
     | Some ((`ClassMember x | `Field x | `Any x), r) -> of_ptr_ (DQ.snoc tmp x) r
-                  
+    | Some (`Anonymous a, r) -> of_ptr_ (DQ.snoc tmp (string_of_int a))  r
+								
   let of_ptr dq = of_ptr_ DQ.empty dq
                                                                         
 end
@@ -89,19 +91,20 @@ type constr =  CArray of int
              | CDer of string list
                          [@@deriving yojson,eq,show]
 
-type class_path_elem = [`Protected | `ClassMember of string | `Field of string | `SuperClass of int] [@@deriving eq,show,yojson]
+type class_path_elem = [`Protected | `ClassMember of string | `Anonymous of int | `Field of string | `SuperClass of int] [@@deriving eq,show,yojson]
 
 type class_path = class_path_elem DQ.t [@@deriving eq,show,yojson]
                                                                                                      
 type class_ptr_elem = [class_path_elem | `Any of string] [@@deriving eq,show,yojson]
-
+						 
 type class_ptr = class_ptr_elem DQ.t [@@deriving eq,show,yojson]
-                         
+
 type class_term = Reference of DS.name
                 | RedeclareExtends
                 | Empty of open_class
                 | Close
                 | RootReference of DS.name
+		| KnownPtr of class_ptr
                 | PInt | PReal | PString | PBool | PExternalObject
                 | PEnumeration of StrSet.t
                 | Constr of class_constr
@@ -141,6 +144,7 @@ module Normalized = struct
                        | Class of object_struct
                        | Replaceable of class_value
                        | GlobalReference of Name.t
+		       | GlobalPath of class_path
                        | Recursive of rec_term
 		       | DynamicReference of Name.t
                                                [@@deriving eq,show,yojson]
@@ -152,11 +156,14 @@ module Normalized = struct
      and object_struct = { object_sort : sort ;
                            source_name : Name.t;
                            public : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }];
-                           protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }]}
+                           protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }] ;
+			   anonymous : class_value IntMap.t [@default IntMap.empty] ; (* modified classes, not inherited, unnamed *)
+			 }
                                                                  
      and elements_struct = { class_members : class_value StrMap.t [@default StrMap.empty];
                              super : class_value IntMap.t [@default IntMap.empty];
-                             fields : class_value StrMap.t [@default StrMap.empty] }
+                             fields : class_value StrMap.t [@default StrMap.empty]
+			   }
                              
     type flat_attributes = {
 	fa_sort : sort option [@default None] ;
@@ -195,12 +202,13 @@ module Normalized = struct
 
     let norm_cv = flat %> unflat											   												   
     let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
-    let empty_object_struct = {object_sort=Class; source_name=Name.singleton "EMPTY"; public=empty_elements; protected=empty_elements}
+    let empty_object_struct = {object_sort=Class; source_name=Name.singleton "EMPTY"; public=empty_elements; protected=empty_elements; anonymous=IntMap.empty}
 
     let empty_class = Class empty_object_struct 
 
     let rec compress = function
-        Class os -> Class {os with public = compress_elements os.public; protected = compress_elements os.protected }
+        Class os ->
+	Class {os with public = compress_elements os.public; protected = compress_elements os.protected ; anonymous = IntMap.map pack_class os.anonymous}
       | Constr {constr; arg} -> Constr {constr; arg = compress arg}
       | Replaceable v -> Replaceable (compress v)
       | v -> v
