@@ -92,23 +92,14 @@ and get_class_element global found_path e p =
     None -> (`Found {found_path ; found_value = e; found_visible=true})
   | Some (x, xs) -> begin
       match e with
-      | Class {protected;public;anonymous} ->
+      | Class {protected;public} ->
 	 begin
-	 try
-	   (* lookup inside anonymous classes *)
-	   let a = Int.of_string x in
-	   if IntMap.mem a anonymous then
-	     get_class_element global (DQ.snoc found_path (`Anonymous a)) (IntMap.find a anonymous) xs
-	   else
-	     `PrefixFound {not_found=p; found=found_path}
-	 with	   
-	 | Failure _ -> 
-            let f = get_class_element_in global found_path public x xs in
-            begin
-              match f with
-		`NothingFound -> get_class_element_in global found_path protected x xs
-              | _ as r -> r
-            end
+           let f = get_class_element_in global found_path public x xs in
+           begin
+             match f with
+	       `NothingFound -> get_class_element_in global found_path protected x xs
+             | _ as r -> r
+           end
 	 end
            
       (* we might encounter recursive elements *)
@@ -125,18 +116,6 @@ and get_class_element global found_path e p =
                  end
                | None -> raise EmptyName
          end
-      | GlobalPath ptr ->
-	 (* TODO: follow path directly, should increase performance *)
-	 let g = Name.of_ptr ptr in
-         begin match DQ.front g with
-                 Some(x,xs) ->
-                 begin match get_class_element_in global DQ.empty global x xs with
-                       | `Found {found_value} -> get_class_element global found_path found_value p
-                       | `Recursion _ as r -> r
-                       | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not follow (probably recursive) %s\n" (Name.show g); result
-                 end
-               | None -> raise EmptyName
-         end	 
 	   
       (* Replaceable/Constr means to look into it *)
       | Replaceable v -> get_class_element global found_path v p    
@@ -163,7 +142,6 @@ let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) 
   | Some (`Field x, r) -> {elements with fields = update_map r rhs x fields}
   | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
   | Some (`Protected,_) -> raise IllegalPathElement
-  | Some (`Anonymous _,_) -> raise IllegalPathElement
 				 
 and update_map lhs rhs x m =  
   StrMap.modify_def empty_class x (update_class_value lhs rhs) m
@@ -173,29 +151,19 @@ and update_intmap lhs rhs i map =
 
 and update_class_value lhs rhs = function
   | Constr {constr; arg} -> Constr {constr ; arg = (update_class_value lhs rhs arg)}
-  | Class ({public; protected;anonymous} as os) -> begin match DQ.front lhs with
-							   None -> rhs
-							 | Some(`Protected, q) -> Class {os with protected = update_ q rhs protected}
-							 | Some(`Anonymous a, q) -> Class {os with anonymous = update_intmap q rhs a anonymous} 
-							 | Some _ -> Class {os with public = update_ lhs rhs public}
-						   end
+  | Class ({public; protected} as os) -> begin match DQ.front lhs with
+						 None -> rhs
+					       | Some(`Protected, q) -> Class {os with protected = update_ q rhs protected}
+					       | Some _ -> Class {os with public = update_ lhs rhs public}
+					 end
   | Replaceable cv -> Replaceable (update_class_value lhs rhs cv)
-  | (Recursive _ | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _) as v ->
+  | (Recursive _ | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _ | DynamicReference _) as v ->
      begin match DQ.front lhs with
              None -> rhs
            | Some (x,xs) -> raise (CannotUpdate(show_class_path_elem x, show_class_path xs, show_class_value v))
      end
 
-let rec norm_path normed path = match DQ.front path with
-    None -> normed
-  | Some (`Anonymous a, xs) -> begin match DQ.rear normed with
-				       (* remove protected element in case of anonymous class *)
-				       Some (ys, `Protected)  -> norm_path (DQ.snoc ys (`Anonymous a)) xs
-				     | _ -> norm_path (DQ.snoc normed (`Anonymous a)) xs
-			       end
-  | Some (x, xs) -> norm_path (DQ.snoc normed x) xs
-
-let update lhs rhs es = update_ (norm_path DQ.empty lhs) rhs es
+let update lhs rhs es = update_ lhs rhs es
 			      
 exception NonLeafRecursion
 
@@ -204,7 +172,7 @@ exception Stratification of class_path * string
 let rec stratify_non_existing done_ todo = match DQ.front todo with
     None -> done_
   | Some(`Any x, _) -> raise (Stratification (done_, x))
-  | Some((`Protected | `ClassMember _ | `Field _ | `SuperClass _ | `Anonymous _) as x, xs) -> stratify_non_existing (DQ.snoc done_ x) xs
+  | Some((`Protected | `ClassMember _ | `Field _ | `SuperClass _ ) as x, xs) -> stratify_non_existing (DQ.snoc done_ x) xs
     
 let rec stratify global c (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
@@ -217,10 +185,6 @@ let rec stratify global c (done_:class_path) (todo:class_ptr) =
                              | _ -> raise (Stratification (done_, x))
                        end
 
-  | Some(`Anonymous a, xs) -> begin match c with
-				      Class {anonymous} when IntMap.mem a anonymous -> stratify global (IntMap.find a anonymous) (DQ.snoc done_ (`Anonymous a)) xs
-				    | _ -> stratify_non_existing done_ todo
-			      end
   | Some(`Protected, xs) -> 
      begin match c with
              Class {protected} -> stratify_elements global protected (DQ.snoc done_ `Protected) xs
@@ -348,7 +312,7 @@ and norm lhs =
 
   | KnownPtr p -> Report.do_ ;
 		  path <-- stratify_ptr p ;
-		  return (GlobalPath path)
+		  return (GlobalReference (Name.of_ptr path))
 			      
   | Reference n ->
      let ctxt = Name.scope_of_ptr lhs in
@@ -473,7 +437,7 @@ let rec close_term lhs = function
   | KnownPtr p ->
      Report.do_ ;
      path <-- stratify_ptr p ;		  
-     return (GlobalPath path)
+     return (GlobalReference (Name.of_ptr path))
 
   | Reference n -> Report.do_ ; p <--resolve (lhs :> class_ptr) n ; return (GlobalReference (Name.of_ptr p))
 
@@ -544,7 +508,7 @@ let rec decompressions p dcs = function
     Class os -> let dcs' = elements_decompressions p dcs os.public in
                 elements_decompressions (DQ.snoc p `Protected) dcs' os.protected
   | _ -> dcs
-
+					   
 and superclass_to_decompress parent_class superclass_nr dcs = function
     GlobalReference superclass_name -> {parent_class; superclass_nr ; superclass_name}::dcs
   | Constr {arg} -> superclass_to_decompress parent_class superclass_nr dcs arg

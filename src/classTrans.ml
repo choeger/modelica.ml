@@ -101,7 +101,7 @@ let open_class sort post state = ((), {state with code =
 						     rhs = (post (Empty {class_sort = sort; class_name = (Name.of_ptr state.current_path)}))} :: state.code})
 
 let in_context m state =
-  let (x, s') = m state in
+  let (x, s') = m {state with anons = (Hashtbl.hash state.current_path)} in
   (x, {state with code = s'.code})
 
 let inside name m state =
@@ -222,10 +222,10 @@ and mtranslate_texp post =
      s <-- current_path ;
      let src = match DQ.rear s with None -> raise InconsistentHierarchy | Some(xs,_) -> xs in
      a <-- next_anon ;
-     let pullout = DQ.snoc src (`Anonymous a) in     
+     let pullout = DQ.snoc src (`ClassMember (string_of_int a)) in     
      define (KnownPtr pullout) ;
      up ;
-     down (`Anonymous a) ;
+     down (`ClassMember (string_of_int a)) ;
      open_class Class (fun x -> x) ;
      down (`SuperClass 0) ;
      mtranslate_texp (fun x -> x) mod_type ;
@@ -259,7 +259,7 @@ and mtranslate_type_redeclaration src {redecl_type} =
   (* a redeclared type is resolved in the parent class scope *)
   do_ ;
   a <-- next_anon ;
-  let pullout = DQ.snoc src (`Anonymous a) in
+  let pullout = DQ.snoc src (`ClassMember (string_of_int a)) in
   inside pullout (mtranslate_texp (final tds.type_options %> sort tds.sort) tds.type_exp ) ;
   down (`ClassMember tds.td_name.txt) ;  
   define (KnownPtr pullout) ;  
@@ -286,7 +286,7 @@ and mtranslate_nested_modification src = function
 and mtranslate_def_redeclaration src {def} = do_ ;
 					     (* a redeclared type is resolved in the parent class scope *)
 					     f <-- next_anon ;
-					     let pullout = DQ.snoc src (`Anonymous f) in
+					     let pullout = DQ.snoc src (`ClassMember (string_of_int f)) in
 					     inside pullout (mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type) ;
 					     down (`Field def.commented.def_name) ;
 					     define (KnownPtr pullout) ;  

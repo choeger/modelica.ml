@@ -61,9 +61,19 @@ type token =
 module StdFormat = Format
 open Batteries
 
+exception StructuralError of string
+       
 module IntMap = struct include Map.Make(Int)
                        let compare (k,v) (k',v') = Int.compare k k'
-                       let to_yojson a m = `List (List.map (fun (k,v) -> a v) (List.sort compare (bindings m)))
+                       let to_yojson a m =
+			 (* We encode intMaps as lists, using the entry number as key, this means that we cannot encode sparsely populated maps,
+                            but since IntMaps in the abstract syntax are only used to ease the lookup, that should be fine. Maybe switch to vectors later. *)
+			 let max = (cardinal m) in
+			 for i = 0 to max - 1 do
+			   if not (mem i m) then
+			     raise (StructuralError (Printf.sprintf "Yojson failed. IntMap is not densely packed. Missing element %d out of %d." i max))
+			 done ;
+			 `List (List.map (fun (k,v) -> a v) (List.sort compare (bindings m)))
 
                        let of_yojson f js =
                          let rec h mr v =

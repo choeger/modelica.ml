@@ -71,7 +71,6 @@ exception IllegalRedeclaration
                                         
 let rec reads r i {lhs; rhs} =  
   match rhs with
-  | KnownPtr ptr -> add_reads i (Precisely (Name.of_ptr ptr)) r
   | RedeclareExtends -> r (* does not "read" a name, but depends on superclass-statements. needs to be handled later *) 
   | PInt | PReal | PString | PBool | PExternalObject | Empty _ -> r
   | PEnumeration _ -> r
@@ -83,7 +82,8 @@ let rec reads r i {lhs; rhs} =
      add_reads i (FirstOf {what; sources}) r
                               
   | RootReference n -> add_reads i (Precisely (Name.of_list (lunloc n))) r
-
+  | KnownPtr ptr -> add_reads i (Precisely (Name.of_ptr ptr)) r
+				 
 let readsMap prog = Array.fold_lefti reads IntMap.empty prog
                                   
 module GInt = struct include Int let hash i = i end

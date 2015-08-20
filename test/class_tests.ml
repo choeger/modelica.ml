@@ -85,15 +85,6 @@ let rec lookup_ x xs f got =
 		   | None -> assert_failure
 			       (Printf.sprintf "Empty global reference when looking up %s" (Name.show (DQ.cons x xs)))
 	     end
-	   | {flat_val = GlobalPath p; flat_attr} ->
-	      let n = Name.of_ptr p in
-	      begin match DQ.front n with
-		      (* In case of a path, lookup the path and remember all local attributes *)
-		      Some (x,xs) -> let pipe = fun flat_val -> f (unflat {flat_val; flat_attr}) in
-				     lookup_ x xs pipe got 
-		    | None -> assert_failure
-				(Printf.sprintf "Empty global reference when looking up %s" (Name.show (DQ.cons x xs)))
-	      end	       
 	   (* In any other case, apply the predicate *)
 	   | _ -> f found_value
      end
