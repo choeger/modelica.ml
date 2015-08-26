@@ -123,8 +123,13 @@ let mseqi = mseqi_ 0
 		   
 let rec mseq fm list state = match list with
     [] -> ((), state)
-  | x::xs -> let (a', s) = fm x state in
+  | x::xs -> let (_, s) = fm x state in
 	     mseq fm xs s
+
+let rec mfold a f fm list state = match list with
+    [] -> (a, state)
+  | x::xs -> let (a', s) = fm x state in
+	     mfold (f a a') f fm xs s
 
 let apply_import n state = match n with
     | x::xs when StrMap.mem x.txt state.env -> ((StrMap.find x.txt state.env) @ xs, state)
@@ -136,7 +141,7 @@ let set state s = ((), state)
 
 let set_env env state = ((), {state with env})
 		    
-let next_anon state = state.anons, {state with anons = state.anons + 1}
+let next_anon state = `ClassMember ("anon" ^ (string_of_int state.anons)), {state with anons = state.anons + 1}
    			    
 let rec mtranslate_tds = function
   | Short tds -> do_ ;
@@ -219,19 +224,29 @@ and mtranslate_texp post =
 
   | TMod {mod_type; modification} ->
      do_ ;
-     s <-- current_path ;
+     state <-- get ;
+     let s = state.current_path in
      let src = match DQ.rear s with None -> raise InconsistentHierarchy | Some(xs,_) -> xs in
      a <-- next_anon ;
-     let pullout = DQ.snoc src (`ClassMember (string_of_int a)) in     
+     let pullout = DQ.snoc src a in     
      define (KnownPtr pullout) ;
      up ;
-     down (`ClassMember (string_of_int a)) ;
+     down a ;
      open_class Class (fun x -> x) ;
      down (`SuperClass 0) ;
      mtranslate_texp (fun x -> x) mod_type ;
      up ;     
-     mtranslate_modification src modification ;
-     
+     redec <-- mtranslate_modification src modification ;
+
+     (* Do not introduce a new class in case of (nested) modifications without redeclarations *)
+     if (not redec) then begin
+         do_ ;
+         set state ;
+         mtranslate_texp (fun x -> x) mod_type 
+       end
+     else
+       return ()
+       
 and mtranslate_extends i {ext_type} =
   do_ ;
   down (`SuperClass i) ;
@@ -259,7 +274,7 @@ and mtranslate_type_redeclaration src {redecl_type} =
   (* a redeclared type is resolved in the parent class scope *)
   do_ ;
   a <-- next_anon ;
-  let pullout = DQ.snoc src (`ClassMember (string_of_int a)) in
+  let pullout = DQ.snoc src a in
   inside pullout (mtranslate_texp (final tds.type_options %> sort tds.sort) tds.type_exp ) ;
   down (`ClassMember tds.td_name.txt) ;  
   define (KnownPtr pullout) ;  
@@ -269,8 +284,9 @@ and mtranslate_modification src {types; components; modifications} =
   do_ ;
   mseq (mtranslate_type_redeclaration src) types ;
   mseq (mtranslate_def_redeclaration src) components ; 
-  mseq (mtranslate_nested_modification src) modifications
-  
+  x <-- mfold false (||) (mtranslate_nested_modification src) modifications ;
+  return (x || types != [] || components != [])
+                 
 and mtranslate_nested_modification src = function
     {commented = {mod_name =  []; mod_value = Some (Nested nested | NestedRebind {nested}) }} ->    
     mtranslate_modification src nested
@@ -281,12 +297,12 @@ and mtranslate_nested_modification src = function
      define RedeclareExtends ;
      up;
      mtranslate_modification src nested
-  | _ -> return ()                                                                           
+  | _ -> return false                                              
 
 and mtranslate_def_redeclaration src {def} = do_ ;
 					     (* a redeclared type is resolved in the parent class scope *)
 					     f <-- next_anon ;
-					     let pullout = DQ.snoc src (`ClassMember (string_of_int f)) in
+					     let pullout = DQ.snoc src f in
 					     inside pullout (mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type) ;
 					     down (`Field def.commented.def_name) ;
 					     define (KnownPtr pullout) ;  

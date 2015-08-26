@@ -39,17 +39,17 @@ open Report
        
 exception ExpansionException of string
                                         
-type prefix_found_struct = { found : class_path ; not_found : Name.t } [@@deriving show]
+type prefix_found_struct = { found : class_path ; not_found : Name.t } [@@deriving show,yojson]
 
 let show_prefix_found {found; not_found} = "No element named " ^ (Name.show not_found) ^ " in " ^ (Name.show (Name.of_ptr found))
                       
-type found_struct = { found_path : class_path ; found_value : Normalized.class_value ; found_visible : bool } [@@deriving show]
+type found_struct = { found_path : class_path ; found_value : Normalized.class_value ; found_visible : bool } [@@deriving show,yojson]
 
-type search_error = [ `NothingFound | `PrefixFound of prefix_found_struct ] [@@deriving show]
+type search_error = [ `NothingFound | `PrefixFound of prefix_found_struct ] [@@deriving show,yojson]
 
-type found_recursion = { rec_term : Normalized.rec_term ; search_state : prefix_found_struct } [@@deriving show]
+type found_recursion = { rec_term : Normalized.rec_term ; search_state : prefix_found_struct } [@@deriving show,yojson]
                                                                             
-type search_result = [`Found of found_struct | `Recursion of found_recursion | search_error ] [@@deriving show]
+type search_result = [`Found of found_struct | `Recursion of found_recursion | search_error ] [@@deriving show,yojson]
                                                    
 type unresolved_dependency = { searching : Name.t ; result : search_error }
                                
