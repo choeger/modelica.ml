@@ -113,11 +113,17 @@ type class_term = Reference of DS.name
 and open_class = { class_sort : sort ; class_name : Name.t }
                     
 and  class_constr = { constr : constr ; arg : class_term }
+
+type ('lhs, 'rhs) stmt = {lhs : 'lhs ; rhs : 'rhs} [@@deriving eq,show,yojson]
                       
-type class_stmt = {lhs : class_ptr ; rhs : class_term} [@@deriving eq,show,yojson]
+type class_stmt = (class_ptr, class_term) stmt [@@deriving eq,show,yojson]
                                                        
+type value_ptr = { scope : class_ptr ; field : string DQ.t } [@@deriving eq,show,yojson]
+
+type value_stmt = (value_ptr, Syntax.exp) stmt
+                   
 type class_program = class_stmt list [@@deriving show,yojson]
-      
+                   
 module Normalized = struct
     
     type constr =  Array of int
@@ -136,6 +142,67 @@ module Normalized = struct
       | CCon c -> Con c
       | CDer d -> Der d
       | CRepl -> raise (Invalid_argument "'replaceable' is not a normlized constructor")
+
+    type binary_exp = { left : exp ; right : exp ; }
+     and idx = { variable : string ; range : exp option }
+     and named_arg = { argument_name : string ; argument : exp }                                               
+     and else_condition = { guard : exp ; elsethen : exp }                               
+     and if_expression = { condition : exp ; then_ : exp ; else_if : else_condition list ; else_ : exp }
+     and array_access =  { lhs : exp ; indices : exp list }                           
+     and range = { start : exp ; end_ : exp ; step : exp option }
+     and projection = { object_ : exp ; field : string }
+     and application = { fun_ : exp ; args : exp list ; named_args : named_arg list }
+     and comprehension = { exp : exp ; idxs : idx list }
+
+     and exp = { desc : exp_desc  } [@@deriving show]                           
+
+     and exp_desc = Pow of binary_exp
+                  | DPow of binary_exp
+                  | Mul of binary_exp
+                  | DMul of binary_exp
+                  | Div of binary_exp
+                  | DDiv of binary_exp
+                  | Plus of binary_exp
+                  | DPlus of binary_exp
+                  | Minus of binary_exp
+                  | DMinus of binary_exp
+                  | UMinus of exp
+                  | UPlus of exp
+                  | UDMinus of exp
+                  | UDPlus of exp
+
+                  | And of binary_exp
+                  | Or of binary_exp
+                  | Not of exp
+                             
+                  | Gt of binary_exp
+                  | Lt of binary_exp
+                  | Leq of binary_exp
+                  | Geq of binary_exp
+                  | Neq of binary_exp
+                  | Eq of binary_exp
+
+                  | If of if_expression
+                  | ArrayAccess of array_access
+                  | Range of range
+                  | Ptr of class_path
+                  | Ide of string 
+                  | Proj of projection
+                  | App of application
+                  | Bool of bool
+                  | Int of int
+                  | Real of float
+                  | String of string
+                  | Compr of comprehension
+                  | Array of exp list
+                  | MArray of (exp list) list
+                  | ExplicitClosure of exp
+                  | End | Colon | Der | Initial | Assert
+                  | OutputExpression of exp option list
+                                            [@@deriving show]
+
+      
+                       
                        
     type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                        | Enumeration of StrSet.t

@@ -67,23 +67,23 @@ module type S = sig
     type der_spec = { der_name : name ; idents : str list } [@@deriving show,yojson]
 
     (** Something that can be commented can wrapped in this record *)
-    type 'a commented = { commented : 'a ; comment : comment }
+    type 'a commented = { commented : 'a ; comment : comment } [@@deriving show]
                           
      (** Something that can be annotated can wrapped in this record *)
-     and 'a annotated = { annotated_elem : 'a ; annotation : modification option; }
+     and 'a annotated = { annotated_elem : 'a ; annotation : modification option; } [@@deriving show]
                           
      (** Comments are optionally annotated optional strings *)
-     and comment = str option annotated
+     and comment = str option annotated [@@deriving show]
                        
      (** The stored definition unit is the representation of a single Modelica file *)
-     and unit_ = { within : name option; toplevel_defs : typedef list }
+     and unit_ = { within : name option; toplevel_defs : typedef list } [@@deriving show]
                    
      (** The options of a type-definition:
     is the definition replaceable / final / partial / encapsulated ? *)
      and typedef_options = { type_replaceable : bool ; 
                              type_final : bool ; 
                              partial : bool ; 
-                             encapsulated : bool }
+                             encapsulated : bool } [@@deriving show]
 
      (** Typedefs share a lot of common code. 
     This is reflected by the {! Syntax.typedef_struct }: {v 'a v} denotes the definition's distincitve payload. *)
@@ -211,7 +211,7 @@ module type S = sig
 
      and comprehension = { exp : exp ; idxs : idx list }
 
-     and exp = { term : exp_struct ; attr : attr }
+     and exp = { term : exp_struct ; attr : attr } [@@deriving show]
                            
      and exp_struct = Pow of binary_exp
                     | DPow of binary_exp
@@ -256,14 +256,15 @@ module type S = sig
                     | ExplicitClosure of exp
                     | End | Colon | Der | Initial | Assert
                     | OutputExpression of exp option list
+                                              [@@deriving show]
+                                              
+     and idx = { variable : str ; range : exp option } [@@deriving show]
 
-     and idx = { variable : str ; range : exp option }
+     and tprojection = { class_type : texp ; type_element : string } [@@deriving show]
 
-     and tprojection = { class_type : texp ; type_element : string }
+     and array_type = { base_type : texp ; dims : exp list } [@@deriving show]
 
-     and array_type = { base_type : texp ; dims : exp list }
-
-     and mod_type = { mod_type : texp ; modification : modification }
+     and mod_type = { mod_type : texp ; modification : modification } [@@deriving show]
                       
      and texp = TName of name
               | TRootName of name
@@ -272,35 +273,42 @@ module type S = sig
               | TVar of variability flagged_type
               | TCon of connectivity flagged_type
               | TCau of causality flagged_type
+                                  [@@deriving show]
                                   
-     and 'a flagged_type = { flag : 'a ; flagged : texp }
+     and 'a flagged_type = { flag : 'a ; flagged : texp } [@@deriving show]
                              
-     and type_redeclaration = { redecl_each : bool ; redecl_type : texp typedef_struct commented ; }
+     and type_redeclaration = { redecl_each : bool ; redecl_type : texp typedef_struct commented ; } [@@deriving show]
 
-     and component_redeclaration = { each : bool ; def : definition; }
+     and component_redeclaration = { each : bool ; def : definition; } [@@deriving show]
 
      and component_modification_struct = { mod_each : bool ; mod_final : bool; mod_name : name;
                                            mod_value : modification_value option ; }
+                                           [@@deriving show]
 
      and modification_value = Nested of modification
                             | Rebind of exp
-                            | NestedRebind of nested_and_rebind_modification
-
-     and nested_and_rebind_modification = { nested : modification ; new_value : exp }
+                            | NestedRebind of nested_and_rebind_modification 
+                                                [@@deriving show]
+                                                
+     and nested_and_rebind_modification = { nested : modification ; new_value : exp } [@@deriving show]
                                             
-     and component_modification = component_modification_struct commented
+     and component_modification = component_modification_struct commented [@@deriving show]
 
      and modification = { types : type_redeclaration list ;
                           components : component_redeclaration list ;
-                          modifications : component_modification list ; }
+                          modifications : component_modification list ; } [@@deriving show]
 end
 
 module type Attributes = sig
     type t
+    val pp : Format.formatter -> t -> unit
   end
                            
 module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
     type attr = Attr.t
+
+    let pp_attr = Attr.pp
+
     type str = string loc [@@deriving yojson]
 
     let equal_str a b = a.txt = b.txt
@@ -319,13 +327,13 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
     type 'a commented = { commented : 'a ; comment : comment }
                           
      (** Something that can be annotated can wrapped in this record *)
-     and 'a annotated = { annotated_elem : 'a ; annotation : modification option; }
+     and 'a annotated = { annotated_elem : 'a ; annotation : modification option; } [@@deriving show] 
                           
      (** Comments are optionally annotated optional strings *)
-     and comment = str option annotated
+     and comment = str option annotated [@@deriving show]
                        
      (** The stored definition unit is the representation of a single Modelica file *)
-     and unit_ = { within : name option; toplevel_defs : typedef list }
+     and unit_ = { within : name option; toplevel_defs : typedef list } [@@deriving show]
                    
      (** The options of a type-definition:
     is the definition replaceable / final / partial / encapsulated ? *)
@@ -333,10 +341,11 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                              type_final : bool ; 
                              partial : bool ; 
                              encapsulated : bool }
-
+                             [@@deriving show]
+                             
      (** Typedefs share a lot of common code. 
     This is reflected by the {! Syntax.typedef_struct }: {v 'a v} denotes the definition's distincitve payload. *)
-     and 'a typedef_struct = { td_name : str ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options }
+     and 'a typedef_struct = { td_name : str ; sort : sort ; type_exp : 'a ; cns : constraint_ option ; type_options : typedef_options } [@@deriving show]
                                
      (** The definition of a new type/class etc. *)
      and typedef_desc = Short of texp typedef_struct
@@ -345,23 +354,24 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                       | OpenEnumeration of unit typedef_struct
                       | DerSpec of der_spec typedef_struct
                       | Extension of extension typedef_struct
-
-     and extension = composition * modification option
+                                               [@@deriving show]
+                                               
+     and extension = composition * modification option [@@deriving show]
                                                 
-     and typedef = typedef_desc commented
+     and typedef = typedef_desc commented [@@deriving show]
 
-     and constraint_ = texp commented
+     and constraint_ = texp commented [@@deriving show]
 
-     and algorithm = statement list
+     and algorithm = statement list [@@deriving show]
 
      and behavior = {algorithms : algorithm list ;
                      equations : equation list ;
                      initial_algorithms : algorithm list ;
                      initial_equations : equation list ;
-                     external_ : external_def option }
+                     external_ : external_def option } [@@deriving show]
 
-     and external_def_struct = { lang : string ; ext_lhs : exp option ; ext_ident : string ; ext_args : exp list }
-     and external_def = external_def_struct annotated
+     and external_def_struct = { lang : string ; ext_lhs : exp option ; ext_ident : string ; ext_args : exp list } [@@deriving show]
+     and external_def = external_def_struct annotated [@@deriving show]
 
      and elements = {
          typedefs : typedef list ;
@@ -369,36 +379,38 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
          extensions : extend list ;
          defs : definition list ;
          redeclared_defs : definition list ;
-       }
+       } [@@deriving show]
                       
      and composition = { imports : import list ;
                          public : elements ;
                          protected : elements;
                          cargo : behavior ;
-                       }
+                       } [@@deriving show]
 
-     and enum_literal = string commented
+     and enum_literal = string commented [@@deriving show]
 
-     and named_import = { global : name ; local : str }
+     and named_import = { global : name ; local : str } [@@deriving show]
 
-     and import = import_desc commented
+     and import = import_desc commented [@@deriving show]
                               
      and import_desc = NamedImport of named_import
                      | Unnamed of name
                      | UnqualifiedImport of name
+                                              [@@deriving show]
 
-     and extend = { ext_type : texp ; ext_annotation : modification option }
+     and extend = { ext_type : texp ; ext_annotation : modification option } [@@deriving show]
 
-     and definition_options = { final : bool ; scope : scope ; replaceable : bool }
+     and definition_options = { final : bool ; scope : scope ; replaceable : bool } [@@deriving show]
 
      and definition_structure = { def_name : string ; def_type : texp ; def_constraint : constraint_ option ;
                                   def_rhs : exp option ; def_if : exp option ; def_options : definition_options }
+                                  [@@deriving show]
+                                  
+     and definition = definition_structure commented [@@deriving show]
 
-     and definition = definition_structure commented 
+     and statement = statement_desc commented [@@deriving show]
 
-     and statement = statement_desc commented 
-
-     and statements = statement list
+     and statements = statement list [@@deriving show]
 
      and statement_desc = Assignment of assignment
                         | Call of call_statement
@@ -408,59 +420,60 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                         | Return
                         | ForStmt of for_statement
                         | WhileStmt of while_statement
+                                         [@@deriving show]
                                          
-                                         
-     and assignment = { target : exp ; source : exp }
+     and assignment = { target : exp ; source : exp } [@@deriving show]
 
-     and named_arg = { argument_name : str ; argument : exp }
+     and named_arg = { argument_name : str ; argument : exp } [@@deriving show]
                        
-     and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : named_arg list }
+     and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : named_arg list } [@@deriving show]
                             
-     and 'a else_condition = { guard : exp ; elsethen : 'a }
+     and 'a else_condition = { guard : exp ; elsethen : 'a } [@@deriving show]
                                
-     and 'a condition_struct = { condition : exp ; then_ : 'a ; else_if : 'a else_condition list ; else_ : 'a }
+     and 'a condition_struct = { condition : exp ; then_ : 'a ; else_if : 'a else_condition list ; else_ : 'a } [@@deriving show]
                                  
-     and if_statement = statements condition_struct 
+     and if_statement = statements condition_struct [@@deriving show]
 
-     and when_statement = statements condition_struct
+     and when_statement = statements condition_struct [@@deriving show]
 
-     and 'a for_loop_struct = {idx : idx list ; body : 'a }
+     and 'a for_loop_struct = {idx : idx list ; body : 'a } [@@deriving show]
                                 
-     and for_statement = statements for_loop_struct 
+     and for_statement = statements for_loop_struct [@@deriving show]
 
-     and while_statement = { while_ : exp ; while_body : statements }
+     and while_statement = { while_ : exp ; while_body : statements } [@@deriving show]
                              
-     and equations = equation list
+     and equations = equation list [@@deriving show]
 
-     and equation = equation_desc commented 
+     and equation = equation_desc commented [@@deriving show]
 
      and equation_desc = SimpleEquation of binary_exp
                        | ForEquation of for_equation
                        | IfEquation of if_equation
                        | WhenEquation of when_equation
                        | ExpEquation of exp
+                                          [@@deriving show]
 
-     and for_equation = equations for_loop_struct
+     and for_equation = equations for_loop_struct  [@@deriving show]
 
-     and if_equation = equations condition_struct
+     and if_equation = equations condition_struct [@@deriving show]
 
-     and when_equation = equations condition_struct
+     and when_equation = equations condition_struct [@@deriving show]
 
-     and binary_exp = { left : exp ; right : exp ; }
+     and binary_exp = { left : exp ; right : exp ; } [@@deriving show]
 
-     and if_expression = exp condition_struct 
+     and if_expression = exp condition_struct [@@deriving show]
 
-     and array_access =  { lhs : exp ; indices : exp list }
+     and array_access =  { lhs : exp ; indices : exp list } [@@deriving show]
 
-     and range = { start : exp ; end_ : exp ; step : exp option }
+     and range = { start : exp ; end_ : exp ; step : exp option } [@@deriving show]
 
-     and projection = { object_ : exp ; field : string }
+     and projection = { object_ : exp ; field : string } [@@deriving show]
 
-     and application = { fun_ : exp ; args : exp list ; named_args : named_arg list }
+     and application = { fun_ : exp ; args : exp list ; named_args : named_arg list } [@@deriving show]
 
-     and comprehension = { exp : exp ; idxs : idx list }
+     and comprehension = { exp : exp ; idxs : idx list } [@@deriving show]
 
-     and exp = { term : exp_struct ; attr : attr }
+     and exp = { term : exp_struct ; attr : attr } [@@deriving show]
                            
      and exp_struct = Pow of binary_exp
                     | DPow of binary_exp
@@ -505,14 +518,15 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                     | ExplicitClosure of exp
                     | End | Colon | Der | Initial | Assert
                     | OutputExpression of exp option list
+                                              [@@deriving show]
+                                              
+     and idx = { variable : str ; range : exp option } [@@deriving show]
 
-     and idx = { variable : str ; range : exp option }
+     and tprojection = { class_type : texp ; type_element : string } [@@deriving show]
 
-     and tprojection = { class_type : texp ; type_element : string }
+     and array_type = { base_type : texp ; dims : exp list } [@@deriving show]
 
-     and array_type = { base_type : texp ; dims : exp list }
-
-     and mod_type = { mod_type : texp ; modification : modification }
+     and mod_type = { mod_type : texp ; modification : modification } [@@deriving show]
                       
      and texp = TName of name
               | TRootName of name
@@ -521,25 +535,26 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
               | TVar of variability flagged_type
               | TCon of connectivity flagged_type
               | TCau of causality flagged_type
+                                  [@@deriving show]
                                   
-     and 'a flagged_type = { flag : 'a ; flagged : texp }
+     and 'a flagged_type = { flag : 'a ; flagged : texp } [@@deriving show]
                              
-     and type_redeclaration = { redecl_each : bool ; redecl_type : texp typedef_struct commented ; }
+     and type_redeclaration = { redecl_each : bool ; redecl_type : texp typedef_struct commented ; } [@@deriving show]
 
-     and component_redeclaration = { each : bool ; def : definition; }
+     and component_redeclaration = { each : bool ; def : definition; } [@@deriving show]
 
      and component_modification_struct = { mod_each : bool ; mod_final : bool; mod_name : name;
-                                           mod_value : modification_value option ; }
+                                           mod_value : modification_value option ; } [@@deriving show]
 
      and modification_value = Nested of modification
                             | Rebind of exp
-                            | NestedRebind of nested_and_rebind_modification
+                            | NestedRebind of nested_and_rebind_modification [@@deriving show]
 
-     and nested_and_rebind_modification = { nested : modification ; new_value : exp }
+     and nested_and_rebind_modification = { nested : modification ; new_value : exp } [@@deriving show]
                                             
-     and component_modification = component_modification_struct commented
+     and component_modification = component_modification_struct commented [@@deriving show]
 
      and modification = { types : type_redeclaration list ;
                           components : component_redeclaration list ;
-                          modifications : component_modification list ; }
+                          modifications : component_modification list ; } [@@deriving show]
   end
