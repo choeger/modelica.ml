@@ -265,7 +265,7 @@ and mtranslate_typedef td = mtranslate_tds td.commented
 
 and mtranslate_def def =
   do_ ;
-  down (`Field def.commented.def_name) ;
+  down (`FieldType def.commented.def_name) ;
   mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type ;
   up
 
@@ -304,7 +304,7 @@ and mtranslate_def_redeclaration src {def} = do_ ;
 					     f <-- next_anon ;
 					     let pullout = DQ.snoc src f in
 					     inside pullout (mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type) ;
-					     down (`Field def.commented.def_name) ;
+					     down (`FieldType def.commented.def_name) ;
 					     define (KnownPtr pullout) ;  
 					     up
 						    

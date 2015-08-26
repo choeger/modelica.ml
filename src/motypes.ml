@@ -60,7 +60,7 @@ module Name = struct
                   
   let rec scope_of_ptr_ tmp dq = match DQ.front dq with
     | None -> tmp
-    | Some ((`Field _ | `Any _ | `SuperClass _ ), _) -> tmp
+    | Some ((`FieldType _ | `Any _ | `SuperClass _ ), _) -> tmp
     | Some (`Protected, r) -> scope_of_ptr_ tmp r
     | Some ((`ClassMember x), r) -> scope_of_ptr_ (DQ.snoc tmp x) r
 
@@ -71,7 +71,8 @@ module Name = struct
   let rec of_ptr_ tmp dq = match DQ.front dq with
     | None -> tmp
     | Some ((`SuperClass _  | `Protected), r) -> of_ptr_ tmp r
-    | Some ((`ClassMember x | `Field x | `Any x), r) -> of_ptr_ (DQ.snoc tmp x) r
+    | Some ((`FieldType x), r) -> of_ptr_ (DQ.snoc tmp ("type_of_" ^ x)) r
+    | Some ((`ClassMember x | `Any x), r) -> of_ptr_ (DQ.snoc tmp x) r
 								
   let of_ptr dq = of_ptr_ DQ.empty dq
                                                                         
@@ -89,7 +90,7 @@ type constr =  CArray of int
              | CDer of string list
                          [@@deriving yojson,eq,show]
 
-type class_path_elem = [`Protected | `ClassMember of string | `Field of string | `SuperClass of int] [@@deriving eq,show,yojson]
+type class_path_elem = [`Protected | `ClassMember of string | `FieldType of string | `SuperClass of int] [@@deriving eq,show,yojson]
 
 type class_path = class_path_elem DQ.t [@@deriving eq,show,yojson]
                                                                                                      

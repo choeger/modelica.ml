@@ -67,7 +67,7 @@ let rec get_class_element_in global current_path {Normalized.class_members; supe
       | r -> r
     end
   else if StrMap.mem x fields then begin
-      let found = (DQ.snoc current_path (`Field x)) in
+      let found = (DQ.snoc current_path (`FieldType x)) in
       let r = (get_class_element global found (StrMap.find x fields) xs) in
       match r with
         `NothingFound -> (`PrefixFound {not_found=xs; found})      
@@ -139,7 +139,7 @@ exception CannotUpdate of string * string * string
 let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) = match DQ.front lhs with
     None -> elements
   | Some (`SuperClass i, r) -> {elements with super = update_intmap r rhs i super} 
-  | Some (`Field x, r) -> {elements with fields = update_map r rhs x fields}
+  | Some (`FieldType x, r) -> {elements with fields = update_map r rhs x fields}
   | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
   | Some (`Protected,_) -> raise IllegalPathElement
 				 
@@ -172,7 +172,7 @@ exception Stratification of class_path * string
 let rec stratify_non_existing done_ todo = match DQ.front todo with
     None -> done_
   | Some(`Any x, _) -> raise (Stratification (done_, x))
-  | Some((`Protected | `ClassMember _ | `Field _ | `SuperClass _ ) as x, xs) -> stratify_non_existing (DQ.snoc done_ x) xs
+  | Some((`Protected | `ClassMember _ | `FieldType _ | `SuperClass _ ) as x, xs) -> stratify_non_existing (DQ.snoc done_ x) xs
     
 let rec stratify global c (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
@@ -198,7 +198,7 @@ let rec stratify global c (done_:class_path) (todo:class_ptr) =
 and stratify_elements global ({class_members; super; fields} as es) (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
   | None -> done_
-  | Some(`Field x, xs) when StrMap.mem x fields -> stratify global (StrMap.find x fields) (DQ.snoc done_ (`Field x)) xs 
+  | Some(`FieldType x, xs) when StrMap.mem x fields -> stratify global (StrMap.find x fields) (DQ.snoc done_ (`FieldType x)) xs 
   | Some(`ClassMember x, xs) when StrMap.mem x class_members -> stratify global (StrMap.find x class_members) (DQ.snoc done_ (`ClassMember x)) xs 
   | Some(`SuperClass i, xs) when IntMap.mem i super -> stratify global (IntMap.find i super) (DQ.snoc done_ (`SuperClass i)) xs
 								
@@ -471,7 +471,7 @@ let rec collect_recursive_terms p rts = function
 
 and elements_collect_recursive_terms p rts {class_members; fields;} =
   let rts' = StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`ClassMember k)) rts v) class_members rts in
-  StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`Field k)) rts v) fields rts'               
+  StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`FieldType k)) rts v) fields rts'               
                                   
 let rec close_terms i p =
     Report.do_ ;
