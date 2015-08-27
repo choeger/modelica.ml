@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 69f3ef3b231b56fa9e9dbb09e0bfd509)
+# DO NOT EDIT (digest: 5390636848ba9c60f5a0242769e22f9b)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -26,6 +26,7 @@ true: annot, bin_annot
 <src/*.ml{,i,y}>: package(ppx_import)
 <src/*.ml{,i,y}>: package(ppx_monadic)
 <src/*.ml{,i,y}>: package(sedlex)
+<src/*.ml{,i,y}>: package(yojson)
 # Executable modelica_frontend_tests
 <test/modelica_frontend_tests.{native,byte}>: package(batteries)
 <test/modelica_frontend_tests.{native,byte}>: package(compiler-libs.common)
@@ -38,6 +39,7 @@ true: annot, bin_annot
 <test/modelica_frontend_tests.{native,byte}>: package(ppx_import)
 <test/modelica_frontend_tests.{native,byte}>: package(ppx_monadic)
 <test/modelica_frontend_tests.{native,byte}>: package(sedlex)
+<test/modelica_frontend_tests.{native,byte}>: package(yojson)
 <test/modelica_frontend_tests.{native,byte}>: use_modelica_ml
 <test/*.ml{,i,y}>: package(batteries)
 <test/*.ml{,i,y}>: package(compiler-libs.common)
@@ -50,6 +52,7 @@ true: annot, bin_annot
 <test/*.ml{,i,y}>: package(ppx_import)
 <test/*.ml{,i,y}>: package(ppx_monadic)
 <test/*.ml{,i,y}>: package(sedlex)
+<test/*.ml{,i,y}>: package(yojson)
 <test/*.ml{,i,y}>: use_modelica_ml
 # Executable modml_clc
 <examples/modml_clc.{native,byte}>: package(batteries)
@@ -62,6 +65,7 @@ true: annot, bin_annot
 <examples/modml_clc.{native,byte}>: package(ppx_import)
 <examples/modml_clc.{native,byte}>: package(ppx_monadic)
 <examples/modml_clc.{native,byte}>: package(sedlex)
+<examples/modml_clc.{native,byte}>: package(yojson)
 <examples/modml_clc.{native,byte}>: use_modelica_ml
 # Executable dump_cl
 <examples/dump_cl.{native,byte}>: package(batteries)
@@ -74,6 +78,7 @@ true: annot, bin_annot
 <examples/dump_cl.{native,byte}>: package(ppx_import)
 <examples/dump_cl.{native,byte}>: package(ppx_monadic)
 <examples/dump_cl.{native,byte}>: package(sedlex)
+<examples/dump_cl.{native,byte}>: package(yojson)
 <examples/dump_cl.{native,byte}>: use_modelica_ml
 # Executable modml_cl
 <examples/modml_cl.{native,byte}>: package(batteries)
@@ -86,6 +91,7 @@ true: annot, bin_annot
 <examples/modml_cl.{native,byte}>: package(ppx_import)
 <examples/modml_cl.{native,byte}>: package(ppx_monadic)
 <examples/modml_cl.{native,byte}>: package(sedlex)
+<examples/modml_cl.{native,byte}>: package(yojson)
 <examples/modml_cl.{native,byte}>: use_modelica_ml
 # Executable modml_clread
 <examples/modml_clread.{native,byte}>: package(batteries)
@@ -98,6 +104,7 @@ true: annot, bin_annot
 <examples/modml_clread.{native,byte}>: package(ppx_import)
 <examples/modml_clread.{native,byte}>: package(ppx_monadic)
 <examples/modml_clread.{native,byte}>: package(sedlex)
+<examples/modml_clread.{native,byte}>: package(yojson)
 <examples/modml_clread.{native,byte}>: use_modelica_ml
 <examples/*.ml{,i,y}>: package(batteries)
 <examples/*.ml{,i,y}>: package(compiler-libs.common)
@@ -109,6 +116,7 @@ true: annot, bin_annot
 <examples/*.ml{,i,y}>: package(ppx_import)
 <examples/*.ml{,i,y}>: package(ppx_monadic)
 <examples/*.ml{,i,y}>: package(sedlex)
+<examples/*.ml{,i,y}>: package(yojson)
 <examples/*.ml{,i,y}>: use_modelica_ml
 # OASIS_STOP
 true: use_menhir

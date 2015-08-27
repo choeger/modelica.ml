@@ -67,7 +67,7 @@ module type S = sig
     type der_spec = { der_name : name ; idents : str list } [@@deriving show,yojson]
 
     (** Something that can be commented can wrapped in this record *)
-    type 'a commented = { commented : 'a ; comment : comment } [@@deriving show]
+    type 'a commented = { commented : 'a ; comment : comment } [@@deriving show,yojson]
                           
      (** Something that can be annotated can wrapped in this record *)
      and 'a annotated = { annotated_elem : 'a ; annotation : modification option; } [@@deriving show]
@@ -302,15 +302,17 @@ end
 module type Attributes = sig
     type t
     val pp : Format.formatter -> t -> unit
+    val of_yojson : Yojson.Safe.json -> [`Ok of t | `Error of string ]
+    val to_yojson : t -> Yojson.Safe.json                                     
   end
                            
 module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
-    type attr = Attr.t
-
+    type attr = Attr.t [@@deriving show, yojson]
+                  
     let pp_attr = Attr.pp
 
     type str = string loc [@@deriving yojson]
-
+                      
     let equal_str a b = a.txt = b.txt
                       
     open Flags
@@ -327,7 +329,7 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
     type 'a commented = { commented : 'a ; comment : comment }
                           
      (** Something that can be annotated can wrapped in this record *)
-     and 'a annotated = { annotated_elem : 'a ; annotation : modification option; } [@@deriving show] 
+     and 'a annotated = { annotated_elem : 'a ; annotation : modification option; } [@@deriving show,yojson] 
                           
      (** Comments are optionally annotated optional strings *)
      and comment = str option annotated [@@deriving show]
@@ -557,4 +559,10 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
      and modification = { types : type_redeclaration list ;
                           components : component_redeclaration list ;
                           modifications : component_modification list ; } [@@deriving show]
+
+                                                                          
+    (* Without these lines, the signatures will not match. Although they do. *)
+    exception StrangeOCamlBug                                                                          
+    let typedef_struct_of_yojson = raise StrangeOCamlBug
+
   end

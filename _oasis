@@ -20,7 +20,7 @@ Library modelica_ml
   Path:           src
   CompiledObject: best
   BuildTools:     ocamlbuild
-  BuildDepends:   batteries, menhirLib, sedlex, ppx_deriving.show, ppx_deriving.eq,
+  BuildDepends:   batteries, menhirLib, sedlex, yojson, ppx_deriving.show, ppx_deriving.eq,
                   compiler-libs.common, ocamlgraph, ppx_deriving_yojson, ppx_monadic, ppx_import	
   Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
                   Syntax, Syntax_fragments, Ast, Mapper, Folder, FileSystem, Traversal,
