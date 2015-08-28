@@ -66,7 +66,7 @@ let empty_composition = { imports = [] ; public = empty_elements ; protected = e
 exception EmptyName
 
 let rec name_ components = function
-  | [] -> {components; root=false}
+  | [] -> {components = List.rev components; root=false}
   | ident::r -> name_ ({ident; kind=Any; subscripts=[]}::components) r
 
 let name = function

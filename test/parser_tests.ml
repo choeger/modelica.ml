@@ -97,7 +97,7 @@ let cre cr = no_attr (ComponentReference cr)
                      
 let derc = {ident="der";kind=Der;subscripts=[]}
 let initialc = {ident="initial";kind=Initial;subscripts=[]}
-let assertc = {ident="assert_";kind=Assert;subscripts=[]}
+let assertc = {ident="assert";kind=Assert;subscripts=[]}
 let der = no_attr (ComponentReference (cr [derc]))
 let initial = no_attr (ComponentReference (cr [initialc]))
 let assert_ = no_attr (ComponentReference (cr [assertc]))                   
@@ -182,7 +182,7 @@ let test_cases = [
   (let x = (String.repeat "ABC" 1000) in
    expr ("\"" ^ x ^ "\"") (string x) );
 
-  expr "x.bar" (name ["bar"; "x"]);
+  expr "x.bar" (name ["x"; "bar"]);
 
   expr "'foo'" (ide "'foo'") ;
 

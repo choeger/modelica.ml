@@ -168,6 +168,7 @@ simple_expr:
   | END { no_attr (End) } %prec END
   | COLON { no_attr (Colon) }
 
+  | cr = component_reference { no_attr (ComponentReference cr) }
   | fun_ = component_reference LPAREN arguments = function_args RPAREN
         { let (args, named_args) = arguments in no_attr (App { fun_ ; args; named_args }) }
                                                                       
