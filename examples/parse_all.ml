@@ -60,8 +60,12 @@ let parse file =
             let result' = (unit_parser next last) in            
             let result_noloc = erase_location.map_unit_ erase_location result in
             let result'_noloc = erase_location.map_unit_ erase_location result' in
-            if result_noloc != result'_noloc then
-              ANSITerminal.printf [ANSITerminal.red] "parsing != unparsing '%s'\n" file ;            
+
+            if not (result_noloc = result'_noloc) then begin
+              ANSITerminal.printf [ANSITerminal.red] "parsing != unparsing '%s'\n" file ;
+              Printf.printf "%s\n%s\n" (show_unit_ result_noloc) (show_unit_ result'_noloc) ;
+            end ;
+
             Some result
           with 
           | Sedlexing.MalFormed -> Printf.eprintf "Lexical error in unparse of %s\n" file ;

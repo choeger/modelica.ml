@@ -148,7 +148,11 @@ let defs input expected = parser_test_case defs_parser (defs2str ~max:100) (defs
 let prep_typedef = erase_location.map_typedef erase_location 
 
 let typedef input expected = parser_test_case td_parser (td2str ~max:100) (td2str ~max:20) prep_typedef input expected
-                                           
+
+let prep_unit = erase_location.map_unit_ erase_location 
+
+let unit_ input expected = parser_test_case unit_parser (unit2str ~max:100) (unit2str ~max:20) prep_unit input expected
+
 let test_cases = [ 
   expr "1.234" (real(1.234));
   expr "10e2" (real(1000.));
@@ -644,6 +648,8 @@ let test_cases = [
                                                                     } ;
                                                           } ;
                                                sort = Function } ));
+
+  unit_ "package Test end Test;" {within = None; toplevel_defs = [(uncommented (Composition {empty_typedef with td_name =nl"Test" ; sort=Package; type_exp = empty_composition}))]} ;
   
   (let line = {
      no_modification

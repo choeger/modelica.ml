@@ -167,7 +167,6 @@ module Make(Tree : Ast.S) = struct
           | UnqualifiedImport name -> UnqualifiedImport (this.map_name this name)
 
       end
-
                            
     module Import = struct 
         type sort = import
