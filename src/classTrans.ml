@@ -70,7 +70,7 @@ type translation_state = {
     env : import_env ;
     current_path : class_ptr ;
     anons : int ;
-    code : class_stmt list ;
+    class_code : class_stmt list ;
   }
 			   
 let rec add_imports imports state = match imports with
@@ -82,7 +82,7 @@ let return x = fun s -> (x, s)
 let bind ma f = fun s -> let (a, s') = ma s in
 			 (f a s') 
 
-let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; anons = 0; code = []} in a
+let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; anons = 0; class_code = []} in a
 
 let down pe state = ((), {state with current_path = DQ.snoc state.current_path pe})
 
@@ -92,17 +92,17 @@ let within_path = function
 		      		      
 let up state = ((), {state with current_path = match DQ.rear state.current_path with None -> DQ.empty | Some (xs,_) -> xs})
 		 
-let define rhs state = ((), {state with code = {lhs=state.current_path; rhs} :: state.code})
+let define rhs state = ((), {state with class_code = {lhs=state.current_path; rhs} :: state.class_code})
 
-let open_class sort post state = ((), {state with code =
+let open_class sort post state = ((), {state with class_code =
 						    {lhs = state.current_path ;
 						     rhs = Close } ::
 						    {lhs = state.current_path;
-						     rhs = (post (Empty {class_sort = sort; class_name = (Name.of_ptr state.current_path)}))} :: state.code})
+						     rhs = (post (Empty {class_sort = sort; class_name = (Name.of_ptr state.current_path)}))} :: state.class_code})
 
 let in_context m state =
   let (x, s') = m {state with anons = (Hashtbl.hash state.current_path)} in
-  (x, {state with code = s'.code})
+  (x, {state with class_code = s'.class_code})
 
 let inside name m state =
   let (x, s') = m {state with current_path = name} in
@@ -308,141 +308,6 @@ and mtranslate_def_redeclaration src {def} = do_ ;
 					     define (KnownPtr pullout) ;  
 					     up
 						    
-(*    
-let rec translate_tds fresh env p (prog : class_stmt list) = function
-  | Short tds ->
-     let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-     translate_texp env p' prog ((sort tds.sort) %> (repl tds.type_options)) tds.type_exp
-
-  | Composition tds ->
-     let env' = (List.fold_left add_import env tds.type_exp.imports) in
-     let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-     let rhs = repl tds.type_options (Empty {class_sort = tds.sort; class_name = (Name.of_ptr p')}) in
-     let prog' = {lhs=p'; rhs=Close}::{lhs=p'; rhs}::prog in
-     let public = translate_elements env' p' prog' tds.type_exp.public in
-     let p'' = (DQ.snoc p' `Protected) in
-     let protected = translate_elements env' p'' public tds.type_exp.protected in
-     protected
-
-  | Enumeration tds ->
-     let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-     let rhs = repl tds.type_options (sort tds.sort (PEnumeration (StrSet.of_list (List.map (fun {commented} -> commented) tds.type_exp)))) in
-     {lhs=p'; rhs}::prog
-
-  | OpenEnumeration tds ->
-     let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-     let rhs = repl tds.type_options (sort tds.sort (PEnumeration StrSet.empty)) in
-     {lhs=p'; rhs}::prog
-                          
-  | DerSpec tds ->
-     let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-     let rhs = repl tds.type_options (sort tds.sort (Constr {arg = Reference tds.type_exp.der_name ; constr = CDer (lunloc tds.type_exp.idents)})) in
-     {lhs=p'; rhs}::prog
-
-  | Extension tds ->
-     let (cmp, _) = tds.type_exp in
-     let env' = (List.fold_left add_import env cmp.imports) in
-     let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-     let rhs = repl tds.type_options (Empty {class_name = Name.of_ptr p'; class_sort = tds.sort}) in
-     let prog' = {lhs=p'; rhs=Close}::{lhs=p'; rhs}::prog in
-     let public = translate_elements env' p' prog' cmp.public in
-
-     let baseclass = 
-       {lhs=DQ.snoc p' (`SuperClass (List.length cmp.public.extensions)); rhs=RedeclareExtends}::public                                                                                                  
-     in
-     let p'' = (DQ.snoc p' `Protected) in
-     let protected = translate_elements env' p'' baseclass cmp.protected in
-     protected
-
-                      
-and translate_extends fresh env p (prog : class_stmt list) i {ext_type} =  
-  translate_texp env (DQ.snoc p (`SuperClass i)) prog identity ext_type
-
-and translate_elements fresh env p prog {extensions;typedefs;redeclared_types;defs;redeclared_defs} = 
-  let super = List.fold_lefti (translate_extends env p) prog extensions in
-  let class_members = List.fold_left (translate_typedef env p) super typedefs in
-  let fields = List.fold_left (translate_def env p) class_members defs in  
-  let type_redecls = List.fold_left (translate_typedef env p) fields redeclared_types in    
-  let field_redecls = List.fold_left (translate_def env p) type_redecls redeclared_defs in  
-  field_redecls  
-
-and translate_typedef fresh env p prog td = translate_tds env p prog td.commented
-                                                  
-and translate_def fresh env p prog def = translate_texp env (DQ.snoc p (`Field def.commented.def_name)) prog
-							(repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable})
-                                                  def.commented.def_type 
-                                                    
-(*
--and translate_strict_redeclarations rd_lhs {types} =
--  StrictRedeclaration {rd_lhs ; rds = List.map (fun trd -> let rd_name = trd.redecl_type.commented.td_name.txt in
--                                                           let rd_rhs  = translate_texp trd.redecl_type.commented.type_exp
--                                                           in ClassMember {rd_name ; rd_rhs}) types}
-                                                    *)
-                                                  
-and translate_texp env p (prog : class_stmt list) f =
-  let appl ct constr = let f' = fun arg -> f(Constr {arg;constr}) in
-                       translate_texp env p prog f' ct
-  in
-  let return t = {lhs=p; rhs= f t}::prog in
-  let apply_import = function
-    | x::xs when StrMap.mem x.txt env -> (StrMap.find x.txt env) @ xs
-    | xs -> xs
-  in
-  function
-  | TName [{txt="ExternalObject"}] -> return PExternalObject
-  | TName [{txt="StateSelect"}] -> return (PEnumeration (StrSet.of_list ["never";"default";"avoid";"prefer";"always"]))
-  | TName [{txt="Real"}] -> return PReal
-  | TName [{txt="Integer"}] -> return PInt
-  | TName [{txt="Boolean"}] -> return PBool
-  | TName [{txt="String"}] -> return PString
-  | TName n -> return (Reference (apply_import n))
-  | TRootName n -> return (RootReference n)
-                                 
-  | TArray {base_type;dims} -> appl base_type (CArray (List.length dims))
-  | TVar {flag;flagged} -> appl flagged (CVar flag)                                 
-  | TCon {flag;flagged} -> appl flagged (CCon flag)
-  | TCau {flag;flagged} -> appl flagged (CCau flag)
-
-  | TMod {mod_type; modification} ->
-     (* order does not matter here: will be found by dependency analysis *)
-     begin match DQ.rear p with
-             None -> raise NothingModified (* cannot happen *)
-           (* In case of inheritance, we do not need to handle redeclarations special from normal declarations *)
-           | Some(parent, `SuperClass _) ->
-              let prog' = translate_modification env parent prog modification in
-              translate_texp env p prog' f mod_type
-           (* This is a little bit wonky: Actually there should be a fresh class name generated here ... *)
-           | _ ->	      
-              let prog' = translate_modification env p prog modification in
-              if (prog == prog') then
-                translate_texp env p prog f mod_type
-              else
-                translate_texp env (DQ.snoc p (`SuperClass 0)) ({lhs=p; rhs=Close}::{lhs=p; rhs=Empty {class_sort=Class;class_name=Name.of_ptr p}}::prog') f mod_type
-       end
-
-and translate_type_redeclaration env p prog {redecl_type} =
-  let tds = redecl_type.commented in
-  let p' = DQ.snoc p (`ClassMember tds.td_name.txt) in
-  translate_texp env p' prog (final tds.type_options %> sort tds.sort) tds.type_exp
-                            
-and translate_modification env p prog {types; components; modifications} =
-  let rts = List.fold_left (translate_type_redeclaration env p) prog types in
-  let rds = List.fold_left (translate_def_redeclaration env p) rts components in
-  List.fold_left (translate_nested_modification env p) rds modifications
-  
-and translate_nested_modification env p prog = function
-    {commented = {mod_name; mod_value = Some (Nested nested | NestedRebind {nested}) }} ->
-    let p' = List.fold_left (fun p n -> DQ.snoc p (`Any n.txt)) p mod_name in
-    translate_modification env p' prog nested
-  | _ -> prog                                                                           
-
-and translate_def_redeclaration env p prog {def} = translate_def env p prog def
-           
-let rec translate_typedefs env p (prog : class_stmt list) = function
-    [] -> prog
-  | td::typedefs -> let prog' = translate_tds env p prog td.commented in
-                    translate_typedefs env p prog' typedefs
- *)
     							
 type translated_unit = {
     class_name : Name.t;
@@ -466,7 +331,7 @@ let mtranslate_unit env {within; toplevel_defs=td::_} =
   mtranslate_typedef td ;
   down (`ClassMember (name_of td.commented).txt) ;
   s <-- get ;
-  return {class_code=s.code; class_name=Name.of_ptr s.current_path}
+  return {class_code=s.class_code; class_name=Name.of_ptr s.current_path}
        
 let translate_unit env {scanned; parsed} =
   BatLog.logf "[modclc] %s\n" scanned ;
