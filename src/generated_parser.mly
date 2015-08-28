@@ -135,7 +135,7 @@ modelica_extends : extends = extends EOF { extends }
 ident : x=IDENT { mkloc x $startpos $endpos }
 
 str : x=STRING { mkloc x $startpos $endpos }
-
+      
 expr : e = simple_expr { e }
      | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
        { no_attr (If { condition ; then_ ; else_if ; else_ }) }
@@ -153,10 +153,6 @@ simple_expr:
         { no_attr (Real (f)) }
   | s = STRING
         { no_attr (String(s)) }
-  | DOT x = IDENT
-        { no_attr (RootIde x)}
-  | x = IDENT
-        { no_attr (Ide(x)) }
   | LPAREN e = expr RPAREN
         { e }
   | LPAREN RPAREN { no_attr (OutputExpression [None]) } 
@@ -165,19 +161,14 @@ simple_expr:
 
   | LBRACE es=array_args RBRACE
         { no_attr (Array es) }
-  | lhs = simple_expr LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
-        { no_attr (ArrayAccess { lhs; indices }) }
   | LBRACKET els = separated_nonempty_list(SEMICOLON, separated_nonempty_list(COMMA, expr)) RBRACKET
         { no_attr (MArray els) }
   | FUNCTION e = simple_expr
         { no_attr (ExplicitClosure e) }           
   | END { no_attr (End) } %prec END
-  | DER { no_attr (Der) }
-  | INITIAL { no_attr (Initial) }
   | COLON { no_attr (Colon) }
-  | ASSERT { no_attr (Assert) }
 
-  | fun_ = simple_expr LPAREN arguments = function_args RPAREN
+  | fun_ = component_reference LPAREN arguments = function_args RPAREN
         { let (args, named_args) = arguments in no_attr (App { fun_ ; args; named_args }) }
                                                                       
   | left = simple_expr PLUS right = simple_expr
@@ -221,9 +212,6 @@ simple_expr:
   | left = simple_expr OR right = simple_expr
        { no_attr (Or ( {left ; right} )) }
 
-  | object_ = simple_expr DOT field = IDENT
-       { no_attr (Proj { object_ ; field }) }
-
   | MINUS e = simple_expr { no_attr (UMinus e) } %prec UMinus
   | PLUS e = simple_expr { no_attr (UPlus e) } %prec UMinus
   | DOTMINUS e = simple_expr { no_attr (UDMinus e) } %prec UMinus
@@ -264,16 +252,21 @@ elseif_statement : ELSEIF guard = expr THEN elsethen=list(statement) { { guard ;
 
 elsewhen_statement : ELSEWHEN guard = expr THEN elsethen=list(statement) { { guard ; elsethen } }
                     
-component_reference : x = IDENT { no_attr (Ide x) }
-                    | ASSERT { no_attr (Assert) }
-                    | DOT x = IDENT { no_attr (RootIde x) }                                                     
-                    | object_=component_reference DOT field=IDENT { no_attr (Proj { object_ ; field }) }
-                    | lhs = component_reference LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET
-                                                                                        { no_attr (ArrayAccess { lhs; indices }) }
-lexpr : r = component_reference { r }
-      | LPAREN ps=patterns RPAREN { no_attr (OutputExpression ps) }
-                      
-patterns : p=option(lexpr) ps=list(preceded(COMMA, option(lexpr))) { p::ps }
+component_reference : DOT components = separated_nonempty_list(DOT, component) { {root = true ; components } }
+                    | components = separated_nonempty_list(DOT, component) { {root = false ; components } }
+                    
+subscripts : LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET { indices }
+           | { [] }
+
+component : ident = IDENT subscripts = subscripts { { ident; kind = Any; subscripts } }
+          | ASSERT subscripts = subscripts { { ident = "assert"; kind = Assert; subscripts } }
+          | DER subscripts = subscripts { { ident = "der"; kind = Der; subscripts } }
+          | INITIAL subscripts = subscripts { { ident = "initial"; kind = Initial; subscripts } }
+          
+lexpr : r = component_reference { Single r }
+      | LPAREN ps=patterns RPAREN { Multiple ps }
+                           
+patterns : p=option(expr) ps=list(preceded(COMMA, option(expr))) { p::ps }
 
 statement_body : procedure=component_reference LPAREN arguments = function_args RPAREN
                  { let (pargs, pnamed_args) = arguments in Call { procedure ; pargs; pnamed_args } }                                                                 

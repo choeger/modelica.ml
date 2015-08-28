@@ -328,10 +328,10 @@ module Make(Tree : Ast.S) = struct
         type sort = statement_desc
 
         let fold this = function
-            Assignment { target ; source } ->  this.fold_exp this target %>
+            Assignment { target ; source } ->  this.fold_target this target %>
                                                  this.fold_exp this source
 
-          | Call {procedure; pargs; pnamed_args} -> this.fold_exp this procedure %>
+          | Call {procedure; pargs; pnamed_args} -> this.fold_cr this procedure %>
                                                       fold_list this.fold_exp this pargs %>
                                                         fold_list this.fold_named_arg this pnamed_args
                                                                   
@@ -345,10 +345,10 @@ module Make(Tree : Ast.S) = struct
                                                    fold_list this.fold_statement this while_body
                                                       
         let map this = function
-            Assignment { target ; source } -> Assignment { target = this.map_exp this target ;
+            Assignment { target ; source } -> Assignment { target = this.map_target this target ;
                                                            source = this.map_exp this source }
 
-          | Call {procedure; pargs; pnamed_args} -> Call { procedure = this.map_exp this procedure ;
+          | Call {procedure; pargs; pnamed_args} -> Call { procedure = this.map_cr this procedure ;
                                                            pargs = map_list this.map_exp this pargs ;
                                                            pnamed_args = map_list this.map_named_arg this pnamed_args }
                                                          
@@ -416,15 +416,12 @@ module Make(Tree : Ast.S) = struct
           | Not e -> this.fold_exp this e
 
           | If if_expression -> fold_conditional this.fold_exp this if_expression
-          | ArrayAccess {lhs; indices} -> this.fold_exp this lhs %> fold_list this.fold_exp this indices
 
           | Range {start; end_; step} -> this.fold_exp this start %>
                                            this.fold_exp this end_ %>
                                              fold_option this.fold_exp this step
 
-          | Ide s -> this.fold_identifier this s
-          | Proj {object_; field} -> this.fold_exp this object_ 
-          | App { fun_; args; named_args} -> this.fold_exp this fun_ %>
+          | App { fun_; args; named_args} -> this.fold_cr this fun_ %>
                                                fold_list this.fold_exp this args %>
                                                  fold_list this.fold_named_arg this named_args
 
@@ -435,7 +432,8 @@ module Make(Tree : Ast.S) = struct
           | MArray ess -> fold_list (fold_list this.fold_exp) this ess
           | ExplicitClosure e -> this.fold_exp this e                           
           | OutputExpression eos -> fold_list (fold_option this.fold_exp) this eos
-          | ( End | Colon | Der | Initial | Assert | Bool _ | Int _ | Real _ | String _ | RootIde _) -> fun a -> a
+          | ComponentReference cr -> this.fold_cr this cr
+          | ( End | Colon | Bool _ | Int _ | Real _ | String _ ) -> fun a -> a
                                                                                                                    
         let map this = function
           | Pow b -> Pow (map_binary this b)
@@ -465,16 +463,11 @@ module Make(Tree : Ast.S) = struct
           | Eq b -> Eq (map_binary this b)
 
           | If if_expression -> If (map_conditional this.map_exp this if_expression)
-          | ArrayAccess {lhs; indices} -> ArrayAccess { lhs = this.map_exp this lhs ; indices = map_list this.map_exp this indices }
-
           | Range {start; end_; step} -> Range { start = this.map_exp this start ;
                                                  end_ = this.map_exp this end_ ;
                                                  step = map_option this.map_exp this step }
 
-          | RootIde s -> RootIde s
-          | Ide s -> Ide s
-          | Proj {object_; field} -> Proj { object_ = this.map_exp this object_ ; field }
-          | App { fun_; args; named_args} -> App { fun_ = this.map_exp this fun_ ;
+          | App { fun_; args; named_args} -> App { fun_ = this.map_cr this fun_ ;
                                                    args = map_list this.map_exp this args ;
                                                    named_args = map_list this.map_named_arg this named_args }
 
@@ -484,12 +477,46 @@ module Make(Tree : Ast.S) = struct
           | Array es -> Array (map_list this.map_exp this es)
           | MArray ess -> MArray (map_list (map_list this.map_exp) this ess)
           | ExplicitClosure e -> ExplicitClosure (this.map_exp this e)                           
+          | ComponentReference cr -> ComponentReference (this.map_cr this cr)
           | OutputExpression eos -> OutputExpression (map_list (map_option this.map_exp) this eos)
-          | ( End | Colon | Der | Initial | Assert | Bool _ | Int _ | Real _ | String _) as e -> e
+          | ( End | Colon | Bool _ | Int _ | Real _ | String _) as e -> e
 
 
       end
 
+    module Cr = struct
+        type sort = component_reference
+
+        let fold this {root; components} =
+          fold_list this.fold_component this components 
+
+        let map this {root; components} = {root; components = map_list this.map_component this components}
+      end
+
+    module Component = struct
+        type sort = component
+
+        let fold this {ident; kind; subscripts} = this.fold_identifier this ident %>
+                                                    fold_list this.fold_exp this subscripts
+
+        let map this {ident; kind; subscripts} =
+          {ident = this.map_identifier this ident ;
+           kind;
+           subscripts = map_list this.map_exp this subscripts}          
+      end
+                  
+    module Target = struct
+        type sort = assignment_target
+
+        let fold this = function
+            Single cr -> this.fold_cr this cr
+          | Multiple eos -> fold_list (fold_option this.fold_exp) this eos
+
+        let map this = function
+            Single cr -> Single (this.map_cr this cr)
+          | Multiple eos -> Multiple (map_list (map_option this.map_exp) this eos)
+      end
+                  
     module Elements = struct
         type sort = elements
 
@@ -612,6 +639,9 @@ module Make(Tree : Ast.S) = struct
       end
                           
     let default_folder = {
+        fold_cr = Cr.fold;
+        fold_component = Component.fold;
+        fold_target = Target.fold;
         fold_unit_ = Unit.fold ;
         fold_within = fold_id;
         fold_comment = fold_id;
@@ -663,6 +693,9 @@ module Make(Tree : Ast.S) = struct
       }
                            
     let default_mapper = {
+        map_cr = Cr.map;
+        map_component = Component.map;
+        map_target = Target.map;
         map_unit_ = Unit.map ;
         map_within = map_id;
 

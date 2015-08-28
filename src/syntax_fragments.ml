@@ -65,13 +65,13 @@ let empty_composition = { imports = [] ; public = empty_elements ; protected = e
                         
 exception EmptyName
 
-let rec name_ object_ = function
-  | [] -> object_
-  | field::r -> name_ (no_attr (Proj { object_ ; field })) r
+let rec name_ components = function
+  | [] -> {components; root=false}
+  | ident::r -> name_ ({ident; kind=Any; subscripts=[]}::components) r
 
 let name = function
   | [] -> raise EmptyName
-  | x::r -> name_ (no_attr (Ide x)) r
+  | n -> no_attr (ComponentReference (name_ [] n))
                          
 let type_name xs = TName (List.map Location.mknoloc xs)
 

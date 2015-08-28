@@ -55,16 +55,11 @@ let nl = mknoloc
 
 let int x = no_attr (Int x)
 let real x = no_attr (Real x)
-let ide x = no_attr (Ide x)
+let ide x = name [x]
 let bool x = no_attr (Bool x)
-let proj x = no_attr (Proj x)
 let string x = no_attr (String x)
 let colon = no_attr Colon
-let der = no_attr Der
-let assert_ = no_attr Assert
 let end_ = no_attr End
-let initial = no_attr Initial
-let rootIde x = no_attr (RootIde x)
 let app x = no_attr (App x)
 let pow x = no_attr (Pow x)
 let dpow x = no_attr (DPow x)
@@ -90,14 +85,26 @@ let and_ x = no_attr (And x)
 let or_ x = no_attr (Or x)
 let not_ x = no_attr (Not x)
 let if_ x = no_attr (If x)
-let arrayaccess x = no_attr (ArrayAccess x)
 let range x = no_attr (Range x)
 let compr x = no_attr (Compr x)
 let array x = no_attr (Array x)
 let marray x = no_attr (MArray x)
 let explicitclosure x = no_attr (ExplicitClosure x)
 let outputexpression x = no_attr (OutputExpression x)
-                 
+
+let cr components = {root=false; components}
+let cre cr = no_attr (ComponentReference cr)
+                     
+let derc = {ident="der";kind=Der;subscripts=[]}
+let initialc = {ident="initial";kind=Initial;subscripts=[]}
+let assertc = {ident="assert_";kind=Assert;subscripts=[]}
+let der = no_attr (ComponentReference (cr [derc]))
+let initial = no_attr (ComponentReference (cr [initialc]))
+let assert_ = no_attr (ComponentReference (cr [assertc]))                   
+                
+let any ident = {ident;kind=Any;subscripts=[]}                             
+
+                  
 let parser_test_case parser lprinter sprinter prep input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::
@@ -175,7 +182,7 @@ let test_cases = [
   (let x = (String.repeat "ABC" 1000) in
    expr ("\"" ^ x ^ "\"") (string x) );
 
-  expr "x.bar" (proj ({field = "bar"; object_=(ide "x") }));
+  expr "x.bar" (name ["bar"; "x"]);
 
   expr "'foo'" (ide "'foo'") ;
 
@@ -191,19 +198,18 @@ let test_cases = [
   expr "end" end_ ;
   expr "assert" assert_ ;
   
-  expr "a.b.c"  (proj { object_ = proj { object_ = (ide "a"); field = "b"} ; field = "c" } );
-  expr "a.'b'.c"  (proj { object_ = proj { object_ = (ide "a"); field = "'b'"} ; field = "c" } ) ;
-  expr "a/* comment */.b.c"  (proj { object_ = proj { object_ = (ide "a"); field = "b"} ; field = "c" }) ;
+  expr "a.b.c"  (name ["a"; "b"; "c"]) ;
+  expr "a.'b'.c"  (name ["a"; "'b'"; "c"]) ;
+  expr "a/* comment */.b.c"  (name ["a"; "b"; "c" ]) ;
   
-  expr ".x" (rootIde "x") ;
-  expr ".x.y" (proj {object_ = (rootIde "x"); field = "y"}) ;
+  expr ".x" (no_attr (ComponentReference {root = true; components = [any "x"]})) ;
+  expr ".x.y" (no_attr (ComponentReference {root = true; components = [any "x"; any "y"]})) ;
 
   (* functions *)
-  expr "f()" (app {fun_= (ide "f"); args=[]; named_args=[] });
-  expr "f()()" (app {fun_= app { fun_=ide "f"; args=[]; named_args=[] }; args=[]; named_args=[]});
-  expr "f(1.0)" (app {fun_=ide "f"; args=[real 1.]; named_args=[] }) ;
-  expr "f(x=1.0)" (app {fun_= (ide "f"); args=[]; named_args=[named "x" (real 1.0)]});
-  expr "f(1.0, x=1.0)" (app {fun_= (ide "f"); args=[real 1.]; named_args=[named "x" (real 1.0)]});
+  expr "f()" (app {fun_= (cr [any "f"]); args=[]; named_args=[] });
+  expr "f(1.0)" (app {fun_=cr [any "f"]; args=[real 1.]; named_args=[] }) ;
+  expr "f(x=1.0)" (app {fun_= (cr [any "f"]); args=[]; named_args=[named "x" (real 1.0)]});
+  expr "f(1.0, x=1.0)" (app {fun_= (cr [any "f"]); args=[real 1.]; named_args=[named "x" (real 1.0)]});
   expr "function x" (explicitclosure (ide "x"));
 
   (* precedences *)
@@ -228,8 +234,8 @@ let test_cases = [
   expr "1 < 2 and x or y" (or_ {left=and_ {left= (lt { left = int 1 ; right = int 2 }) ; right=ide "x" }; right=ide "y"}) ;
 
   (* arrays *)
-  expr "x[1]" (arrayaccess { lhs = ide "x" ; indices = [int 1] }) ;
-  expr "x[1].y" (proj { object_ = arrayaccess { lhs = ide "x" ; indices = [int 1] } ; field = "y" });
+  expr "x[1]" (no_attr (ComponentReference (cr [{(any "x") with subscripts = [int 1]}]))) ;
+  expr "x[1].y" (no_attr (ComponentReference (cr [{(any "x") with subscripts = [int 1]}; any "y"]))) ;
   expr "{true}" (array [bool true]);
   expr "[4,2;0,0]" (marray [[int 4; int 2];[int 0; int 0]]);
     
@@ -247,20 +253,20 @@ let test_cases = [
   (* statements *)
   stmt "return;" (uncommented Return) ;
   stmt "break;" (uncommented Break) ;
-  stmt "assert();" (uncommented (Call {procedure=assert_; pargs=[]; pnamed_args = [] }));
+  stmt "assert();" (uncommented (Call {procedure=cr [assertc]; pargs=[]; pnamed_args = [] }));
   stmt "print(\"... testAllFunctions(..) is logged in \" + file);"
-       (uncommented (Call {procedure=ide"print" ; pargs = [
+       (uncommented (Call {procedure=cr [any "print"] ; pargs = [
                              plus { left=string "... testAllFunctions(..) is logged in "; right = ide "file" }
                            ]; pnamed_args =  [] }));
   
   stmt "if true then break; end if;" (uncommented (IfStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
   stmt "if true then break; elseif true then break; end if;" (uncommented (IfStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [{guard=bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
   stmt "when true then break; elsewhen true then break; end when;" (uncommented (WhenStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [{guard=bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
-  stmt "f(1, x=3);" (uncommented (Call { procedure=ide "f"; pargs = [int 1]; pnamed_args = [named "x" (int 3)]} ) );
-  stmt "x := 23;" (uncommented (Assignment { target=ide "x" ; source = int 23 } ));
-  stmt "(,) := 23;" (uncommented (Assignment { target=outputexpression [None; None] ; source = int 23 } ));
-  stmt "() := 23;" (uncommented (Assignment { target=outputexpression [None] ; source = int 23 } ));  
-  stmt "(x,,y) := 23;" (uncommented (Assignment { target=outputexpression([Some (ide "x");None;Some (ide "y")]) ; source = int 23 } ));  
+  stmt "f(1, x=3);" (uncommented (Call { procedure=cr [any "f"]; pargs = [int 1]; pnamed_args = [named "x" (int 3)]} ) );
+  stmt "x := 23;" (uncommented (Assignment { target=Single (cr [any "x"]) ; source = int 23 } ));
+  stmt "(,) := 23;" (uncommented (Assignment { target=Multiple [None; None] ; source = int 23 } ));
+  stmt "() := 23;" (uncommented (Assignment { target=Multiple [None] ; source = int 23 } ));  
+  stmt "(x,,y) := 23;" (uncommented (Assignment { target=Multiple ([Some (ide "x");None;Some (ide "y")]) ; source = int 23 } ));  
   stmt "while true loop break; break; end while;" (uncommented (WhileStmt { while_ = bool true ; while_body = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=None}] ; body = [uncommented Break; uncommented Break] ; } ) );
   stmt "for x in a loop break; break; end for;" (uncommented (ForStmt { idx = [{variable = nl "x"; range=Some (ide "a")}] ; body = [uncommented Break; uncommented Break] ; } ) );
@@ -268,23 +274,23 @@ let test_cases = [
   (* equations *)
   eq "x = 0;" (uncommented (SimpleEquation { left = ide "x"; right = int 0 })) ;
 
-  eq "if true then x.y = 0; end if;" (uncommented (IfEquation { condition= bool true; then_ = [uncommented (SimpleEquation { left = proj { object_ = ide "x"; field= "y" } ;
+  eq "if true then x.y = 0; end if;" (uncommented (IfEquation { condition= bool true; then_ = [uncommented (SimpleEquation { left = name ["x";"y"] ;
                                                                                                                             right = int 0 } )] ;
                                                                 else_if = []; else_ = [];
                                                               })) ;
 
   eq "if c(a[i]) then a[i].p.r = {0,0,0}; end if;"  (uncommented (IfEquation {
-                                                                      condition=app { fun_=ide "c" ;
-                                                                                      args=[arrayaccess{lhs = ide "a" ; indices = [ide "i"]}];
+                                                                      condition=app { fun_=cr [any "c"] ;
+                                                                                      args= [cre (cr [{(any "a") with subscripts = [ide "i"]}])];
                                                                                       named_args=[] };
-                                                                      then_ = [uncommented (SimpleEquation { left = proj { object_ = proj { object_ =
-                                                                                                                                                arrayaccess{ lhs= ide "a";
-                                                                                                                                                              indices=[ide"i"] }; 
-                                                                                                                                              field="p" } ;
-                                                                                                               field = "r"
-                                                                                                             } ;
-                                                                                               right = array [int 0; int 0; int 0];
-                                                                                             })] ;
+                                                                      then_ = [
+                                                                          uncommented (
+                                                                              SimpleEquation {
+                                                                                  left = cre (cr [{(any "a")
+                                                                                                   with subscripts = [ide"i"] } ;
+                                                                                                   any "p"; any "r"]) ;
+                                                                                  right = array [int 0; int 0; int 0];
+                                                                                } ) ] ;
                                                                       else_if = []; else_ = [];
                                                                    })) ;
 
@@ -349,7 +355,7 @@ let test_cases = [
                                                                                    
   defs "Medium medium := Medium()" [uncommented { empty_def with def_name = "medium" ;
                                                                  def_type = type_name ["Medium"] ;
-                                                                 def_rhs = Some ( app ( empty_app (ide "Medium") ) ) ;
+                                                                 def_rhs = Some ( app ( empty_app (cr [any "Medium"]) ) ) ;
                                                 }] ;
 
   
@@ -547,7 +553,7 @@ let test_cases = [
                                                                                 external_ = Some (
                                                                                                 unannotated {
                                                                                                     lang="C" ;
-                                                                                                    ext_lhs=Some (ide "x");
+                                                                                                    ext_lhs=Some (cr [any "x"]);
                                                                                                     ext_ident = "f";
                                                                                                     ext_args = []
                                                                                                   }
@@ -632,7 +638,7 @@ let test_cases = [
                                                type_exp = { empty_composition with
                                                             cargo = { empty_behavior with
                                                                       algorithms = [[uncommented (
-                                                                                       Call {procedure=ide "print" ;
+                                                                                       Call {procedure=cr [any "print"] ;
                                                                                             pargs = [string "hello, world!"] ;
                                                                                             pnamed_args = [] } ) ]];
                                                                     } ;
@@ -665,7 +671,7 @@ let test_cases = [
    in
    let annotation = Some line in
    eq "connect(not1.y, rSFlipFlop.R) annotation (Line(points={{-19,-10},{20,-10}, {20,-6},{38,-6}}, color={255,0,255}));" 
-      { commented = ExpEquation (app {(empty_app (ide "connect")) with args=[name ["not1";"y"]; name ["rSFlipFlop"; "R"] ]}) ; 
+      { commented = ExpEquation (app {(empty_app (cr [any "connect"])) with args=[name ["not1";"y"]; name ["rSFlipFlop"; "R"] ]}) ; 
         comment = { annotated_elem = None ; annotation } } );
   ]
 						  

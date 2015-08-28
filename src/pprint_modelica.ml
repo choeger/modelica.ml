@@ -70,19 +70,13 @@ let pp_str fmt {Location.txt;loc} = pp_print_string fmt txt
 let pp_name = (pp_list ~sep:"." pp_str)
                
 let rec pp_expr_struct fmt = function
-    Ide(x) -> fprintf fmt "@[%s@]" x
-  | RootIde(x) -> fprintf fmt "@[.%s@]" x
   | If c -> pp_complete_conditional pp_expr "if" pp_expr fmt c
   | Int(i) -> fprintf fmt "@[%d@]" i
   | Real(f) -> fprintf fmt "@[%f@]" f
   | Bool(b) -> fprintf fmt "@[%b@]" b
   | String(s) -> fprintf fmt "@[\"%s\"@]" (String.escaped s)
-  | Proj {field; object_} -> fprintf fmt "@[%a.%s@]" pp_expr object_ field
-  | Der -> fprintf fmt "@[der@]"
   | End -> fprintf fmt "@[end@]"
   | Colon -> fprintf fmt "@[:@]"
-  | Initial -> fprintf fmt "@[initial@]"
-  | Assert -> fprintf fmt "@[assert@]"
 
   | Pow { left; right } -> fprintf fmt "@[(%a)^(%a)@]" pp_expr left pp_expr right                  
   | DPow { left; right } -> fprintf fmt "@[(%a).^(%a)@]" pp_expr left pp_expr right                  
@@ -111,20 +105,28 @@ let rec pp_expr_struct fmt = function
   | UDMinus e -> fprintf fmt "@[.+(%a)@]" pp_expr e
   | Not e -> fprintf fmt "@[not (%a)@]" pp_expr e
 
-  | App { fun_ ; args=[] ; named_args } -> fprintf fmt "@[%a(%a)@]" pp_expr fun_ (pp_list ~sep:", " pp_named_arg) named_args
-  | App { fun_ ; args ; named_args = [] } -> fprintf fmt "@[%a(%a)@]" pp_expr fun_ (pp_list ~sep:", " pp_expr) args
-  | App { fun_ ; args; named_args } -> fprintf fmt "@[%a(%a, %a)@]" pp_expr fun_ (pp_list ~sep:", " pp_expr) args (pp_list ~sep:", " pp_named_arg) named_args
+  | App { fun_ ; args=[] ; named_args } -> fprintf fmt "@[%a(%a)@]" pp_cr fun_ (pp_list ~sep:", " pp_named_arg) named_args
+  | App { fun_ ; args ; named_args = [] } -> fprintf fmt "@[%a(%a)@]" pp_cr fun_ (pp_list ~sep:", " pp_expr) args
+  | App { fun_ ; args; named_args } -> fprintf fmt "@[%a(%a, %a)@]" pp_cr fun_ (pp_list ~sep:", " pp_expr) args (pp_list ~sep:", " pp_named_arg) named_args
 
   | Range { start; end_; step = None } -> fprintf fmt "@[(%a):(%a)@]" pp_expr start pp_expr end_
   | Range { start; end_; step = Some(s)  } -> fprintf fmt "@[(%a):(%a):(%a)@]" pp_expr start pp_expr s pp_expr end_
   | Compr { exp ; idxs } -> fprintf fmt "@[(%a) for %a@]" pp_expr exp (pp_list ~sep:", " pp_foridx) idxs
   | Array es -> fprintf fmt "@[{%a}@]" (pp_list ~sep:", " pp_expr) es
   | MArray els -> fprintf fmt "@[[%a]@]" (pp_list ~sep:"; " (pp_list ~sep:", " pp_expr)) els
-  | ArrayAccess { lhs ; indices } -> fprintf fmt "@[%a[%a]@]" pp_expr lhs (pp_list ~sep:", " pp_expr) indices 
   | ExplicitClosure e -> fprintf fmt "@[function %a@]" pp_expr e
 
   | OutputExpression ps -> fprintf fmt "(@[%a@])" (pp_list ~sep:", " (pp_option pp_expr)) ps
+  | ComponentReference cr -> pp_cr fmt cr
+                                   
+and pp_cr fmt = function
+    {root=true ; components} -> fprintf fmt "@[.%a@]" (pp_list ~sep:"." pp_component) components
+  | {root=false ; components} -> fprintf fmt "@[%a@]" (pp_list ~sep:"." pp_component) components
 
+and pp_component fmt = function
+    {ident; subscripts = []} -> fprintf fmt "%s" ident
+  | {ident; subscripts} -> fprintf fmt "@[%s[%a]@]" ident (pp_list ~sep:", " pp_expr) subscripts
+                                         
 and pp_expr fmt {term} = fprintf fmt "%a" pp_expr_struct term
                                    
 and pp_named_arg fmt ({argument_name;argument}) =
@@ -261,9 +263,13 @@ and pp_comment_string fmt = function
 and pp_comment fmt { annotated_elem ; annotation } = 
   pp_comment_string fmt annotated_elem ;
   pp_annotation fmt annotation 
-                         
+
+and pp_target fmt = function
+  | Single cr -> pp_cr fmt cr
+  | Multiple ps -> fprintf fmt "(@[%a@])" (pp_list ~sep:", " (pp_option pp_expr)) ps
+                
 and pp_statement_desc fmt = function
-    Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_expr target pp_expr source 
+    Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_target target pp_expr source 
   | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr_struct (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
                                                       
   | IfStmt c -> pp_conditional "if" pp_statements fmt c 
@@ -401,7 +407,7 @@ and pp_typedef fmt = function
                                              
 and pp_behavior fmt { algorithms ; equations ; initial_algorithms ; initial_equations ; external_ } =
   let pp_external_lhs fmt e =
-    fprintf fmt "%a =" pp_expr e
+    fprintf fmt "%a =" pp_cr e
   in
   
   pp_elements_prefixed "initial equation" pp_equation fmt initial_equations ;

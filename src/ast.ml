@@ -111,7 +111,7 @@ module type S = sig
                      initial_equations : equation list ;
                      external_ : external_def option }
 
-     and external_def_struct = { lang : string ; ext_lhs : exp option ; ext_ident : string ; ext_args : exp list }
+     and external_def_struct = { lang : string ; ext_lhs : component_reference option ; ext_ident : string ; ext_args : exp list }
      and external_def = external_def_struct annotated
 
      and elements = {
@@ -159,13 +159,15 @@ module type S = sig
                         | Return
                         | ForStmt of for_statement
                         | WhileStmt of while_statement
+
+     and assignment_target = Multiple of exp option list                                         
+                           | Single of component_reference
                                          
-                                         
-     and assignment = { target : exp ; source : exp }
+     and assignment = { target : assignment_target ; source : exp }
 
      and named_arg = { argument_name : str ; argument : exp }
                        
-     and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : named_arg list }
+     and call_statement = { procedure : component_reference ; pargs : exp list ; pnamed_args : named_arg list }
                             
      and 'a else_condition = { guard : exp ; elsethen : 'a }
                                
@@ -207,7 +209,7 @@ module type S = sig
 
      and projection = { object_ : exp ; field : string }
 
-     and application = { fun_ : exp ; args : exp list ; named_args : named_arg list }
+     and application = { fun_ : component_reference ; args : exp list ; named_args : named_arg list }
 
      and comprehension = { exp : exp ; idxs : idx list }
 
@@ -240,11 +242,7 @@ module type S = sig
                     | Eq of binary_exp
 
                     | If of if_expression
-                    | ArrayAccess of array_access
                     | Range of range
-                    | RootIde of string (* .foo *)
-                    | Ide of string 
-                    | Proj of projection
                     | App of application
                     | Bool of bool
                     | Int of int
@@ -254,10 +252,17 @@ module type S = sig
                     | Array of exp list
                     | MArray of (exp list) list
                     | ExplicitClosure of exp
-                    | End | Colon | Der | Initial | Assert
+                    | End | Colon
+                    | ComponentReference of component_reference
                     | OutputExpression of exp option list
                                               [@@deriving show]
-                                              
+
+     and component_reference = { root : bool ; components : component list }
+
+     and component_kind = Der | Assert | Initial | ClassComponent | Field | Any | Var
+                                 
+     and component = { ident : string ; kind : component_kind ; subscripts : exp list }
+                                 
      and idx = { variable : str ; range : exp option } [@@deriving show]
 
      and tprojection = { class_type : texp ; type_element : string } [@@deriving show]
@@ -372,7 +377,7 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                      initial_equations : equation list ;
                      external_ : external_def option } [@@deriving show]
 
-     and external_def_struct = { lang : string ; ext_lhs : exp option ; ext_ident : string ; ext_args : exp list } [@@deriving show]
+     and external_def_struct = { lang : string ; ext_lhs : component_reference option ; ext_ident : string ; ext_args : exp list } [@@deriving show]
      and external_def = external_def_struct annotated [@@deriving show]
 
      and elements = {
@@ -424,11 +429,14 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                         | WhileStmt of while_statement
                                          [@@deriving show]
                                          
-     and assignment = { target : exp ; source : exp } [@@deriving show]
+     and assignment_target = Multiple of exp option list                                         
+                           | Single of component_reference
+                                         
+     and assignment = { target : assignment_target ; source : exp }
 
-     and named_arg = { argument_name : str ; argument : exp } [@@deriving show]
+     and named_arg = { argument_name : str ; argument : exp }
                        
-     and call_statement = { procedure : exp ; pargs : exp list ; pnamed_args : named_arg list } [@@deriving show]
+     and call_statement = { procedure : component_reference ; pargs : exp list ; pnamed_args : named_arg list }
                             
      and 'a else_condition = { guard : exp ; elsethen : 'a } [@@deriving show]
                                
@@ -471,12 +479,12 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
 
      and projection = { object_ : exp ; field : string } [@@deriving show]
 
-     and application = { fun_ : exp ; args : exp list ; named_args : named_arg list } [@@deriving show]
+     and application = { fun_ : component_reference ; args : exp list ; named_args : named_arg list }
 
      and comprehension = { exp : exp ; idxs : idx list } [@@deriving show]
 
      and exp = { term : exp_struct ; attr : attr } [@@deriving show]
-                           
+
      and exp_struct = Pow of binary_exp
                     | DPow of binary_exp
                     | Mul of binary_exp
@@ -504,11 +512,7 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                     | Eq of binary_exp
 
                     | If of if_expression
-                    | ArrayAccess of array_access
                     | Range of range
-                    | RootIde of string (* .foo *)
-                    | Ide of string 
-                    | Proj of projection
                     | App of application
                     | Bool of bool
                     | Int of int
@@ -518,9 +522,16 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                     | Array of exp list
                     | MArray of (exp list) list
                     | ExplicitClosure of exp
-                    | End | Colon | Der | Initial | Assert
+                    | End | Colon
+                    | ComponentReference of component_reference
                     | OutputExpression of exp option list
                                               [@@deriving show]
+
+     and component_reference = { root : bool ; components : component list }
+
+     and component_kind = Der | Assert | Initial | ClassComponent | Field | Any | Var
+                                 
+     and component = { ident : string ; kind : component_kind ; subscripts : exp list }
                                               
      and idx = { variable : str ; range : exp option } [@@deriving show]
 
@@ -563,6 +574,6 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                                                                           
     (* Without these lines, the signatures will not match. Although they do. *)
     exception StrangeOCamlBug                                                                          
-    let typedef_struct_of_yojson = raise StrangeOCamlBug
+    let typedef_struct_of_yojson = fun f -> fun x -> raise StrangeOCamlBug
 
   end

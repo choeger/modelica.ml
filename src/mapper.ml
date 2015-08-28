@@ -80,6 +80,8 @@ module type S = sig
 
          map_texp : mapper -> texp -> texp ;
          map_exp : mapper -> exp -> exp;
+         map_cr : mapper -> component_reference -> component_reference ;
+         map_component : mapper -> component -> component ;
          map_exp_struct : mapper -> exp_struct -> exp_struct;
          map_attr : mapper -> attr -> attr;
 
@@ -87,6 +89,7 @@ module type S = sig
          
          map_statement_desc : mapper -> statement_desc -> statement_desc;
          map_statement : mapper -> statement -> statement;
+         map_target : mapper -> assignment_target -> assignment_target ;
          map_equation_desc : mapper -> equation_desc -> equation_desc;
          map_equation : mapper -> equation -> equation ;
 
@@ -181,6 +184,8 @@ module Make(Tree : Ast.S) = struct
 
          map_texp : mapper -> texp -> texp ;
          map_exp : mapper -> exp -> exp;
+         map_cr : mapper -> component_reference -> component_reference ;
+         map_component : mapper -> component -> component ;
          map_exp_struct : mapper -> exp_struct -> exp_struct;
          map_attr : mapper -> attr -> attr;
 
@@ -188,6 +193,7 @@ module Make(Tree : Ast.S) = struct
          
          map_statement_desc : mapper -> statement_desc -> statement_desc;
          map_statement : mapper -> statement -> statement;
+         map_target : mapper -> assignment_target -> assignment_target ;
          map_equation_desc : mapper -> equation_desc -> equation_desc;
          map_equation : mapper -> equation -> equation ;
 
