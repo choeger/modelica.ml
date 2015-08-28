@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 5390636848ba9c60f5a0242769e22f9b)
+# DO NOT EDIT (digest: 4ffa599a39838f876534faf67ada68a3)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -67,6 +67,21 @@ true: annot, bin_annot
 <examples/modml_clc.{native,byte}>: package(sedlex)
 <examples/modml_clc.{native,byte}>: package(yojson)
 <examples/modml_clc.{native,byte}>: use_modelica_ml
+# Executable modml_parseall
+<examples/parse_all.{native,byte}>: package(ANSITerminal)
+<examples/parse_all.{native,byte}>: package(batteries)
+<examples/parse_all.{native,byte}>: package(compiler-libs.common)
+<examples/parse_all.{native,byte}>: package(menhirLib)
+<examples/parse_all.{native,byte}>: package(ocamlgraph)
+<examples/parse_all.{native,byte}>: package(ppx_deriving.eq)
+<examples/parse_all.{native,byte}>: package(ppx_deriving.show)
+<examples/parse_all.{native,byte}>: package(ppx_deriving_yojson)
+<examples/parse_all.{native,byte}>: package(ppx_import)
+<examples/parse_all.{native,byte}>: package(ppx_monadic)
+<examples/parse_all.{native,byte}>: package(sedlex)
+<examples/parse_all.{native,byte}>: package(yojson)
+<examples/parse_all.{native,byte}>: use_modelica_ml
+<examples/*.ml{,i,y}>: package(ANSITerminal)
 # Executable dump_cl
 <examples/dump_cl.{native,byte}>: package(batteries)
 <examples/dump_cl.{native,byte}>: package(compiler-libs.common)

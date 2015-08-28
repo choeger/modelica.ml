@@ -45,6 +45,13 @@ Executable modml_clc
   BuildTools: ocamlbuild
   MainIs:     modml_clc.ml
 
+Executable modml_parseall
+  Path:    examples
+  CompiledObject: best
+  BuildDepends: modelica_ml, ANSITerminal
+  BuildTools: ocamlbuild
+  MainIs:     parse_all.ml
+
 Executable dump_cl
   Path:    examples
   CompiledObject: best
