@@ -99,7 +99,7 @@ let stratify_ptr ptr =
   try return (stratify_elements o o DQ.empty ptr) with
   | Stratification (found, not_found) ->
     Report.do_ ;
-    log{level=Error;where=none;what=Printf.sprintf "Stratification error: No element %s in %s" not_found (show_class_path found)};fail
+    log{level=Error;where=none;what=Printf.sprintf "Stratification error: No element %s in %s" not_found (show_class_path found)}; fail
 
 
 let rec find_lexical global previous path ctxt x current =
@@ -288,8 +288,8 @@ let rec norm_prog i p =
   else
     let {lhs;rhs} = p.(i) in
     Report.do_ ;
-    lhs <-- stratify_ptr lhs ;
     let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in
+    lhs <-- stratify_ptr lhs ;
     norm <-- norm lhs rhs;
     let o' = update lhs (norm_cv norm) o in
     set_output (o') ;

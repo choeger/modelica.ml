@@ -137,7 +137,7 @@ let topological_order w r a =
     | (false, {source_name})::srcs when source_name=DQ.empty -> add_local_deps src g srcs
                          
     | (false, {source_name})::srcs ->
-       (*BatLog.logf "Searching writer of %s\n" (Name.show source_name) ;*)
+      (* BatLog.logf "Searching writer of %s\n" (Name.show source_name) ; *)
        let ws = NameMap.find source_name w in
        (* BatLog.logf "%s can depend on superclasses of %s\n" (show_class_stmt a.(src)) (Name.show source_name) ; *)   
        (* no refinement found in that scope, just depend on the superclasses *)

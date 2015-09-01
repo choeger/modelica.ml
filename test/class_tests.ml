@@ -113,6 +113,7 @@ let replaceable t = Replaceable t
 
 let sup n = `SuperClass n
 let cl x = `ClassMember x
+let fld x = `FieldType x
 let cl_path xs = DQ.of_list (List.map cl xs)
 let dynref x = DynamicReference x
     
@@ -161,7 +162,18 @@ let test_cases = [
               end C3; 
             end A3"
       (lookup (cl "A3") [cl "C3"; cl "D3"; cl "T3"]
-         (eq (replaceable (type_ real)))) ; 
+         (eq (replaceable (type_ real)))) ;
+
+    class_ "class A4
+              model B4
+                replaceable type T = Integer;
+              end B4;
+              model C4
+                B4 b;
+              end C4;
+              C4 c(b(redeclare type T = Real));
+            end A4"
+      (lookup (cl "A4") [fld "c" ; fld "b"; cl "T"] (eq (replaceable (type_ real)))) ;
   ]
                                                 
 let suite = "Normalization" >::: test_cases
