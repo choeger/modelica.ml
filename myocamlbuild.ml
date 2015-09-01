@@ -1,5 +1,5 @@
 (* OASIS_START *)
-(* DO NOT EDIT (digest: eadc43c4f197b7ccc2eef55a66ff5098) *)
+(* DO NOT EDIT (digest: 6e6fbcac7f609b15913f539c44071a83) *)
 module OASISGettext = struct
 (* # 22 "src/oasis/OASISGettext.ml" *)
 
@@ -610,7 +610,8 @@ let package_default =
      MyOCamlbuildBase.lib_ocaml = [("modelica_ml", ["src"], [])];
      lib_c = [];
      flags = [];
-     includes = [("test", ["src"]); ("examples", ["src"])]
+     includes =
+       [("tools.src", ["src"]); ("test", ["src"]); ("examples", ["src"])]
   }
   ;;
 
@@ -618,7 +619,7 @@ let conf = {MyOCamlbuildFindlib.no_automatic_syntax = false}
 
 let dispatch_default = MyOCamlbuildBase.dispatch_default conf package_default;;
 
-# 622 "myocamlbuild.ml"
+# 623 "myocamlbuild.ml"
 (* OASIS_STOP *)
 
       flag ["menhir";"ocaml";"parser"] & S[A"--explain";

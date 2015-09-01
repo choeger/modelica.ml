@@ -48,6 +48,13 @@ Executable modml_clc
   BuildTools: ocamlbuild
   MainIs:     modml_clc.ml
 
+Executable modlibc
+  Path:    tools.src
+  CompiledObject: best
+  BuildDepends: modelica_ml
+  BuildTools: ocamlbuild
+  MainIs:     modlibc.ml
+
 Executable modml_parseall
   Path:    examples
   CompiledObject: best

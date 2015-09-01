@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: da926102669ac97bfa16c39f5e9591e7)
+# DO NOT EDIT (digest: dcf929bde1463613b7a6fd666e505b58)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -71,6 +71,33 @@ true: annot, bin_annot
 <examples/modml_clc.{native,byte}>: package(sedlex)
 <examples/modml_clc.{native,byte}>: package(yojson)
 <examples/modml_clc.{native,byte}>: use_modelica_ml
+# Executable modlibc
+<tools.src/modlibc.{native,byte}>: package(batteries)
+<tools.src/modlibc.{native,byte}>: package(compiler-libs.common)
+<tools.src/modlibc.{native,byte}>: package(menhirLib)
+<tools.src/modlibc.{native,byte}>: package(ocamlgraph)
+<tools.src/modlibc.{native,byte}>: package(ppx_deriving.eq)
+<tools.src/modlibc.{native,byte}>: package(ppx_deriving.ord)
+<tools.src/modlibc.{native,byte}>: package(ppx_deriving.show)
+<tools.src/modlibc.{native,byte}>: package(ppx_deriving_yojson)
+<tools.src/modlibc.{native,byte}>: package(ppx_import)
+<tools.src/modlibc.{native,byte}>: package(ppx_monadic)
+<tools.src/modlibc.{native,byte}>: package(sedlex)
+<tools.src/modlibc.{native,byte}>: package(yojson)
+<tools.src/modlibc.{native,byte}>: use_modelica_ml
+<tools.src/*.ml{,i,y}>: package(batteries)
+<tools.src/*.ml{,i,y}>: package(compiler-libs.common)
+<tools.src/*.ml{,i,y}>: package(menhirLib)
+<tools.src/*.ml{,i,y}>: package(ocamlgraph)
+<tools.src/*.ml{,i,y}>: package(ppx_deriving.eq)
+<tools.src/*.ml{,i,y}>: package(ppx_deriving.ord)
+<tools.src/*.ml{,i,y}>: package(ppx_deriving.show)
+<tools.src/*.ml{,i,y}>: package(ppx_deriving_yojson)
+<tools.src/*.ml{,i,y}>: package(ppx_import)
+<tools.src/*.ml{,i,y}>: package(ppx_monadic)
+<tools.src/*.ml{,i,y}>: package(sedlex)
+<tools.src/*.ml{,i,y}>: package(yojson)
+<tools.src/*.ml{,i,y}>: use_modelica_ml
 # Executable modml_parseall
 <examples/parse_all.{native,byte}>: package(ANSITerminal)
 <examples/parse_all.{native,byte}>: package(batteries)
