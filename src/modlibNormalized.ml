@@ -174,11 +174,15 @@ let rec follow_path global found_path found_value path = match DQ.front path wit
       | Class os -> follow_path_os global found_path os xs x
       (* follow global references *)
       | GlobalReference g -> begin
-          match follow_path_es global DQ.empty global xs x with
-          | `Found {found_value} ->
-            follow_path global found_path found_value path
-          | `Recursion _ as r -> r
-          | `NothingFound | `PrefixFound _ as result -> result
+          match DQ.front g with
+            None -> raise IllegalPath
+          | Some (y,ys) -> begin 
+              match follow_path_es global DQ.empty global ys y with
+              | `Found {found_value} ->
+                follow_path global found_path found_value path
+              | `Recursion _ as r -> r
+              | `NothingFound | `PrefixFound _ as result -> result
+            end
         end
       (* Replaceable/Constr means to look into it *)
       | Replaceable v -> begin match follow_path global found_path v path with

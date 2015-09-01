@@ -89,6 +89,9 @@ let rec lookup_ x xs f got =
      end
   | _ as result -> assert_failure (Printf.sprintf "Could not find test-path.\n%s\n %s\n" (show_search_result result) (show_elements_struct got)) 
 
+let lookup x xs f got =
+  lookup_ x (DQ.of_list xs) f got
+    
 let lookup_cl x xs f got =
   lookup_ (`ClassMember x) (DQ.map (fun x -> `ClassMember x) (Name.of_list xs)) f got
 			
@@ -108,6 +111,7 @@ let int = type_ Int
 let real_t x = real
 let replaceable t = Replaceable t
 
+let sup n = `SuperClass n
 let cl x = `ClassMember x
 let cl_path xs = DQ.of_list (List.map cl xs)
 let dynref x = DynamicReference x
@@ -131,9 +135,12 @@ let test_cases = [
 
     class_ "class A type B = Real; class C import D = A.B; class E type F = D; end E; end C; end A" (lookup_cl "A" ["C"; "E";"F"] (eq (type_ real)));
 
-    class_ "class A class B1 type T = Real; end B1; extends B1; end A" (lookup_cl "A" ["T"] (eq (real)));
+    class_ "class A class B1 type T = Real; end B1; extends B1; end A"
+      (lookup (cl "A") [sup 0 ; cl "T"] (eq (real)));
 
-    class_ "class A class B class C type T = Real; end C; end B; class D extends B; end D; end A" (lookup_cl "A" ["D"; "C"; "T"] (eq (type_ real))) ;
+    class_ "class A class B class C type T = Real; end C; end B; 
+            class D extends B; end D; end A"
+      (lookup (cl "A") [cl "D"; sup 0; cl "C"; cl "T"] (eq (type_ real))) ;
     
     class_ "class A 
               class B2 
@@ -152,7 +159,9 @@ let test_cases = [
                 type T3 = Real; 
                 model D3 = B3(redeclare type T3 = T3); 
               end C3; 
-            end A3" (lookup_cl "A3" ["C3";"D3";"T3"] (eq (replaceable (type_ real)))) ; 
+            end A3"
+      (lookup (cl "A3") [cl "C3"; cl "D3"; cl "T3"]
+         (eq (replaceable (type_ real)))) ; 
   ]
                                                 
 let suite = "Normalization" >::: test_cases
