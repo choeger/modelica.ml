@@ -111,8 +111,14 @@ module type S = sig
                      initial_equations : equation list ;
                      external_ : external_def option }
 
-     and external_def_struct = { lang : string ; ext_lhs : component_reference option ; ext_ident : string ; ext_args : exp list }
-     and external_def = external_def_struct annotated
+     
+     and external_call = { ext_ident : string;
+                           ext_lhs : component_reference option ;
+                           ext_args : exp list }
+                                
+     and external_def_struct = { lang : string ;
+                                 ext_call : external_call option } 
+     and external_def = external_def_struct annotated 
 
      and elements = {
          typedefs : typedef list ;
@@ -377,8 +383,14 @@ module Make(Attr : Attributes) : (S with type attr = Attr.t) = struct
                      initial_equations : equation list ;
                      external_ : external_def option } [@@deriving show]
 
-     and external_def_struct = { lang : string ; ext_lhs : component_reference option ; ext_ident : string ; ext_args : exp list } [@@deriving show]
-     and external_def = external_def_struct annotated [@@deriving show]
+
+     and external_call = { ext_ident : string;
+                           ext_lhs : component_reference option ;
+                           ext_args : exp list }
+                                
+     and external_def_struct = { lang : string ;
+                                 ext_call : external_call option } 
+     and external_def = external_def_struct annotated 
 
      and elements = {
          typedefs : typedef list ;

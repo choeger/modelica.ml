@@ -526,16 +526,14 @@ protected_composition_elements :
             | PROTECTED rest = protected_composition_elements { rest }
             | PUBLIC rest = public_composition_elements { rest }
 
-composition_external :             
-            | EXTERNAL lang=STRING lhs=external_lhs ext_ident=IDENT 
-              LPAREN ext_args = separated_list(COMMA, expr) RPAREN annotation=option(annotation) SEMICOLON
-                { { annotated_elem = {lang ; ext_ident; ext_lhs=Some lhs; ext_args}; annotation} }
-            | EXTERNAL lang=STRING ext_ident=IDENT 
-              LPAREN ext_args = separated_list(COMMA, expr) RPAREN annotation=option(annotation) SEMICOLON
-                { { annotated_elem = {lang ; ext_ident; ext_lhs=None; ext_args}; annotation} }
+composition_external :
+            | EXTERNAL lang=STRING ext_call=option(external_call) annotation = option(annotation) SEMICOLON
+            { {annotated_elem = {lang; ext_call}; annotation} }
+            
 
-
-external_lhs : e=component_reference EQ { e }
+external_call :
+              lhs=component_reference EQ ext_ident=IDENT LPAREN ext_args = separated_list(COMMA, expr) RPAREN { {ext_lhs=Some lhs; ext_ident; ext_args } }
+              | ext_ident=IDENT LPAREN ext_args  = separated_list(COMMA, expr) RPAREN { {ext_lhs=None; ext_ident; ext_args } }
 
 type_definition_clause : td=type_definition SEMICOLON { td }
 

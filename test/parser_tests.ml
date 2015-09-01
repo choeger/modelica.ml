@@ -541,9 +541,9 @@ let test_cases = [
                                                                       external_ = Some (
                                                                                       unannotated {
                                                                                           lang="C" ;
-                                                                                          ext_lhs=None;
-                                                                                          ext_ident = "f";
-                                                                                          ext_args = []
+                                                                                          ext_call=Some {                                                                                  ext_lhs=None;
+                                                                                                                                                                                           ext_ident = "f";
+                                                                                                                                                                                           ext_args = [] }
                                                                                         }
                                                                                     )
                                                                     } ;
@@ -557,9 +557,9 @@ let test_cases = [
                                                                                 external_ = Some (
                                                                                                 unannotated {
                                                                                                     lang="C" ;
-                                                                                                    ext_lhs=Some (cr [any "x"]);
-                                                                                                    ext_ident = "f";
-                                                                                                    ext_args = []
+                  ext_call=Some{                                                                                  ext_lhs=Some (cr [any "x"]);
+                                                                                                                  ext_ident = "f";
+                                                                                                                  ext_args = [] }
                                                                                                   }
                                                                                               )
                                                                               } ;

@@ -417,7 +417,9 @@ and pp_behavior fmt { algorithms ; equations ; initial_algorithms ; initial_equa
   begin
   match external_ with
     None -> ()
-  | Some {annotated_elem = {lang;ext_lhs;ext_ident;ext_args}; annotation} -> fprintf fmt "@[external@ \"%s\"%a@ %s(%a)%a;"
+  | Some {annotated_elem = {lang;ext_call=None}; annotation} ->
+    fprintf fmt "@[external@ \"%s\"%a@]" lang pp_annotation annotation
+  | Some {annotated_elem = {lang;ext_call=Some {ext_lhs;ext_ident;ext_args}}; annotation} -> fprintf fmt "@[external@ \"%s\"%a@ %s(%a)%a;"
                                                                                      lang
                                                                                      (pp_option pp_external_lhs) ext_lhs
                                                                                      ext_ident
