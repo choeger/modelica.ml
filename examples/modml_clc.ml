@@ -34,10 +34,9 @@ open Syntax
 open Motypes
 open Utils
 open Batteries
-open ClassTrans
-open ClassDeps
 open Location
-       
+open Modlib
+    
 let stats u =
   let {def_count; type_count} = generate_stats u in
   Printf.printf "Component Definitions: %d\nType Definitions: %d\n" def_count type_count  
@@ -47,7 +46,7 @@ let _ =
   match (parse argv.(1)) with
   | None -> Printf.eprintf "'%s' seems to contain no Modelica content.\n" argv.(1) ; 1
   | Some parsed ->
-     let tu = translate_unit StrMap.empty {scanned=argv.(1); parsed} in
-     let js = translated_unit_to_yojson tu in
+     let tu = Trans.translate_unit StrMap.empty {scanned=argv.(1); parsed} in
+     let js = Trans.translated_unit_to_yojson tu in
      Printf.printf "%s\n" (Yojson.Safe.pretty_to_string js)  ;
      0

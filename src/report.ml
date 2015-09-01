@@ -26,12 +26,9 @@
  *
  *)
 
-module StdFormat = Format
 open Batteries
-module Format = StdFormat
-open Motypes
-open Motypes.Normalized
 open Utils
+open ModlibNormalized
        
 type level = Info | Warning | Error [@@deriving show]
 
@@ -45,7 +42,7 @@ let print_message o msg = IO.nwrite o (show_message msg)
 
 let print_messages o msgs = List.print ~sep:"\n" print_message o msgs
                                   
-type state = { messages : message list; output : Normalized.elements_struct }
+type state = { messages : message list; output : elements_struct }
                  
 type 'a report = { result : 'a result ; state : state }
 
@@ -93,3 +90,13 @@ let log msg state = {state={state with messages = msg::state.messages}; result=O
 let fail state = {state; result=Failed}
                           
 let if_ b m = if b then m else return ()
+
+type unresolved_dependency = { searching : Name.t ; result : search_error }
+
+let fail_unresolved {searching; result} =
+  do_ ;
+  log{level=Error;where=Location.none;
+      what=Printf.sprintf "Dependency %s not evaluated:\n%s\n"
+          (Name.show searching)
+          (show_search_error result)} ;
+  fail

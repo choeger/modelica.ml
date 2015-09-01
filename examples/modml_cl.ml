@@ -34,12 +34,10 @@ open Syntax
 open Motypes
 open Utils
 open Batteries
-open ClassTrans
-open ClassDeps
-open ClassNorm
 open Report
 open Location
-       
+open Modlib
+
 let print_message msg = BatLog.logf "%s\n" (show_message msg)
 
 open Normalized
@@ -50,14 +48,14 @@ let _ =
   | {root_units = []; root_packages = []} -> Printf.eprintf "'%s' seems to contain no Modelica content.\n" argv.(1) ; 1
   | root -> begin match parse_root root with
                     Some root -> begin 
-                      let tr = translate_pkg_root root in
-                      let o = run (norm_pkg_root tr) {messages=[]; output=empty_elements} in
+                      let tr = Trans.translate_pkg_root root in
+                      let o = run (NormSig.norm_pkg_root tr) {messages=[]; output=empty_elements} in
                       List.iter print_message o.final_messages ;
                       match o.final_result with
                         Ok o -> BatLog.logf "Normalization Ok.\n%!" ;
-                                let c = compress_elements o in
+                                let c = Compress.compress_elements o in
                                 BatLog.logf "Compression Ok.\n%!" ;
-                                let js = elements_struct_to_yojson c in
+                                let js = Normalized.elements_struct_to_yojson c in
                                 let dump = Yojson.Safe.pretty_to_string js in
                                 BatLog.logf "Dump (%d) Ok.\n" (String.length dump);
                                 Printf.printf "%s\n" dump ;

@@ -31,15 +31,12 @@ open FileSystem
 open Pprint_modelica
 open Stats
 open Syntax
-open Motypes
 open Utils
 open Batteries
-open ClassTrans
-open ClassDeps
-open ClassNorm
 open Report
 open Location
-
+open Modlib
+    
 let print_message msg = BatLog.logf "%s\n" (show_message msg)
 
 open Normalized
@@ -48,13 +45,13 @@ let _ =
   StdFormat.pp_set_margin StdFormat.str_formatter (240);
   let js = Yojson.Safe.from_file argv.(1) in  
   BatLog.logf "Read value. Ok.\n" ;
-  let o = run (load_from_json js) {messages=[]; output=empty_elements} in
+  let o = run (Compress.load_from_json js) {messages=[]; output=empty_elements} in
   List.iter print_message o.final_messages ;
   match o.final_result with
     Ok o -> BatLog.logf "Decompression Ok.\n" ;
-            let c = compress_elements o in
+            let c = Compress.compress_elements o in
             BatLog.logf "Compression Ok.\n" ;
-            let js = elements_struct_to_yojson c in
+            let js = Normalized.elements_struct_to_yojson c in
             let dump = Yojson.Safe.pretty_to_string js in
             BatLog.logf "Dump (%d) Ok.\n" (String.length dump);
             Printf.printf "%s\n" dump ;

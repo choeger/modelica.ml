@@ -26,23 +26,9 @@
  *
  *)
 
-
-(**
-   Modelica 3.x normalized types
-*)
-module StdFormat = Format
-open Batteries
-module Format = StdFormat
-open Utils
-open Ast.Flags
-module DS = Syntax
-
-
-module Normalized = struct
-
-
-end
-
-
-
-
+module Trans = ModlibTrans
+module Inter = ModlibInter
+module Normalized = ModlibNormalized
+module Lookup = ModlibLookup
+module Compress = ModlibCompress
+module NormSig = ModlibNormSig

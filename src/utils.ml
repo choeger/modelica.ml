@@ -60,7 +60,8 @@ type token =
 
 module StdFormat = Format
 open Batteries
-
+module Format = StdFormat
+  
 exception StructuralError of string
        
 module IntMap = struct include Map.Make(Int)
@@ -178,3 +179,46 @@ module DQ = struct include BatDeque
 let unloc {Location.txt} = txt
 
 let lunloc xs = List.map unloc xs
+
+module Name = struct         
+  type t = string DQ.t [@@deriving show, yojson]
+
+  let str_compare a b = String.compare a b 
+
+  let compare a b = Enum.compare str_compare (DQ.enum a) (DQ.enum b)
+
+  let hash = Hashtbl.hash
+
+  let equal a b = compare a b = 0
+
+  let empty = DQ.empty
+
+  let is_empty = DQ.is_empty
+
+  let of_list = DQ.of_list
+
+  let to_list = DQ.to_list
+
+  let singleton = DQ.singleton
+
+  let rec scope_of_ptr_ tmp dq = match DQ.front dq with
+    | None -> tmp
+    | Some ((`FieldType _ | `Any _ | `SuperClass _ ), _) -> tmp
+    | Some (`Protected, r) -> scope_of_ptr_ tmp r
+    | Some ((`ClassMember x), r) -> scope_of_ptr_ (DQ.snoc tmp x) r
+
+  let scope_of_ptr dq = match (DQ.rear dq) with
+      Some(xs,`ClassMember x) -> (scope_of_ptr_ DQ.empty xs)
+    | _ -> (scope_of_ptr_ DQ.empty dq)
+
+  let rec of_ptr_ tmp dq = match DQ.front dq with
+    | None -> tmp
+    | Some ((`SuperClass _  | `Protected), r) -> of_ptr_ tmp r
+    | Some ((`FieldType x), r) -> of_ptr_ (DQ.snoc tmp ("type_of_" ^ x)) r
+    | Some ((`ClassMember x | `Any x), r) -> of_ptr_ (DQ.snoc tmp x) r
+
+  let of_ptr dq = of_ptr_ DQ.empty dq
+end
+
+module NameMap = Map.Make(Name)
+module NameSet = Set.Make(Name)

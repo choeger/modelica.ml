@@ -47,7 +47,7 @@ module type S = sig
     module Import : TRAVERSAL with type sort = import
     module Imports : TRAVERSAL with type sort = import list                                             
     module Comment : TRAVERSAL with type sort = comment
-    module Name : TRAVERSAL with type sort = name                   
+    module TravName : TRAVERSAL with type sort = name                   
     module TD : TRAVERSAL with type sort = typedef
     module TD_Desc : TRAVERSAL with type sort = typedef_desc
     module TRD : TRAVERSAL with type sort = type_redeclaration
@@ -195,7 +195,7 @@ module Make(Tree : Ast.S) = struct
                                                          annotation = map_option this.map_annotation this annotation }
       end
 
-    module Name = struct
+    module TravName = struct
         type sort = name
 
         let fold this = fold_list (fold_located this.fold_identifier) this
@@ -684,7 +684,7 @@ module Make(Tree : Ast.S) = struct
         fold_component_modification = CMOD.fold;
         fold_component_modification_struct = CMOD_Struct.fold;
         fold_modification_value = CMOD_Value.fold;
-        fold_name = Name.fold;
+        fold_name = TravName.fold;
         fold_named_arg = Named_Arg.fold;
         fold_identifier = fold_id;
         fold_comment_str = fold_id;
@@ -745,7 +745,7 @@ module Make(Tree : Ast.S) = struct
         map_equation_desc = Equation_Desc.map;
         map_equation = Equation.map;
 
-        map_name = Name.map ;
+        map_name = TravName.map ;
         map_identifier = map_id;
         map_named_arg = Named_Arg.map;
         map_comment_str = map_id;

@@ -26,12 +26,10 @@
  *
  *)
 
-module StdFormat = Format
 open Batteries
-module Format = StdFormat
 open Utils
-open Motypes
-
+open ModlibInter
+       
 let writes w i {lhs;rhs} =
   let name = Name.of_ptr lhs in
   match NameMap.Exceptionless.find name w with

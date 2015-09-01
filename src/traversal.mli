@@ -54,7 +54,7 @@ module type S = sig
                                              
     module Comment : TRAVERSAL with type sort = comment
 
-    module Name : TRAVERSAL with type sort = name                   
+    module TravName : TRAVERSAL with type sort = name                   
 
     module TD : TRAVERSAL with type sort = typedef
 

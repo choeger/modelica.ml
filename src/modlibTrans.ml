@@ -27,16 +27,17 @@
  *)
 
 
-(** Translation of Modelica type/class-expressions to classLang *)
+(** Translation of Modelica units to intermediate representation *)
 
 open Ast.Flags
 open Syntax
 open Utils
 open Location
-open Motypes
+
 open Batteries
-open ClassDeps
-       
+open Utils
+open ModlibInter
+
 exception UnqualifiedImportNotSupported
 exception NothingModified
 exception InconsistentHierarchy
@@ -71,7 +72,9 @@ type translation_state = {
     current_path : class_ptr ;
     anons : int ;
     class_code : class_stmt list ;
-  }
+    current_field : string DQ.t ;
+    value_code : value_stmt list ;
+}
 			   
 let rec add_imports imports state = match imports with
     [] -> ((),state)
@@ -82,7 +85,7 @@ let return x = fun s -> (x, s)
 let bind ma f = fun s -> let (a, s') = ma s in
 			 (f a s') 
 
-let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; anons = 0; class_code = []} in a
+let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; anons = 0; class_code = []; current_field = DQ.empty ; value_code = []} in a
 
 let down pe state = ((), {state with current_path = DQ.snoc state.current_path pe})
 
@@ -93,6 +96,12 @@ let within_path = function
 let up state = ((), {state with current_path = match DQ.rear state.current_path with None -> DQ.empty | Some (xs,_) -> xs})
 		 
 let define rhs state = ((), {state with class_code = {lhs=state.current_path; rhs} :: state.class_code})
+
+let down_field x state = ((), {state with current_field = DQ.snoc state.current_field x})
+
+let up_field state = ((), {state with current_field = match DQ.rear state.current_field with None -> DQ.empty | Some (xs,_) -> xs})
+
+let bind_value rhs state = ((), {state with value_code = {lhs = {scope = state.current_path; field = state.current_field}; rhs} :: state.value_code})
 
 let open_class sort post state = ((), {state with class_code =
 						    {lhs = state.current_path ;
@@ -140,18 +149,18 @@ let get state = (state, state)
 let set state s = ((), state)
 
 let set_env env state = ((), {state with env})
-		    
+
 let next_anon state = `ClassMember ("anon" ^ (string_of_int state.anons)), {state with anons = state.anons + 1}
-   			    
+
 let rec mtranslate_tds = function
   | Short tds -> do_ ;
-		 (* new path is the definition *)
-		 down (`ClassMember tds.td_name.txt) ;
-		 (* Translate the rhs of the type-definition *)
-		 te <-- mtranslate_texp ((sort tds.sort) %> (repl tds.type_options)) tds.type_exp ;
-		 (* restore path *)
-		 up ;
-		 return ()
+    (* new path is the definition *)
+    down (`ClassMember tds.td_name.txt) ;
+    (* Translate the rhs of the type-definition *)
+    te <-- mtranslate_texp ((sort tds.sort) %> (repl tds.type_options)) tds.type_exp ;
+    (* restore path *)
+    up ;
+    return ()
 
   | Composition tds ->
      do_ ;
@@ -244,7 +253,7 @@ and mtranslate_texp post =
          set state ;
          mtranslate_texp (fun x -> x) mod_type 
        end
-     else
+      else
        return ()
        
 and mtranslate_extends i {ext_type} =
@@ -266,8 +275,13 @@ and mtranslate_typedef td = mtranslate_tds td.commented
 and mtranslate_def def =
   do_ ;
   down (`FieldType def.commented.def_name) ;
-  mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type ;
-  up
+  down_field def.commented.def_name ;
+  mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type ;  
+  begin match def.commented.def_rhs with
+    Some e -> bind_value e
+  | None -> return () end ;
+  up ;
+  up_field 
 
 and mtranslate_type_redeclaration src {redecl_type} =
   let tds = redecl_type.commented in
@@ -288,16 +302,30 @@ and mtranslate_modification src {types; components; modifications} =
   return (x || types != [] || components != [])
                  
 and mtranslate_nested_modification src = function
-    {commented = {mod_name =  []; mod_value = Some (Nested nested | NestedRebind {nested}) }} ->    
+  | {commented = {mod_name = []; mod_value = None}} -> return false
+  | {commented = {mod_name = []; mod_value = Some (Nested nested)}} ->     
     mtranslate_modification src nested
-  | {commented = {mod_name =  x::xs; mod_value = Some (Nested nested | NestedRebind {nested}) }} ->
-     down (`Any x.txt) ;
-     open_class Class (fun x -> x) ;
-     down (`SuperClass 0) ;
-     define RedeclareExtends ;
-     up;
-     mtranslate_modification src nested
-  | _ -> return false                                              
+  | {commented = {mod_name =  []; mod_value = Some (NestedRebind {nested; new_value})}} ->
+    do_ ;
+    change <-- mtranslate_modification src nested ;
+    bind_value new_value ;
+    return change 
+  | {commented = {mod_name =  []; mod_value = Some (Rebind new_value)}} ->
+    do_ ;
+    bind_value new_value ;
+    return false 
+  | {commented = {mod_name =  x::xs}} as nm ->
+    do_ ;
+    down_field x.txt ;
+    down (`Any x.txt) ;
+    open_class Class (fun x -> x) ;
+    down (`SuperClass 0) ;
+    define RedeclareExtends ;
+    up;    
+    change <-- mtranslate_nested_modification src {nm with commented = {nm.commented with mod_name = xs}} ;
+    up ;
+    up_field ;
+    return change    
 
 and mtranslate_def_redeclaration src {def} = do_ ;
 					     (* a redeclared type is resolved in the parent class scope *)

@@ -26,6 +26,7 @@
  *
  *)
 
+open OUnit2
 open Utils
 open Batteries
 open Modelica_parser
@@ -37,11 +38,9 @@ open Modelica_lexer
 open Location
 open Parser_tests
 open Report
-open Motypes
-open ClassNorm
-open ClassTrans
-open OUnit2
-       
+
+open Modlib
+
 let assert_result = function
   | Failed -> assert_failure "Result was not OK."
   | Ok a -> a
@@ -53,7 +52,7 @@ let show_messages msgs =
                                              
 let assert_normalization expected td =  
   let parsed = {within = Some []; toplevel_defs = [td] } in
-  let {final_messages; final_result} = Report.run (norm_pkg_root (translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=Normalized.empty_elements} in
+  let {final_messages; final_result} = Report.run (NormSig.norm_pkg_root (Trans.translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=Normalized.empty_elements} in
   IO.flush (!BatLog.output) ;
   let () = assert_equal ~msg:"No warnings and errors expected" ~printer:show_messages [] final_messages in (* TODO: filter warnings / errors *)
   let cv = assert_result final_result in
@@ -73,7 +72,7 @@ let should_be_replaceable expected got =
 
 (* Lookup a name and apply a predicate *)
 let rec lookup_ x xs f got =
-  let m = get_class_element_in got Name.empty got x xs in
+  let m = Normalized.follow_path_es got Name.empty got xs x in
   match m with
   | `Found {found_value} ->
      begin match flat found_value with
@@ -83,14 +82,15 @@ let rec lookup_ x xs f got =
 		     Some (x,xs) -> let pipe = fun flat_val -> f (unflat {flat_val; flat_attr}) in
 				    lookup_ x xs pipe got 
 		   | None -> assert_failure
-			       (Printf.sprintf "Empty global reference when looking up %s" (Name.show (DQ.cons x xs)))
+			       (Printf.sprintf "Empty global reference when looking up %s" (Inter.Path.show (DQ.cons x xs)))
 	     end
 	   (* In any other case, apply the predicate *)
 	   | _ -> f found_value
      end
   | _ as result -> assert_failure (Printf.sprintf "Could not find test-path.\n%s\n %s\n" (show_search_result result) (show_elements_struct got)) 
 
-let lookup x xs f got = lookup_ x (Name.of_list xs) f got
+let lookup_cl x xs f got =
+  lookup_ (`ClassMember x) (DQ.map (fun x -> `ClassMember x) (Name.of_list xs)) f got
 			
 let class_ input expected =
   (Printf.sprintf "Normalize '%s'" input) >:: (parse_test td_parser input (assert_normalization expected))
@@ -107,7 +107,12 @@ let real = type_ Real
 let int = type_ Int
 let real_t x = real
 let replaceable t = Replaceable t
-                 
+
+let cl x = `ClassMember x
+let cl_path xs = DQ.of_list (List.map cl xs)
+let dynref x = DynamicReference x
+    
+
 let test_cases = [
     class_ "type T = Real" (eq_val "T" real_t ) ;
     class_ "class M Real x; end M" (eq_val "M" class_M);
@@ -117,18 +122,18 @@ let test_cases = [
 
     class_ "record A end A" (eq_val "A" (empty Record)) ;
 
-    class_ "class A class B replaceable type T = Real; end B; type T = B.T ; end A" (lookup "A" ["B"; "T"] (eq (replaceable (type_ real)))) ;
+    class_ "class A class B replaceable type T = Real; end B; type T = B.T ; end A" (lookup_cl "A" ["B"; "T"] (eq (replaceable (type_ real)))) ;
 
-    class_ "class A class B replaceable type T = Integer; end B; type T = B.T ; end A" (lookup "A" ["T"] (eq (type_ (DynamicReference (Name.of_list ["A";"B";"T"]))))) ;
+    class_ "class A class B replaceable type T = Integer; end B; type T = B.T ; end A" (lookup_cl "A" ["T"] (eq (type_ (dynref (cl_path ["A";"B";"T"]))))) ;
 
     
-    class_ "class A type B = Real; class C type S = B; end C; end A" (lookup "A" ["C";"S"] (eq (real))) ;
+    class_ "class A type B = Real; class C type S = B; end C; end A" (lookup_cl "A" ["C";"S"] (eq (real))) ;
 
-    class_ "class A type B = Real; class C import D = A.B; class E type F = D; end E; end C; end A" (lookup "A" ["C"; "E";"F"] (eq (type_ real)));
+    class_ "class A type B = Real; class C import D = A.B; class E type F = D; end E; end C; end A" (lookup_cl "A" ["C"; "E";"F"] (eq (type_ real)));
 
-    class_ "class A class B1 type T = Real; end B1; extends B1; end A" (lookup "A" ["T"] (eq (real)));
+    class_ "class A class B1 type T = Real; end B1; extends B1; end A" (lookup_cl "A" ["T"] (eq (real)));
 
-    class_ "class A class B class C type T = Real; end C; end B; class D extends B; end D; end A" (lookup "A" ["D"; "C"; "T"] (eq (type_ real))) ;
+    class_ "class A class B class C type T = Real; end C; end B; class D extends B; end D; end A" (lookup_cl "A" ["D"; "C"; "T"] (eq (type_ real))) ;
     
     class_ "class A 
               class B2 
@@ -137,7 +142,7 @@ let test_cases = [
               class C = B2(redeclare type T2 = Integer); 
               type T = C.T2 ; 
             end A"
-           (lookup "A" ["T"] (eq (replaceable (type_ (int))))) ;
+           (lookup_cl "A" ["T"] (eq (replaceable (type_ (int))))) ;
 
     class_ "class A3 
               model B3 
@@ -147,7 +152,7 @@ let test_cases = [
                 type T3 = Real; 
                 model D3 = B3(redeclare type T3 = T3); 
               end C3; 
-            end A3" (lookup "A3" ["C3";"D3";"T3"] (eq (replaceable (type_ real)))) ; 
+            end A3" (lookup_cl "A3" ["C3";"D3";"T3"] (eq (replaceable (type_ real)))) ; 
   ]
                                                 
 let suite = "Normalization" >::: test_cases
