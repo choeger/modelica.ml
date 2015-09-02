@@ -221,6 +221,10 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
   | `ClassMember x -> raise IllegalPath
 
 
+let lookup_path global path = match DQ.front path with
+    Some (x,xs) -> follow_path_es global DQ.empty global xs x
+  | None -> raise IllegalPath
+
 exception CannotUpdate of string * string * string
 
 let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) = match DQ.front lhs with
