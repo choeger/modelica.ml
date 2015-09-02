@@ -314,18 +314,26 @@ and mtranslate_nested_modification src = function
     do_ ;
     bind_value new_value ;
     return false 
+
   | {commented = {mod_name =  x::xs}} as nm ->
     do_ ;
+    state <-- get ;
     down_field x.txt ;
     down (`Any x.txt) ;
     open_class Class (fun x -> x) ;
     down (`SuperClass 0) ;
     define RedeclareExtends ;
     up;    
-    change <-- mtranslate_nested_modification src {nm with commented = {nm.commented with mod_name = xs}} ;
+    change <-- mtranslate_nested_modification src
+      {nm with commented = {nm.commented with mod_name = xs}} ;
     up ;
     up_field ;
-    return change    
+    if (not change) then begin
+      do_ ;
+      set state ;
+      return false
+    end else
+      return true    
 
 and mtranslate_def_redeclaration src {def} = do_ ;
 					     (* a redeclared type is resolved in the parent class scope *)

@@ -220,7 +220,24 @@ let test_cases = [
             end A7"
       (lookup (cl "A7") [fld "d" ; sup 0; fld "b"; cl "T"] (eq (replaceable (type_ real)))) ;
 
-    
+    class_ "class A8
+              Real x(start = 2.0);
+            end A8"
+      (lookup (cl "A8") [fld "x"] (eq Normalized.Real)) ;
+
+    class_ "class A9
+              model B Real x(start = 2.0); end B;
+              B b(x(start = 42.0));
+            end A9"
+      (lookup (cl "A9") [fld "b"; fld "x"] (eq Normalized.Real)) ;
+
+    class_ "class A10
+              model B replaceable type T = Real; Real x(start = 2.0); end B;
+              model C extends B(x(start=42.0),redeclare type T = Real); end C;
+              C c;
+            end A10"
+      (lookup (cl "A10") [fld "c"; sup 0; sup 0; fld "x"] (eq Normalized.Real)) ;
+
 ]
                                                 
 let suite = "Normalization" >::: test_cases
