@@ -58,9 +58,9 @@ let rec stratify global c (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
     None -> done_
   | Some(`Any x,xs) -> begin match get_class_element global DQ.empty c (DQ.singleton x) with
-        `Found {found_value;found_path} -> begin match DQ.front found_path with
+        `Found {found_value;found_path} -> begin match DQ.rear found_path with
             None -> raise (Failure "internal error, succeeded lookup returned empty path") 
-          | Some _ -> stratify global found_value (DQ.append done_ found_path) xs
+          | Some (_,y) -> stratify global found_value (DQ.snoc done_ y) xs
         end
       | _ -> raise (Stratification (done_, x))
     end
@@ -162,8 +162,7 @@ and norm lhs =
   | RedeclareExtends -> begin match DQ.rear lhs with
         Some(parent, `SuperClass _) -> begin match DQ.rear parent with
             Some(enclosing, (`ClassMember id | `FieldType id)) -> Report.do_ ; o <-- output ;
-            let name = (Name.of_ptr enclosing) in
-            begin match lookup o name with
+            begin match lookup_path o enclosing with
               | `Found {found_value=Class os} ->
                 begin
                   BatLog.logf "Enclosing class source name: %s\n" (Name.show os.source_name) ;
@@ -182,9 +181,11 @@ and norm lhs =
                     Report.do_ ;
                     log{where=none;level=Error;
                         what=Printf.sprintf "Could not find redeclared base class %s\n" id};
-                    fail_unresolved {searching=name; result}
+                    fail_unresolved {searching=Name.of_ptr enclosing; result}
                 end
-              | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find parent of redeclared base class %s\n" id; fail_unresolved {searching=name; result}     
+              | `NothingFound | `PrefixFound _ as result ->
+                BatLog.logf "Could not find parent of redeclared base class %s\n" id;
+                fail_unresolved {searching=Name.of_ptr enclosing; result}     
               | _ -> BatLog.logf "Internal error. Parent of redeclare-extends is not a class.\n"; fail
             end
           | _ ->  BatLog.logf "Illegal redeclare extends\n"; fail
