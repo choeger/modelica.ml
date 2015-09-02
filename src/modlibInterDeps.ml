@@ -29,22 +29,22 @@
 open Batteries
 open Utils
 open ModlibInter
-       
+
 let writes w i {lhs;rhs} =
   let name = Name.of_ptr lhs in
   match NameMap.Exceptionless.find name w with
     None -> NameMap.add name [i] w
   | Some is -> NameMap.add name (i::is) w
-                           
+
 let writesMap prog =
   Array.fold_lefti writes NameMap.empty prog
 
 let is_super {lhs} = match DQ.rear lhs with
     Some(_, `SuperClass _) -> true
   | _ -> false
-                   
+
 type first_of = { what : Name.t ; sources : Name.t list } [@@deriving show, yojson]
-                   
+
 type dependency_source = {
   source_name : Name.t;
   required : Name.t;
@@ -53,20 +53,20 @@ type dependency_source = {
 type external_dependency = dependency_source list [@@deriving show, yojson]
 
 type external_dependencies = external_dependency list [@@deriving show, yojson]						
-                                             
+
 type read_dep = Precisely of Name.t
               | FirstOf of first_of
 
 let rec prefixes_ ps n = match DQ.rear n with
     None -> n::ps
   | Some (r, x) -> prefixes_ (n :: ps) r
-                                             
+
 let prefixes n = List.rev (prefixes_ [] n)
 
 let add_reads i d r = IntMap.modify_def [] i (List.cons d) r 
 
 exception IllegalRedeclaration                                          
-                                        
+
 let rec reads r i {lhs; rhs} =  
   match rhs with
   | RedeclareExtends -> r (* does not "read" a name, but depends on superclass-statements. needs to be handled later *) 
@@ -75,24 +75,24 @@ let rec reads r i {lhs; rhs} =
   | Constr {arg} ->  reads r i {lhs; rhs=arg}
   | Close -> r                         
   | Reference n ->
-     let sources = prefixes (Name.scope_of_ptr lhs) in 
-     let what = Name.of_list (lunloc n) in
-     add_reads i (FirstOf {what; sources}) r
-                              
+    let sources = prefixes (Name.scope_of_ptr lhs) in 
+    let what = Name.of_list (lunloc n) in
+    add_reads i (FirstOf {what; sources}) r
+
   | RootReference n -> add_reads i (Precisely (Name.of_list (lunloc n))) r
   | KnownPtr ptr -> add_reads i (Precisely (Name.of_ptr ptr)) r
-				 
+
 let readsMap prog = Array.fold_lefti reads IntMap.empty prog
-                                  
+
 module GInt = struct include Int let hash i = i end
-                                  
+
 module DepGraph = Graph.Persistent.Digraph.Concrete(GInt)
 
 module Scc = Graph.Components.Make(DepGraph)
 
 exception NoClose
 exception IllegalRecursion of string
-                                    
+
 let topological_order w r a =
 
   let add_edge g from to_ = (*BatLog.logf "%s depends on %s\n" (show_class_stmt a.(from)) (show_class_stmt a.(to_)) ;*) DepGraph.add_edge g to_ from in
@@ -100,11 +100,11 @@ let topological_order w r a =
   let find_super_classes =
     List.filter (fun j -> is_super a.(j)) 
   in
-  
+
   let is_closer = function Close -> true
                          | _ -> false
   in
-  
+
   let find_close =
     function
     | [] -> raise NoClose
@@ -112,47 +112,47 @@ let topological_order w r a =
     (* In case of multiple writers there needs to be a close statement *)
     | js -> List.find (fun j -> is_closer a.(j).rhs) js 
   in
-  
+
   let rec refine_ h s = match DQ.front s.required with 
       None -> (NameMap.mem s.source_name w, s)
     | Some (x,xs) ->  let source_name = (DQ.snoc s.source_name x)  in
-                      if NameMap.mem source_name w then refine_ true {source_name; required=xs} else (h,s)
+      if NameMap.mem source_name w then refine_ true {source_name; required=xs} else (h,s)
   in
-  
+
   let refine s = refine_ false s in
 
   let add_lookup_dependencies src g = List.fold_left (fun g dest -> add_edge g src dest) g in
-  
+
   let rec add_local_deps src g = function
       [] -> g
 
     | (true, {source_name})::_ ->
-       let ws = NameMap.find source_name w in
-       let c = find_close ws in
-       (* depend on the refinement being normalized *)
-       (*BatLog.logf "%s can depend on %s\n" (show_class_stmt a.(src)) (show_class_stmt a.(c)) ;*)
-       add_edge g src c                         
+      let ws = NameMap.find source_name w in
+      let c = find_close ws in
+      (* depend on the refinement being normalized *)
+      (*BatLog.logf "%s can depend on %s\n" (show_class_stmt a.(src)) (show_class_stmt a.(c)) ;*)
+      add_edge g src c                         
 
     (* when the empty source name could not be refined, it will not match, since the root-package is never tainted *)
     | (false, {source_name})::srcs when source_name=DQ.empty -> add_local_deps src g srcs
-                         
+
     | (false, {source_name})::srcs ->
       (* BatLog.logf "Searching writer of %s\n" (Name.show source_name) ; *)
-       let ws = NameMap.find source_name w in
-       (* BatLog.logf "%s can depend on superclasses of %s\n" (show_class_stmt a.(src)) (Name.show source_name) ; *)   
-       (* no refinement found in that scope, just depend on the superclasses *)
-       add_local_deps src (add_lookup_dependencies src g (find_super_classes ws)) srcs
+      let ws = NameMap.find source_name w in
+      (* BatLog.logf "%s can depend on superclasses of %s\n" (show_class_stmt a.(src)) (Name.show source_name) ; *)   
+      (* no refinement found in that scope, just depend on the superclasses *)
+      add_local_deps src (add_lookup_dependencies src g (find_super_classes ws)) srcs
   in
 
   let add_dep i g d =
     match d with
     | Precisely n -> let (refined, source) = refine {source_name=DQ.empty; required=n} in
-                     add_local_deps i g [(refined, source)]
-                                    
+      add_local_deps i g [(refined, source)]
+
     | FirstOf ({what ; sources } as fo) ->
-       let srcs = List.map (fun source_name -> {source_name; required=what}) sources in
-       let refined = List.map refine srcs in       
-       add_local_deps i g refined
+      let srcs = List.map (fun source_name -> {source_name; required=what}) sources in
+      let refined = List.map refine srcs in       
+      add_local_deps i g refined
   in
 
   (* Find the statement responsible for creating a scope out of possible multiple writers *)
@@ -162,28 +162,28 @@ let topological_order w r a =
                               | _ -> false
     in
     if NameMap.mem lhs w then
-    match NameMap.find lhs w with
-      [] -> g
+      match NameMap.find lhs w with
+        [] -> g
 
-    (* single writer, add dependency to parent opener *) 
-    | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_empty_creator g i xs | None -> g end 
+      (* single writer, add dependency to parent opener *) 
+      | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_empty_creator g i xs | None -> g end 
 
-    (* In case of multiple writers there needs to be a Empty statement *)
-    | js -> (*BatLog.logf "searching opener for: %s\n%!" (Name.show lhs) ;*)
-	    let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
+      (* In case of multiple writers there needs to be a Empty statement *)
+      | js -> (*BatLog.logf "searching opener for: %s\n%!" (Name.show lhs) ;*)
+        let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
     else (BatLog.logf "Could not add %s to open-statement, no such statement found.\n" (Name.show lhs) ; g)
   in
 
   (* Find the statement responsible for closing a scope out of possible multiple writers *)
   let rec add_to_closer g i lhs =
     if NameMap.mem lhs w then
-    match NameMap.find lhs w with
-      [] -> raise NoClose
-    | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_to_closer g i xs | None -> g end
-    | ws ->
-       (*BatLog.logf "searching closer for: %s\n%!" (Name.show lhs) ;*)
-       let c = find_close ws in
-       add_edge g c i
+      match NameMap.find lhs w with
+        [] -> raise NoClose
+      | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_to_closer g i xs | None -> g end
+      | ws ->
+        (*BatLog.logf "searching closer for: %s\n%!" (Name.show lhs) ;*)
+        let c = find_close ws in
+        add_edge g c i
     else (BatLog.logf "Could not add %s to close-statement, no such statement found.\n" (Name.show lhs) ; g)
   in
 
@@ -192,39 +192,58 @@ let topological_order w r a =
     | Constr {arg} -> opens_scope arg
     | _ -> false
   in
-  
-  (* add all the "upwards" dependencies to ensure the scope chain is properly setup 
-     (basically just ensure that parents in the form of 'lhs := reference' are normalized first *)
+
+  (* add all the "upwards" dependencies to ensure 
+     the scope chain is properly setup 
+     (basically just ensure that parents in the form 
+     of 'lhs := reference' are normalized first *)
   let rec scope_deps g i lhs rhs = match (DQ.rear lhs) with
-    | Some(q, _) when NameMap.mem lhs w ->
-       let g' = add_empty_creator g i lhs in
-       let g'' = add_to_closer g' i lhs in
-       begin match rhs with               
-               (* If this is a close statement, add a reverse dependency to the parent's close statement *)
-               Close when NameMap.mem q w -> add_to_closer g'' i q
-             | t when (opens_scope t) && (NameMap.mem q w) -> add_empty_creator g'' i q
-             | RedeclareExtends ->
-                    let ws = NameMap.find q w in
-                    let supers = List.filter (fun i -> is_super a.(i)) ws in
-                    List.fold_left (fun g super -> add_edge g i super) g'' supers 
-             | _ -> g''
-       end
+    | Some(q, x) when NameMap.mem lhs w ->
+      let g' = add_empty_creator g i lhs in
+      let g'' =  add_to_closer g' i lhs             
+      in
+      begin match rhs with               
+        (* If this is a close statement, add a reverse dependency 
+           to the parent's close statement *)
+          Close when NameMap.mem q w -> add_to_closer g'' i q
+
+        | t when (opens_scope t) && (NameMap.mem q w) ->
+          add_empty_creator g'' i q
+                                                           
+        (* create dependency on parent superclass for modifications *)
+        | RedeclareExtends ->
+          let ws = NameMap.find q w in
+          let supers = List.filter (fun i -> is_super a.(i)) ws in
+          List.fold_left (fun g super -> add_edge g i super) g'' supers 
+        | _ -> g''
+      end
     | _ -> g
   in
-                             
+
   let add_deps g (i, ds) = List.fold_left (add_dep i) g ds in
 
   let add_scope_deps g i {lhs;rhs} =    
+    (* `Any as the last name element 
+       means we need to resolve the parent superclass(es) first for the
+       stratification *)
+    let g' = match DQ.rear lhs with
+        Some (q, `Any _) ->
+        let ws = NameMap.find (Name.of_ptr q) w in
+        let supers = List.filter (fun i -> is_super a.(i)) ws in
+        let g' = add_to_closer g i (Name.of_ptr lhs) in
+        List.fold_left (fun g super -> add_edge g i super) g' supers          
+      | _ -> g
+    in
     scope_deps (DepGraph.add_vertex g i) i (Name.of_ptr lhs) rhs in
-  
+
   let g = Array.fold_lefti add_scope_deps DepGraph.empty a in
-      
+
   let g = List.fold_left add_deps g (IntMap.bindings r) in
 
   let sccs = Scc.scc_list g in
-  
+
   BatLog.logf "Got %d vertices and %d edges in %d strongly connected components in the dependency graph out of %d statements\n"
-              (DepGraph.nb_vertex g) (DepGraph.nb_edges g) (List.length sccs) (Array.length a) ;
+    (DepGraph.nb_vertex g) (DepGraph.nb_edges g) (List.length sccs) (Array.length a) ;
 
 
   (* SCC processing:
@@ -242,7 +261,7 @@ let topological_order w r a =
                  |         |__no__ : Create Delay() statement
                  |
                  |__yes_ : * Remove incoming edges to (hierachically) highest superclass process subgraph
-   *)                           
+  *)                           
   let rec process_scc prog graph scc =
     let superclasses = List.sort (fun i j -> Int.compare (DQ.size a.(i).lhs) (DQ.size a.(j).lhs)) (List.filter (fun i -> is_super a.(i)) scc) in
     List.iter (fun i -> BatLog.logf "SCC superclass: %s\n" (show_class_ptr a.(i).lhs)) superclasses ;
@@ -250,34 +269,34 @@ let topological_order w r a =
     match superclasses with
       [] -> process_scc2 prog scc
     | fst::_ -> begin
-	let vs = IntSet.of_list scc in
-	BatLog.logf "Breaking SCC with %d vertices.\n" (IntSet.cardinal vs);
+        let vs = IntSet.of_list scc in
+        BatLog.logf "Breaking SCC with %d vertices.\n" (IntSet.cardinal vs);
 
-	let copy_edges v1 v2 g =
-	  (* copy edges from the subgraph, ignore incoming edges to the highest superclass *)
-	  if v1 != fst && IntSet.mem v1 vs && IntSet.mem v2 vs then
-	    (DepGraph.add_edge g v1 v2)
-	  else g
-	in
+        let copy_edges v1 v2 g =
+          (* copy edges from the subgraph, ignore incoming edges to the highest superclass *)
+          if v1 != fst && IntSet.mem v1 vs && IntSet.mem v2 vs then
+            (DepGraph.add_edge g v1 v2)
+          else g
+        in
 
-	let subgraph = DepGraph.fold_edges copy_edges graph (List.fold_left DepGraph.add_vertex DepGraph.empty scc) in
-	let sccs' = Scc.scc_list subgraph in
-	reorder_sccs prog sccs'
+        let subgraph = DepGraph.fold_edges copy_edges graph (List.fold_left DepGraph.add_vertex DepGraph.empty scc) in
+        let sccs' = Scc.scc_list subgraph in
+        reorder_sccs prog sccs'
       end		  
 
   and process_scc2 prog = function [] -> prog
-				 | i::scc when is_super a.(i) -> raise (IllegalRecursion (show_class_ptr (a.(i).lhs)))
-				 | i::scc when is_closer a.(i).rhs -> process_scc2 (a.(i)::prog) scc
-				 | i::scc -> process_scc2 ({lhs=a.(i).lhs; rhs=Delay a.(i).rhs}::prog) scc
+                                 | i::scc when is_super a.(i) -> raise (IllegalRecursion (show_class_ptr (a.(i).lhs)))
+                                 | i::scc when is_closer a.(i).rhs -> process_scc2 (a.(i)::prog) scc
+                                 | i::scc -> process_scc2 ({lhs=a.(i).lhs; rhs=Delay a.(i).rhs}::prog) scc
 
   and reorder_sccs prog = function
     | [] -> prog 
     | [i]::sccs -> reorder_sccs (a.(i)::prog) sccs                                
     | scc::sccs -> BatLog.logf "Begin SCC\n" ; reorder_sccs (process_scc prog g scc) sccs
   in
-        
+
   reorder_sccs [] sccs
- 
+
 let preprocess prog =
   let a = Array.of_list prog in
   let wm = writesMap a in
