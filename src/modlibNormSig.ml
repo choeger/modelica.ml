@@ -60,7 +60,7 @@ let rec stratify global c (done_:class_path) (todo:class_ptr) =
   | Some(`Any x,xs) -> begin match get_class_element global DQ.empty c (DQ.singleton x) with
         `Found {found_value;found_path} -> begin match DQ.front found_path with
             None -> raise (Failure "internal error, succeeded lookup returned empty path") 
-          | Some (y, ys) -> stratify global found_value (DQ.snoc done_ y) xs
+          | Some _ -> stratify global found_value (DQ.append done_ found_path) xs
         end
       | _ -> raise (Stratification (done_, x))
     end
@@ -149,16 +149,19 @@ and norm lhs =
   | Delay rec_rhs -> return (Recursive {rec_lhs=lhs;rec_rhs})
 
   | Close ->
-    let name = Name.of_ptr lhs in
-    Report.do_ ; o <-- output ; begin match lookup o name with
+    Report.do_ ; o <-- output ; begin match lookup_path o lhs with
         `Found {found_value} -> return found_value
-      | `Recursion _ -> BatLog.logf "Internal error. Trying to close a recursive element.\n"; fail
-      | `NothingFound | `PrefixFound _ as result ->  BatLog.logf "Could not find closed scope\n"; fail_unresolved {searching=name; result}
+      | `Recursion _ ->
+        BatLog.logf "Internal error. Trying to close a recursive element.\n";
+        fail
+      | `NothingFound | `PrefixFound _ as result ->
+        BatLog.logf "Could not find closed scope\n";
+        fail_unresolved {searching=Name.of_ptr lhs; result}
     end
 
   | RedeclareExtends -> begin match DQ.rear lhs with
         Some(parent, `SuperClass _) -> begin match DQ.rear parent with
-            Some(enclosing, `ClassMember id) -> Report.do_ ; o <-- output ;
+            Some(enclosing, (`ClassMember id | `FieldType id)) -> Report.do_ ; o <-- output ;
             let name = (Name.of_ptr enclosing) in
             begin match lookup o name with
               | `Found {found_value=Class os} ->
@@ -290,6 +293,7 @@ let rec norm_prog i p =
     Report.do_ ;
     let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in
     lhs <-- stratify_ptr lhs ;
+    let () = BatLog.logf "Stratified: %s\n" (Path.show lhs) in
     norm <-- norm lhs rhs;
     let o' = update lhs (norm_cv norm) o in
     set_output (o') ;
