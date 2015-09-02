@@ -72,7 +72,9 @@ let should_be_replaceable expected got =
 
 (* Lookup a name and apply a predicate *)
 let rec lookup_ x xs f got =
-  let m = Normalized.follow_path_es got Name.empty got xs x in
+  let m = try Normalized.follow_path_es got Name.empty got xs x
+    with IllegalPath -> Printf.eprintf "%s\n" (Normalized.show_elements_struct got) ; raise IllegalPath
+  in 
   match m with
   | `Found {found_value} ->
      begin match flat found_value with
@@ -106,6 +108,7 @@ let class_with_protected_M source_name = Class {empty_object_struct with source_
 
 let empty object_sort source_name = (Class {empty_object_struct with object_sort; source_name })                                               
 let type_ arg = Constr {constr=Sort Type; arg}
+let const arg = Constr {constr=Var Constant; arg}
 let real = type_ Real
 let int = type_ Int
 let real_t x = real
@@ -178,6 +181,46 @@ let test_cases = [
               C4 c(b(redeclare type T = Real));
             end A4"
       (lookup (cl "A4") [fld "c" ; fld "b"; cl "T"] (eq (replaceable (type_ real)))) ;
-  ]
+
+    class_ "class A5
+              model B5
+                constant Real x;
+              end B5;
+              model C5
+                B5 b;
+              end C5;
+              C5 c(b(x = 3.0));
+            end A5"
+      (lookup (cl "A5")
+         [fld "c" ; fld "b"; fld "x"] (eq (const (Normalized.Real)))) ;
+
+    class_ "class A6
+              model B
+                constant Real x;
+              end B;
+              model C
+                extends B(x = 3.0);
+              end C;
+              C c;
+            end A6"
+      (lookup (cl "A6")
+         [fld "c" ; sup 0; fld "x"] (eq (const (Normalized.Real)))) ;
+    
+    class_ "class A7
+              model B
+                replaceable type T = Integer;
+              end B;
+              model C
+                B b;
+              end C;
+              model D
+                extends C(b(redeclare type T = Real));
+              end D;
+              D d;
+            end A7"
+      (lookup (cl "A7") [fld "d" ; sup 0; fld "b"; cl "T"] (eq (replaceable (type_ real)))) ;
+
+    
+]
                                                 
 let suite = "Normalization" >::: test_cases
