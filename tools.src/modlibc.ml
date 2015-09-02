@@ -80,6 +80,15 @@ let gather_sources () =
     raise NoInput
   | root -> root
 
+let clean global c =
+  let open Normalized in
+  let remove_cl k _ c = 
+    BatLog.logf "Removing class %s\n" k ;
+    {c with class_members = StrMap.remove k c.class_members}
+  in
+  (* remove the dependency parts *)
+  StrMap.fold remove_cl global.class_members c
+
 let run_compile global root =
   match FileSystem.parse_root root with
     Some root -> begin 
@@ -88,10 +97,11 @@ let run_compile global root =
           {messages=[]; output=global} in
       List.iteri print_message o.final_messages ;
       match o.final_result with
-        Ok o -> BatLog.logf "Normalization Ok.\n%!" ;
+        Ok o -> BatLog.logf "Normalization Ok.\n%!" ;                
         let c = Compress.compress_elements o in
         BatLog.logf "Compression Ok.\n%!" ;
-        let js = Normalized.elements_struct_to_yojson c in
+        let c' = clean global c in
+        let js = Normalized.elements_struct_to_yojson c' in
         let dump = Yojson.Safe.pretty_to_string js in
         BatLog.logf "Dump (%d) Ok.\n" (String.length dump);
         let f = open_out !outfile in

@@ -165,13 +165,13 @@ and norm lhs =
             begin match lookup_path o enclosing with
               | `Found {found_value=Class os} ->
                 begin
-                  BatLog.logf "Enclosing class source name: %s\n" (Name.show os.source_name) ;
+                  (*BatLog.logf "Enclosing class source name: %s\n" (Name.show os.source_name) ;*)
                   let base_only = Class {os with public = {empty_elements with super = os.public.super};
                                                  protected = {empty_elements with super = os.protected.super}} in
 
                   match get_class_element o enclosing base_only (DQ.singleton id) with
 
-                    `Found {found_value;found_path} -> BatLog.logf "Found redeclare-base (%s): \n%s\n" id (show_class_value found_value); return found_value
+                    `Found {found_value;found_path} -> (*BatLog.logf "Found redeclare-base (%s): \n%s\n" id (show_class_value found_value);*) return found_value
 
                   | `Recursion _ -> Report.do_ ;
                     log{where=none;level=Error;what="Trying to extend from recursive element."};
@@ -292,9 +292,8 @@ let rec norm_prog i p =
   else
     let {lhs;rhs} = p.(i) in
     Report.do_ ;
-    let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in
+    (*let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in*)
     lhs <-- stratify_ptr lhs ;
-    let () = BatLog.logf "Stratified: %s\n" (Path.show lhs) in
     norm <-- norm lhs rhs;
     let o' = update lhs (norm_cv norm) o in
     set_output (o') ;
@@ -410,7 +409,7 @@ let rec close_terms i p =
   else
     let {open_lhs;open_rhs} = p.(i) in
     Report.do_ ;
-    let () = BatLog.logf "Close [%d / %d] %s := %s\n" i (Array.length p) (show_class_path open_lhs) (show_class_term open_rhs.rec_rhs) in      
+    (*let () = BatLog.logf "Close [%d / %d] %s := %s\n" i (Array.length p) (show_class_path open_lhs) (show_class_term open_rhs.rec_rhs) in *)
     closed <-- close_term open_rhs.rec_lhs open_rhs.rec_rhs;
     set_output (update open_lhs closed o) ;
     close_terms (i+1) p

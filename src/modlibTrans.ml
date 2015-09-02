@@ -48,8 +48,7 @@ let add_import env import = match import.commented with
     | NamedImport {global=[]; _} | Unnamed [] -> (* cannot happen, make ocamlc happy *) env                                                                    
     (* in the case of a renaming import, pick up the substitution *)
     | NamedImport {global;local} ->
-       BatLog.logf "Importing %s = %s\n" local.txt (show_name global);
-       StrMap.add local.txt global env
+      StrMap.add local.txt global env
 
     | Unnamed name -> begin match List.rev name with
                               [] -> raise (Failure "Cannot happen.") (* really, see pattern above *)
@@ -370,8 +369,6 @@ let mtranslate_unit env {within; toplevel_defs=td::_} =
   return {class_code=s.class_code; class_name=Name.of_ptr s.current_path}
        
 let translate_unit env {scanned; parsed} =
-  BatLog.logf "[modclc] %s\n" scanned ;
-  BatIO.flush (!BatLog.output) ;
   run (mtranslate_unit env parsed)
 
 let rec translate_package env {pkg_name; package_unit; external_units; sub_packages} =  

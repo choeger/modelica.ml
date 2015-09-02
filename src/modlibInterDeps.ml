@@ -272,9 +272,9 @@ let topological_order w r a =
       [] -> process_scc2 prog scc
     | fst::_ -> begin
         let vs = IntSet.of_list scc in
-        BatLog.logf "Breaking SCC with %d vertices.\n" (IntSet.cardinal vs);
+(*      BatLog.logf "Breaking SCC with %d vertices.\n" (IntSet.cardinal vs);
         BatLog.logf "Removing dependencies on %s\n" (show_class_ptr a.(fst).lhs) ;
-        
+*)      
         let copy_edges v1 v2 g =
           (* copy edges from the subgraph, ignore incoming edges to the highest superclass *)
           if v1 != fst && IntSet.mem v1 vs && IntSet.mem v2 vs then begin
