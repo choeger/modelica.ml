@@ -142,6 +142,10 @@ let test_cases = [
     class_ "class A class B class C type T = Real; end C; end B; 
             class D extends B; end D; end A"
       (lookup (cl "A") [cl "D"; sup 0; cl "C"; cl "T"] (eq (type_ real))) ;
+
+    class_ "class AA class B Real b; end B; 
+            class C extends B; end C; end AA"
+      (lookup (cl "AA") [cl "C"; sup 0; fld "b"] (eq Normalized.Real)) ;
     
     class_ "class A 
               class B2 
