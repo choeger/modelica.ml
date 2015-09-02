@@ -32,213 +32,213 @@ open Batteries
 open Location
 
 module type S = sig
-    module Syntax : Ast.S
-    open Syntax
+  module Syntax : Ast.S
+  open Syntax
 
-    type 'sort map_method = mapper -> 'sort -> 'sort
-     (** A map method takes one value of the to-be-mapped
-         syntactic sort and yields another one (or the same). 
-      *)
-                                                 
-     and mapper = {
-         map_unit_ : mapper -> unit_ -> unit_ ;
-         map_within : mapper -> name option -> name option ;
-         map_comment : mapper -> comment -> comment ;              
-         map_annotation : mapper -> modification -> modification;
-         
-         map_typedef_options : mapper -> typedef_options -> typedef_options;
-         map_typedef : mapper -> typedef -> typedef;
-         map_typedef_desc : typedef_desc map_method;
+  type 'sort map_method = mapper -> 'sort -> 'sort
+  (** A map method takes one value of the to-be-mapped
+      syntactic sort and yields another one (or the same). 
+  *)
 
-         map_composition : mapper -> composition -> composition;
+  and mapper = {
+    map_unit_ : mapper -> unit_ -> unit_ ;
+    map_within : mapper -> name option -> name option ;
+    map_comment : mapper -> comment -> comment ;              
+    map_annotation : mapper -> modification -> modification;
 
-         map_redeclared_typedef : mapper -> typedef -> typedef;
-         map_extension : mapper -> extension -> extension ;
-         
-         map_def : mapper -> definition -> definition ;
-         map_definition_options : definition_options map_method;
-         map_definition_structure : definition_structure map_method;
-         map_redeclared_def : mapper -> definition -> definition ;
+    map_typedef_options : mapper -> typedef_options -> typedef_options;
+    map_typedef : mapper -> typedef -> typedef;
+    map_typedef_desc : typedef_desc map_method;
 
-         map_import : mapper -> import -> import ;
-         map_import_desc : mapper -> import_desc -> import_desc ;
-         map_extend : mapper -> extend -> extend;
-         
-         map_imports : mapper -> import list -> import list ;
-         map_public : mapper -> elements -> elements ;
-         map_protected : mapper -> elements -> elements ;
-         map_cargo : mapper -> behavior -> behavior ;
+    map_composition : mapper -> composition -> composition;
 
-         map_constraint : mapper -> constraint_ -> constraint_ ;
+    map_redeclared_typedef : mapper -> typedef -> typedef;
+    map_extension : mapper -> extension -> extension ;
 
-         map_der_spec : mapper -> der_spec -> der_spec;
-         
-         map_enum_literal : mapper -> enum_literal -> enum_literal ;
-         
-         map_algorithm : mapper -> algorithm -> algorithm ;
-         map_external_def : mapper -> external_def -> external_def ;
+    map_def : mapper -> definition -> definition ;
+    map_definition_options : definition_options map_method;
+    map_definition_structure : definition_structure map_method;
+    map_redeclared_def : mapper -> definition -> definition ;
 
-         map_texp : mapper -> texp -> texp ;
-         map_exp : mapper -> exp -> exp;
-         map_cr : mapper -> component_reference -> component_reference ;
-         map_component : mapper -> component -> component ;
-         map_exp_struct : mapper -> exp_struct -> exp_struct;
-         map_attr : mapper -> attr -> attr;
+    map_import : mapper -> import -> import ;
+    map_import_desc : mapper -> import_desc -> import_desc ;
+    map_extend : mapper -> extend -> extend;
 
-         map_idx : mapper -> idx -> idx ;
-         
-         map_statement_desc : mapper -> statement_desc -> statement_desc;
-         map_statement : mapper -> statement -> statement;
-         map_target : mapper -> assignment_target -> assignment_target ;
-         map_equation_desc : mapper -> equation_desc -> equation_desc;
-         map_equation : mapper -> equation -> equation ;
+    map_imports : mapper -> import list -> import list ;
+    map_public : mapper -> elements -> elements ;
+    map_protected : mapper -> elements -> elements ;
+    map_cargo : mapper -> behavior -> behavior ;
 
-         map_modification : mapper -> modification -> modification;
-         map_type_redeclaration : mapper -> type_redeclaration -> type_redeclaration ;
-         map_component_redeclaration : mapper -> component_redeclaration -> component_redeclaration ;
-         map_component_modification : mapper -> component_modification -> component_modification ;
-         map_component_modification_struct : mapper -> component_modification_struct -> component_modification_struct ;
-         map_modification_value : mapper -> modification_value -> modification_value ;
-         
-         map_name : mapper -> name -> name ;
-         map_named_arg : mapper -> named_arg -> named_arg ;
-         map_identifier : mapper -> string -> string;
-         map_comment_str : mapper -> string -> string ;
-         map_location : mapper -> Location.t -> Location.t;
-       }  
-    (** A mapper record implements one "method" per syntactic category,
-    using an open recursion style: each method takes as its first
-    argument the mapper to be applied to children in the syntax
-    tree. *)
-                    
-    val map_id : 'sort map_method
-    (** Dummy map method, returns the input *)
+    map_constraint : mapper -> constraint_ -> constraint_ ;
 
-    val map_commented : 'sort map_method -> 'sort commented map_method
-    (** Lift an element map method over a commented element *)
+    map_der_spec : mapper -> der_spec -> der_spec;
 
-    val map_located : 'sort map_method -> 'sort Location.loc map_method
-    (** Lift an element map method over a located element *)
+    map_enum_literal : mapper -> enum_literal -> enum_literal ;
 
-    val map_list : 'sort map_method -> 'sort list map_method
-    (** Lift an element map method over a list of elements *)
+    map_algorithm : mapper -> algorithm -> algorithm ;
+    map_external_def : mapper -> external_def -> external_def ;
 
-    val map_option : 'sort map_method -> 'sort option map_method                                                           
-    (** Lift an element map method over an optional elements *)
+    map_texp : mapper -> texp -> texp ;
+    map_exp : mapper -> exp -> exp;
+    map_cr : mapper -> component_reference -> component_reference ;
+    map_component : mapper -> component -> component ;
+    map_exp_struct : mapper -> exp_struct -> exp_struct;
+    map_attr : mapper -> attr -> attr;
 
-    val map_for_loop : 'sort map_method -> 'sort for_loop_struct map_method                                                           
-    (** Lift an element map method over a loop structure containing this element as body *)
+    map_idx : mapper -> idx -> idx ;
 
-    val map_conditional : 'sort map_method -> 'sort condition_struct map_method                                                           
-    (** Lift an element map method over a conditional structure containing this element as body *)
-                                                    
-    val (&&&) : ('b map_method -> 'c map_method) -> ('a map_method -> 'b map_method) -> 'a map_method -> 'c map_method
-                                                                                                            (** combine two generic mappers *)
-  end
+    map_statement_desc : mapper -> statement_desc -> statement_desc;
+    map_statement : mapper -> statement -> statement;
+    map_target : mapper -> assignment_target -> assignment_target ;
+    map_equation_desc : mapper -> equation_desc -> equation_desc;
+    map_equation : mapper -> equation -> equation ;
+
+    map_modification : mapper -> modification -> modification;
+    map_type_redeclaration : mapper -> type_redeclaration -> type_redeclaration ;
+    map_component_redeclaration : mapper -> component_redeclaration -> component_redeclaration ;
+    map_component_modification : mapper -> component_modification -> component_modification ;
+    map_component_modification_struct : mapper -> component_modification_struct -> component_modification_struct ;
+    map_modification_value : mapper -> modification_value -> modification_value ;
+
+    map_name : mapper -> name -> name ;
+    map_named_arg : mapper -> named_arg -> named_arg ;
+    map_identifier : mapper -> string -> string;
+    map_comment_str : mapper -> string -> string ;
+    map_location : mapper -> Location.t -> Location.t;
+  }  
+  (** A mapper record implements one "method" per syntactic category,
+      using an open recursion style: each method takes as its first
+      argument the mapper to be applied to children in the syntax
+      tree. *)
+
+  val map_id : 'sort map_method
+  (** Dummy map method, returns the input *)
+
+  val map_commented : 'sort map_method -> 'sort commented map_method
+  (** Lift an element map method over a commented element *)
+
+  val map_located : 'sort map_method -> 'sort Location.loc map_method
+  (** Lift an element map method over a located element *)
+
+  val map_list : 'sort map_method -> 'sort list map_method
+  (** Lift an element map method over a list of elements *)
+
+  val map_option : 'sort map_method -> 'sort option map_method                                                           
+  (** Lift an element map method over an optional elements *)
+
+  val map_for_loop : 'sort map_method -> 'sort for_loop_struct map_method                                                           
+  (** Lift an element map method over a loop structure containing this element as body *)
+
+  val map_conditional : 'sort map_method -> 'sort condition_struct map_method                                                           
+  (** Lift an element map method over a conditional structure containing this element as body *)
+
+  val (&&&) : ('b map_method -> 'c map_method) -> ('a map_method -> 'b map_method) -> 'a map_method -> 'c map_method
+  (** combine two generic mappers *)
+end
 
 module Make(Tree : Ast.S) = struct
-    type attr = Tree.attr
-                  
-    module Syntax = Tree
-    open Syntax
-           
-    type 'sort map_method = mapper -> 'sort -> 'sort
-                                                 
-     and mapper = {
-         map_unit_ : mapper -> unit_ -> unit_ ;
-         map_within : mapper -> name option -> name option ;
-         map_comment : mapper -> comment -> comment ;              
-         map_annotation : mapper -> modification -> modification;
-         
-         map_typedef_options : mapper -> typedef_options -> typedef_options;
-         map_typedef : mapper -> typedef -> typedef;
-         map_typedef_desc : typedef_desc map_method;
+  type attr = Tree.attr
 
-         map_composition : mapper -> composition -> composition;
+  module Syntax = Tree
+  open Syntax
 
-         map_redeclared_typedef : mapper -> typedef -> typedef;
-         map_extension : mapper -> extension -> extension ;
-         
-         map_def : mapper -> definition -> definition ;
-         map_definition_options : definition_options map_method;
-         map_definition_structure : definition_structure map_method;
-         map_redeclared_def : mapper -> definition -> definition ;
+  type 'sort map_method = mapper -> 'sort -> 'sort
 
-         map_import : mapper -> import -> import ;
-         map_import_desc : mapper -> import_desc -> import_desc ;
-         map_extend : mapper -> extend -> extend;
-         
-         map_imports : mapper -> import list -> import list ;
-         map_public : mapper -> elements -> elements ;
-         map_protected : mapper -> elements -> elements ;
-         map_cargo : mapper -> behavior -> behavior ;
+  and mapper = {
+    map_unit_ : mapper -> unit_ -> unit_ ;
+    map_within : mapper -> name option -> name option ;
+    map_comment : mapper -> comment -> comment ;              
+    map_annotation : mapper -> modification -> modification;
 
-         map_constraint : mapper -> constraint_ -> constraint_ ;
+    map_typedef_options : mapper -> typedef_options -> typedef_options;
+    map_typedef : mapper -> typedef -> typedef;
+    map_typedef_desc : typedef_desc map_method;
 
-         map_der_spec : mapper -> der_spec -> der_spec;
-         
-         map_enum_literal : mapper -> enum_literal -> enum_literal ;
-         
-         map_algorithm : mapper -> algorithm -> algorithm ;
-         map_external_def : mapper -> external_def -> external_def ;
+    map_composition : mapper -> composition -> composition;
 
-         map_texp : mapper -> texp -> texp ;
-         map_exp : mapper -> exp -> exp;
-         map_cr : mapper -> component_reference -> component_reference ;
-         map_component : mapper -> component -> component ;
-         map_exp_struct : mapper -> exp_struct -> exp_struct;
-         map_attr : mapper -> attr -> attr;
+    map_redeclared_typedef : mapper -> typedef -> typedef;
+    map_extension : mapper -> extension -> extension ;
 
-         map_idx : mapper -> idx -> idx ;
-         
-         map_statement_desc : mapper -> statement_desc -> statement_desc;
-         map_statement : mapper -> statement -> statement;
-         map_target : mapper -> assignment_target -> assignment_target ;
-         map_equation_desc : mapper -> equation_desc -> equation_desc;
-         map_equation : mapper -> equation -> equation ;
+    map_def : mapper -> definition -> definition ;
+    map_definition_options : definition_options map_method;
+    map_definition_structure : definition_structure map_method;
+    map_redeclared_def : mapper -> definition -> definition ;
 
-         map_modification : mapper -> modification -> modification;
-         map_type_redeclaration : mapper -> type_redeclaration -> type_redeclaration ;
-         map_component_redeclaration : mapper -> component_redeclaration -> component_redeclaration ;
-         map_component_modification : mapper -> component_modification -> component_modification ;
-         map_component_modification_struct : mapper -> component_modification_struct -> component_modification_struct ;
-         map_modification_value : mapper -> modification_value -> modification_value ;
-         
-         map_name : mapper -> name -> name ;
-         map_named_arg : mapper -> named_arg -> named_arg ;
-         map_identifier : mapper -> string -> string;
-         map_comment_str : mapper -> string -> string ;
-         map_location : mapper -> Location.t -> Location.t;
-       }  
+    map_import : mapper -> import -> import ;
+    map_import_desc : mapper -> import_desc -> import_desc ;
+    map_extend : mapper -> extend -> extend;
 
-    let (&&&) l r = fun sub this x -> l (r sub) this x
-                                        
-    (** Lift a sub-map function to a map function over lists *)
-    let map_list sub this = List.map (sub this)
+    map_imports : mapper -> import list -> import list ;
+    map_public : mapper -> elements -> elements ;
+    map_protected : mapper -> elements -> elements ;
+    map_cargo : mapper -> behavior -> behavior ;
 
-    let map_option sub this = function
-      | None -> None
-      | Some x -> Some (sub this x)
-                       
-    let map_commented sub this {commented; comment} = { commented = sub this commented ;
-                                                        comment = this.map_comment this comment }
+    map_constraint : mapper -> constraint_ -> constraint_ ;
 
-    let map_located sub this { txt ; loc } = { txt = sub this txt ; loc = this.map_location this loc }
+    map_der_spec : mapper -> der_spec -> der_spec;
 
-    let map_else_conditional sub this { guard ; elsethen } =
-      { guard = this.map_exp this guard ;
-        elsethen = sub this elsethen }
-        
-    let map_conditional sub this { condition ; then_ ; else_if ; else_ } =
-      { condition = this.map_exp this condition ;
-        then_ = sub this then_ ;
-        else_if = map_list (map_else_conditional sub) this else_if ;
-        else_ = sub this else_;
-      }
-        
-    let map_for_loop sub this {idx; body} = {idx= map_list this.map_idx this idx ;
-                                             body = sub this body }
-                                              
-    (** The identity map function. Does {b no} traversal *)
-    let map_id this x = x
-  end
+    map_enum_literal : mapper -> enum_literal -> enum_literal ;
+
+    map_algorithm : mapper -> algorithm -> algorithm ;
+    map_external_def : mapper -> external_def -> external_def ;
+
+    map_texp : mapper -> texp -> texp ;
+    map_exp : mapper -> exp -> exp;
+    map_cr : mapper -> component_reference -> component_reference ;
+    map_component : mapper -> component -> component ;
+    map_exp_struct : mapper -> exp_struct -> exp_struct;
+    map_attr : mapper -> attr -> attr;
+
+    map_idx : mapper -> idx -> idx ;
+
+    map_statement_desc : mapper -> statement_desc -> statement_desc;
+    map_statement : mapper -> statement -> statement;
+    map_target : mapper -> assignment_target -> assignment_target ;
+    map_equation_desc : mapper -> equation_desc -> equation_desc;
+    map_equation : mapper -> equation -> equation ;
+
+    map_modification : mapper -> modification -> modification;
+    map_type_redeclaration : mapper -> type_redeclaration -> type_redeclaration ;
+    map_component_redeclaration : mapper -> component_redeclaration -> component_redeclaration ;
+    map_component_modification : mapper -> component_modification -> component_modification ;
+    map_component_modification_struct : mapper -> component_modification_struct -> component_modification_struct ;
+    map_modification_value : mapper -> modification_value -> modification_value ;
+
+    map_name : mapper -> name -> name ;
+    map_named_arg : mapper -> named_arg -> named_arg ;
+    map_identifier : mapper -> string -> string;
+    map_comment_str : mapper -> string -> string ;
+    map_location : mapper -> Location.t -> Location.t;
+  }  
+
+  let (&&&) l r = fun sub this x -> l (r sub) this x
+
+  (** Lift a sub-map function to a map function over lists *)
+  let map_list sub this = List.map (sub this)
+
+  let map_option sub this = function
+    | None -> None
+    | Some x -> Some (sub this x)
+
+  let map_commented sub this {commented; comment} = { commented = sub this commented ;
+                                                      comment = this.map_comment this comment }
+
+  let map_located sub this { txt ; loc } = { txt = sub this txt ; loc = this.map_location this loc }
+
+  let map_else_conditional sub this { guard ; elsethen } =
+    { guard = this.map_exp this guard ;
+      elsethen = sub this elsethen }
+
+  let map_conditional sub this { condition ; then_ ; else_if ; else_ } =
+    { condition = this.map_exp this condition ;
+      then_ = sub this then_ ;
+      else_if = map_list (map_else_conditional sub) this else_if ;
+      else_ = sub this else_;
+    }
+
+  let map_for_loop sub this {idx; body} = {idx= map_list this.map_idx this idx ;
+                                           body = sub this body }
+
+  (** The identity map function. Does {b no} traversal *)
+  let map_id this x = x
+end

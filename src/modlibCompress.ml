@@ -141,7 +141,8 @@ let load_from_json js =
         log {level=Error;what;where=none}; fail
     in  
 
-    Report.do_ ;              
-    set_output es ;     
+    Report.do_ ;
+    o <-- output ;
+    set_output {o with class_members = StrMap.union o.class_members es.class_members} ;     
     dcs <-- reorder_sccs sccs;
     do_decompression 0 (Array.of_list dcs)

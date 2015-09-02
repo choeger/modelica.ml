@@ -29,11 +29,11 @@
 open Batteries
 open Utils
 open ModlibNormalized
-       
+
 type level = Info | Warning | Error [@@deriving show]
 
 type 'a result = Ok of 'a | Failed
-                              
+
 type message = { level : level ; where : Location.t ; what : string }
 
 let show_message {level;what} = Printf.sprintf "%s: %s" (show_level level) what
@@ -41,54 +41,54 @@ let show_message {level;what} = Printf.sprintf "%s: %s" (show_level level) what
 let print_message o msg = IO.nwrite o (show_message msg)
 
 let print_messages o msgs = List.print ~sep:"\n" print_message o msgs
-                                  
+
 type state = { messages : message list; output : elements_struct }
-                 
+
 type 'a report = { result : 'a result ; state : state }
 
 type 'a final_report = { final_result : 'a result ; final_messages : message list }
 
 let run m state = let {result;state} = m state in
-                  {final_result=result; final_messages=state.messages}
-                         
+  {final_result=result; final_messages=state.messages}
+
 let bind m f state = let {state;result} = m state in
-                     match result with Failed -> {state;result=Failed}
-                                     | Ok a -> f a state
+  match result with Failed -> {state;result=Failed}
+                  | Ok a -> f a state
 
 let return a state = {state ; result = Ok a}
 
 let rec miter f = function
     [] -> return ()
   | x::xs ->     
-     bind (f x) (fun () -> miter f xs)
-                       
+    bind (f x) (fun () -> miter f xs)
+
 let rec on_sequence f = function
-    (* TODO: tail_recursion *)
+  (* TODO: tail_recursion *)
     [] -> return []
   | x::xs ->
-     bind (f x) (fun x' -> (bind (on_sequence f xs) (fun xs' -> (return (x'::xs') ) )  ) )
-               
+    bind (f x) (fun x' -> (bind (on_sequence f xs) (fun xs' -> (return (x'::xs') ) )  ) )
+
 let on_kv_pair f (k,v) = do_ ; v' <-- f v ; return (k,v')
-               
+
 let on_strMap_values f map = do_ ;
-                             xs <-- on_sequence (on_kv_pair f) (StrMap.bindings map) ;
-                             return (StrMap.of_list xs)
+  xs <-- on_sequence (on_kv_pair f) (StrMap.bindings map) ;
+  return (StrMap.of_list xs)
 
 let on_intMap_values f map = do_ ;
-                             xs <-- on_sequence (on_kv_pair f) (IntMap.bindings map) ;
-                             return (IntMap.of_list xs)
+  xs <-- on_sequence (on_kv_pair f) (IntMap.bindings map) ;
+  return (IntMap.of_list xs)
 
-                                    
+
 let output ({output} as state) = {result = Ok output; state }
 
 let set_output output state = {result = Ok (); state={state with output}}
-                                   
+
 let messages ({messages} as state) = {result=Ok messages; state}
-                                           
+
 let log msg state = {state={state with messages = msg::state.messages}; result=Ok ()}
 
 let fail state = {state; result=Failed}
-                          
+
 let if_ b m = if b then m else return ()
 
 type unresolved_dependency = { searching : Name.t ; result : search_error }

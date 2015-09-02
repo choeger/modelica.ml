@@ -32,7 +32,7 @@ open Modelica_parser
 open Modelica_lexer
 
 let hidden dir = String.starts_with (Filename.basename dir) "."
-                                    
+
 let parse file =
   let start = Sys.time () in
   begin
@@ -48,41 +48,41 @@ let parse file =
           Some result                              
         with
         | SyntaxError e -> Printf.eprintf "Syntax Error at %s:\n%s" (show_location e) (error_message e input) ;
-                           ANSITerminal.printf [ANSITerminal.red] "%fs parsing: '%s'\n" (Sys.time () -. start) file ;
-                           None
+          ANSITerminal.printf [ANSITerminal.red] "%fs parsing: '%s'\n" (Sys.time () -. start) file ;
+          None
       end
     with
     | Sedlexing.MalFormed -> Printf.eprintf "Lexical error in %s\n" file ;
-                             ANSITerminal.printf [ANSITerminal.red] "%fs parsing: '%s'\n" (Sys.time () -. start) file ;
-                             None
+      ANSITerminal.printf [ANSITerminal.red] "%fs parsing: '%s'\n" (Sys.time () -. start) file ;
+      None
 
   end
-       
+
 let walk_directory_tree dir suffix =
   let select str =
     String.ends_with str suffix
   in
   let rec walk acc = function
-  | [] -> (acc)
-  | dir::tail when not (hidden dir)->
+    | [] -> (acc)
+    | dir::tail when not (hidden dir)->
       let contents = Array.to_list (Sys.readdir dir) in
       let contents = List.rev_map (Filename.concat dir) contents in
       let dirs, files =
         List.fold_left (fun (dirs,files) f ->
-             match (stat f).st_kind with
-             | S_REG -> (dirs, f::files)  (* Regular file *)
-             | S_DIR -> (f::dirs, files)  (* Directory *)
-             | _ -> (dirs, files)
+            match (stat f).st_kind with
+            | S_REG -> (dirs, f::files)  (* Regular file *)
+            | S_DIR -> (f::dirs, files)  (* Directory *)
+            | _ -> (dirs, files)
           ) ([],[]) contents
       in
       let matched = List.filter (select) files in
       let acc' = matched @ acc in
       walk (acc') (dirs @ tail) 
-  | dir::tail -> walk acc tail
+    | dir::tail -> walk acc tail
   in
   walk [] [dir]
 ;;
-  
+
 let () =
   let results = walk_directory_tree (Sys.getcwd ()) ".mo" in
   List.map parse results;

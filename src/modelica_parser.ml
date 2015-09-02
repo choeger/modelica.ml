@@ -31,15 +31,15 @@ open Location
 open Modelica_lexer
 
 type 'a parser = (unit -> Modelica_lexer.tokplus) -> (unit -> Modelica_lexer.tokplus option) -> 'a
-       
+
 let get_token {txt} = txt
 
 let get_start {txt;loc} = loc.loc_start
 
 let get_end {txt;loc} = loc.loc_end
-                        
+
 exception SyntaxError of Location.t
-                           
+
 open Batteries
 
 let locate = function
@@ -47,8 +47,8 @@ let locate = function
   | None -> { loc_start = dummy_pos ; loc_end = dummy_pos ; loc_ghost = true }
 
 let guard parser next last = try parser next  
-                             with
-                             | Generated_parser.Error -> raise ( SyntaxError ( locate (last ()) ) )
+  with
+  | Generated_parser.Error -> raise ( SyntaxError ( locate (last ()) ) )
 
 (* entry points below stored definition, mainly for unit tests *)
 let texpr_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_texpr)
@@ -68,7 +68,7 @@ let defs_parser = guard (MenhirLib.Convert.traditional2revised get_token get_sta
 let td_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_type_definition)
 
 let unit_parser = guard (MenhirLib.Convert.traditional2revised get_token get_start get_end Generated_parser.modelica_stored_definition)
-                          
+
 let error_message e input =
   let lb = Lexing.from_string (input ^ "\n") in
   highlight_dumb Format.str_formatter lb e ; Format.flush_str_formatter ()

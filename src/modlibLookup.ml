@@ -78,7 +78,7 @@ and get_class_element global found_path e p =
     in
     `Found {found_path ; found_value = e;
             found_visible=true; found_replaceable}
-      
+
   | Some (x, xs) -> begin
       match e with
       | Class {protected;public} ->

@@ -35,7 +35,7 @@ open Utils
 
 type scanned = string
 type parsed = {scanned : scanned ; parsed : Syntax.unit_}
-       
+
 type 'stage package = {
   pkg_name : string list;
   sub_packages : ('stage package) list ;
@@ -44,10 +44,10 @@ type 'stage package = {
 }
 
 type 'stage pkg_root = {
-    root_units : 'stage list ;
-    root_packages : 'stage package list;
-  }
-                 
+  root_units : 'stage list ;
+  root_packages : 'stage package list;
+}
+
 let parse file =
   begin
     try
@@ -61,18 +61,18 @@ let parse file =
           Some result                              
         with
         | SyntaxError e -> Printf.eprintf "Syntax Error at %s:\n%s" (show_location e) (error_message e input) ;
-                           None
+          None
       end
     with
     | Sedlexing.MalFormed -> Printf.eprintf "Lexical error in %s\n" file ;
-                             None
+      None
 
   end
-                 
+
 let is_source_file file = String.ends_with (Filename.basename file) ".mo" 
 
 let is_package_mo file = (Filename.basename file) = "package.mo" 
-                                                                            
+
 let rec scan prefix dir =
   if is_directory dir then
     let pkg_name = (Filename.basename dir)::prefix in
@@ -84,18 +84,18 @@ let rec scan prefix dir =
       let package_unit = List.find is_package_mo contents in
       let collect_sub_pkg pkgs file = match scan pkg_name file with None -> pkgs | Some pkg -> pkg::pkgs in
       let collect_source_files files file = if (is_source_file file) && not (is_package_mo file) then file::files else files in
-        
+
       let sub_packages = List.fold_left collect_sub_pkg [] contents in
       let external_units = List.fold_left collect_source_files [] contents in      
       Some { package_unit ; pkg_name ; sub_packages ; external_units }
     else None
-    
+
   else None
 
 let scan_root dir =
   if is_directory dir then
     let contents = Array.to_list (Array.map (Filename.concat dir) (Sys.readdir dir)) in
-    
+
     let collect_sub_pkg pkgs file = match scan [dir] file with None -> pkgs | Some pkg -> pkg::pkgs in
     let collect_source_files files file = if (is_source_file file) && not (is_package_mo file) then file::files else files in
 
@@ -107,10 +107,10 @@ let scan_root dir =
 let rec parse_externals done_ = function
     [] -> Some done_
   | scanned::fs -> begin match parse scanned with
-                         | Some parsed -> parse_externals ({scanned;parsed}::done_) fs
-                         | None -> None
-                   end
-    
+      | Some parsed -> parse_externals ({scanned;parsed}::done_) fs
+      | None -> None
+    end
+
 let rec parse_package {pkg_name; package_unit=scanned; external_units; sub_packages } =
   match parse_packages [] sub_packages with
     Some sub_packages -> begin
@@ -123,19 +123,19 @@ let rec parse_package {pkg_name; package_unit=scanned; external_units; sub_packa
       | None -> None
     end
   | None -> None
-  
+
 and parse_packages done_ = function
     [] -> Some done_
   | pkg::pkgs -> begin 
       match parse_package pkg with Some pkg -> parse_packages (pkg::done_) pkgs
                                  | None -> None
     end
-    
+
 let rec parse_root {root_units; root_packages} =  
   match parse_packages [] root_packages with
     Some root_packages -> begin match parse_externals [] root_units with
-                                  Some root_units -> Some {root_units; root_packages}
-                                | None -> None
-                          end
+        Some root_units -> Some {root_units; root_packages}
+      | None -> None
+    end
   | None -> None
-                                              
+

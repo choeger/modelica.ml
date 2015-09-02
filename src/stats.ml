@@ -38,7 +38,7 @@ let count_definition _ _ ({def_count} as s) = {s with def_count = def_count + 1}
 
 let count_typedef this def  ({type_count} as s) =
   TD.fold this def {s with type_count = type_count + 1}
-                           
+
 let counter = { default_folder with
                 fold_def = count_definition ;
                 fold_typedef = count_typedef ;

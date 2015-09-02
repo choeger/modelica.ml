@@ -27,154 +27,154 @@
  *)
 
 type position = Lexing.position = {
-      pos_fname : string;
-      pos_lnum : int;
-      pos_bol : int;
-      pos_cnum : int;
-    } [@@deriving yojson]
+  pos_fname : string;
+  pos_lnum : int;
+  pos_bol : int;
+  pos_cnum : int;
+} [@@deriving yojson]
 
 type location = Location.t = {
-      loc_start: position;
-      loc_end: position;
-      loc_ghost: bool;
-    } [@@deriving yojson]
-      
+  loc_start: position;
+  loc_end: position;
+  loc_ghost: bool;
+} [@@deriving yojson]
+
 type 'a loc = 'a Location.loc = { txt : 'a; loc : location; } [@@deriving yojson]
 
 type token =
- GT | LT | NEQ | GEQ | LEQ | EQ | EQEQ | LPAREN | RPAREN | LBRACKET | RBRACKET | LBRACE | RBRACE | SEMICOLON | COMMA | DOT | COLON | COLONEQ
- | INT of int
- | FLOAT of float
- | IDENT of string
- | QIDENT of string
- | STRING of string
- | DOTPOWER | POWER | PLUS | MINUS | TIMES | DIV | DOTPLUS | DOTMINUS | DOTTIMES | DOTDIV
- | EOF
- | ALGORITHM | DISCRETE | FALSE | LOOP | PURE | AND | EACH | FINAL | MODEL | RECORD | ANNOTATION | ELSE
- | FLOW | NOT | REDECLARE | ASSERT | ELSEIF | FOR | OPERATOR | REPLACEABLE | BLOCK | ELSEWHEN | FUNCTION | OR | RETURN
- | BREAK | ENCAPSULATED | IF | OUTER | STREAM | CLASS | END | IMPORT | OUTPUT | THEN | CONNECT | ENUMERATION | IMPURE
- | PACKAGE | TRUE | CONNECTOR | EQUATION | IN | PARAMETER | TYPE | CONSTANT | EXPANDABLE | INITIAL | PARTIAL | WHEN
- | CONSTRAINEDBY | EXTENDS | INNER | PROTECTED | WHILE | DER | EXTERNAL | INPUT | PUBLIC | WITHIN
- | ENDWHEN | ENDIF | ENDFOR | ENDWHILE | END_IDENT of string | INITIAL_EQUATION | INITIAL_ALGORITHM
-                                [@@deriving show]
+    GT | LT | NEQ | GEQ | LEQ | EQ | EQEQ | LPAREN | RPAREN | LBRACKET | RBRACKET | LBRACE | RBRACE | SEMICOLON | COMMA | DOT | COLON | COLONEQ
+  | INT of int
+  | FLOAT of float
+  | IDENT of string
+  | QIDENT of string
+  | STRING of string
+  | DOTPOWER | POWER | PLUS | MINUS | TIMES | DIV | DOTPLUS | DOTMINUS | DOTTIMES | DOTDIV
+  | EOF
+  | ALGORITHM | DISCRETE | FALSE | LOOP | PURE | AND | EACH | FINAL | MODEL | RECORD | ANNOTATION | ELSE
+  | FLOW | NOT | REDECLARE | ASSERT | ELSEIF | FOR | OPERATOR | REPLACEABLE | BLOCK | ELSEWHEN | FUNCTION | OR | RETURN
+  | BREAK | ENCAPSULATED | IF | OUTER | STREAM | CLASS | END | IMPORT | OUTPUT | THEN | CONNECT | ENUMERATION | IMPURE
+  | PACKAGE | TRUE | CONNECTOR | EQUATION | IN | PARAMETER | TYPE | CONSTANT | EXPANDABLE | INITIAL | PARTIAL | WHEN
+  | CONSTRAINEDBY | EXTENDS | INNER | PROTECTED | WHILE | DER | EXTERNAL | INPUT | PUBLIC | WITHIN
+  | ENDWHEN | ENDIF | ENDFOR | ENDWHILE | END_IDENT of string | INITIAL_EQUATION | INITIAL_ALGORITHM
+    [@@deriving show]
 
 module StdFormat = Format
 open Batteries
 module Format = StdFormat
-  
+
 exception StructuralError of string
-       
+
 module IntMap = struct include Map.Make(Int)
-                       let compare (k,v) (k',v') = Int.compare k k'
-                       let to_yojson a m =
-			 (* We encode intMaps as lists, using the entry number as key, this means that we cannot encode sparsely populated maps,
+  let compare (k,v) (k',v') = Int.compare k k'
+  let to_yojson a m =
+    (* We encode intMaps as lists, using the entry number as key, this means that we cannot encode sparsely populated maps,
                             but since IntMaps in the abstract syntax are only used to ease the lookup, that should be fine. Maybe switch to vectors later. *)
-			 let max = (cardinal m) in
-			 for i = 0 to max - 1 do
-			   if not (mem i m) then
-			     raise (StructuralError (Printf.sprintf "Yojson failed. IntMap is not densely packed. Missing element %d out of %d." i max))
-			 done ;
-			 `List (List.map (fun (k,v) -> a v) (List.sort compare (bindings m)))
+    let max = (cardinal m) in
+    for i = 0 to max - 1 do
+      if not (mem i m) then
+        raise (StructuralError (Printf.sprintf "Yojson failed. IntMap is not densely packed. Missing element %d out of %d." i max))
+    done ;
+    `List (List.map (fun (k,v) -> a v) (List.sort compare (bindings m)))
 
-                       let of_yojson f js =
-                         let rec h mr v =
-                           match mr with
-                             `Ok m -> begin
-                               match f v with
-                                 `Error _ as e -> e
-                               | `Ok v' -> `Ok (add (cardinal m) v' m)
-                             end
-                           | `Error _ as e -> e
-                         in
-                         match js with `List ls -> List.fold_left h (`Ok empty) ls
-                                     | _ -> `Error "expected a json-list"                                             
+  let of_yojson f js =
+    let rec h mr v =
+      match mr with
+        `Ok m -> begin
+          match f v with
+            `Error _ as e -> e
+          | `Ok v' -> `Ok (add (cardinal m) v' m)
+        end
+      | `Error _ as e -> e
+    in
+    match js with `List ls -> List.fold_left h (`Ok empty) ls
+                | _ -> `Error "expected a json-list"                                             
 
-                       let of_list bs = of_enum (List.enum bs)
-                       open StdFormat 
-                       let pp pp_v fmt s =
-                         let pp_comma fmt () = fprintf fmt "," in
-                         let pp_pair fmt (k,v) = fprintf fmt "%d@ =@ %a" k pp_v v in
-                         fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
+  let of_list bs = of_enum (List.enum bs)
+  open StdFormat 
+  let pp pp_v fmt s =
+    let pp_comma fmt () = fprintf fmt "," in
+    let pp_pair fmt (k,v) = fprintf fmt "%d@ =@ %a" k pp_v v in
+    fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
 
-                end
+end
 
 module StrMap = struct include Map.Make(String)
-                       let union m1 m2 = Enum.fold (fun m (k,v) -> add k v m) m1 (enum m2)
-                       let find_or_else v x m = if mem x m then find x m else v
-                       let to_yojson a m = `Assoc (List.map (fun (k,v) -> (k,a v)) (bindings m))                                            
+  let union m1 m2 = Enum.fold (fun m (k,v) -> add k v m) m1 (enum m2)
+  let find_or_else v x m = if mem x m then find x m else v
+  let to_yojson a m = `Assoc (List.map (fun (k,v) -> (k,a v)) (bindings m))                                            
 
-                       let of_yojson f js =
-                         let rec h mr (k,v) =
-                           match mr with
-                             `Ok m -> begin
-                               match f v with
-                                 `Error _ as e -> e
-                               | `Ok v' -> `Ok (add k v' m)
-                             end
-                           | `Error _ as e -> e
-                         in
-                         match js with `Assoc ls -> List.fold_left h (`Ok empty) ls
-                                     | _ -> `Error "expected a json-object"                                             
+  let of_yojson f js =
+    let rec h mr (k,v) =
+      match mr with
+        `Ok m -> begin
+          match f v with
+            `Error _ as e -> e
+          | `Ok v' -> `Ok (add k v' m)
+        end
+      | `Error _ as e -> e
+    in
+    match js with `Assoc ls -> List.fold_left h (`Ok empty) ls
+                | _ -> `Error "expected a json-object"                                             
 
-                                       
-                       let of_list bs = of_enum (List.enum bs)
-                       open StdFormat 
-                       let pp pp_v fmt s =
-                         let pp_comma fmt () = fprintf fmt "," in
-                         let pp_pair fmt (k,v) = fprintf fmt "%s@ =@ %a" k pp_v v in
-                         fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
-                end
+
+  let of_list bs = of_enum (List.enum bs)
+  open StdFormat 
+  let pp pp_v fmt s =
+    let pp_comma fmt () = fprintf fmt "," in
+    let pp_pair fmt (k,v) = fprintf fmt "%s@ =@ %a" k pp_v v in
+    fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
+end
 
 module StrSet = struct include Set.Make(String) 
-                       let to_yojson s = `List (List.map (fun e -> `String e) (elements s))
+  let to_yojson s = `List (List.map (fun e -> `String e) (elements s))
 
-                       let of_yojson js =
-                         let rec h sr v =
-                           match sr with
-                             `Ok s -> begin
-                               match v with
-                               | `String v' -> `Ok (add v' s)
-                               | _ as e -> `Error "Expected a json-string"
-                             end
-                           | `Error _ as e -> e
-                         in
-                         match js with `List ls -> List.fold_left h (`Ok empty) ls
-                                     | _ -> `Error "expected a json-list"                                             
+  let of_yojson js =
+    let rec h sr v =
+      match sr with
+        `Ok s -> begin
+          match v with
+          | `String v' -> `Ok (add v' s)
+          | _ as e -> `Error "Expected a json-string"
+        end
+      | `Error _ as e -> e
+    in
+    match js with `List ls -> List.fold_left h (`Ok empty) ls
+                | _ -> `Error "expected a json-list"                                             
 
-                       open StdFormat
-                       let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_print_string) (elements s)
-                end
+  open StdFormat
+  let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_print_string) (elements s)
+end
 
 module IntSet = struct include Set.Make(Int) end
-		  
+
 module List = List
 
 module DQ = struct include BatDeque
 
-                   let compare f a b = Enum.compare f (enum a) (enum b)
-                                 
-                   let equal f a b = Enum.equal f (enum a) (enum b)
-                                  
-                   let singleton x = cons x empty
+  let compare f a b = Enum.compare f (enum a) (enum b)
 
-                   open StdFormat
-                   let pp pp_v fmt dq = let pp_comma fmt () = fprintf fmt "," in
-                                        fprintf fmt "@[%a@]" (pp_print_list ~pp_sep:pp_comma pp_v) (to_list dq)
-                   let to_yojson a dq = `List (List.map a (to_list dq))
+  let equal f a b = Enum.equal f (enum a) (enum b)
 
-                   let of_yojson f js =
-                     let rec h sr v =
-                       match sr with
-                         `Ok s -> begin
-                           match f v with
-                             `Error _ as e -> e
-                           | `Ok v' -> `Ok (snoc s v')
-                         end
-                       | `Error _ as e -> e
-                     in
-                     match js with `List ls -> List.fold_left h (`Ok empty) ls
-                                 | _ -> `Error "expected a json-list"                                             
-            end
+  let singleton x = cons x empty
+
+  open StdFormat
+  let pp pp_v fmt dq = let pp_comma fmt () = fprintf fmt "," in
+    fprintf fmt "@[%a@]" (pp_print_list ~pp_sep:pp_comma pp_v) (to_list dq)
+  let to_yojson a dq = `List (List.map a (to_list dq))
+
+  let of_yojson f js =
+    let rec h sr v =
+      match sr with
+        `Ok s -> begin
+          match f v with
+            `Error _ as e -> e
+          | `Ok v' -> `Ok (snoc s v')
+        end
+      | `Error _ as e -> e
+    in
+    match js with `List ls -> List.fold_left h (`Ok empty) ls
+                | _ -> `Error "expected a json-list"                                             
+end
 
 let unloc {Location.txt} = txt
 

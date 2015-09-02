@@ -37,17 +37,17 @@ open Syntax_fragments
 open Modelica_lexer
 open Pprint_modelica
 open Location
-       
+
 let parse_test parser input f = 
   let ucs = state_from_utf8_string "test input" input in
   let next () = next_token ucs in
   let last () = last_token ucs in
   fun _ ->
-  try
-    f (parser next last)
-  with 
-    SyntaxError e -> assert_failure (Printf.sprintf "Syntax Error at %s:\n%s" (show_location e) (error_message e input))
-       
+    try
+      f (parser next last)
+    with 
+      SyntaxError e -> assert_failure (Printf.sprintf "Syntax Error at %s:\n%s" (show_location e) (error_message e input))
+
 let expr_test input f =
   parse_test expr_parser
 
@@ -94,31 +94,31 @@ let outputexpression x = no_attr (OutputExpression x)
 
 let cr components = {root=false; components}
 let cre cr = no_attr (ComponentReference cr)
-                     
+
 let derc = {ident="der";kind=Der;subscripts=[]}
 let initialc = {ident="initial";kind=Initial;subscripts=[]}
 let assertc = {ident="assert";kind=Assert;subscripts=[]}
 let der = no_attr (ComponentReference (cr [derc]))
 let initial = no_attr (ComponentReference (cr [initialc]))
 let assert_ = no_attr (ComponentReference (cr [assertc]))                   
-                
+
 let any ident = {ident;kind=Any;subscripts=[]}                             
 
-                  
+
 let parser_test_case parser lprinter sprinter prep input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::
-       parse_test parser input (fun e -> assert_equal ~msg:"equality of parser result" ~printer:sprinter expected (prep e) ) ) ;
-     ("re-parsing" >::
-        parse_test parser input
-                   (fun firstpass -> parse_test parser (lprinter firstpass)
-                                        (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter (prep firstpass) (prep e)) ())) ; 
+     parse_test parser input (fun e -> assert_equal ~msg:"equality of parser result" ~printer:sprinter expected (prep e) ) ) ;
+    ("re-parsing" >::
+     parse_test parser input
+       (fun firstpass -> parse_test parser (lprinter firstpass)
+           (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter (prep firstpass) (prep e)) ())) ; 
   ]
-                                             
+
 let erase_location = { Traversal.default_mapper with Mapper.map_location = (fun _ _ -> Location.none) }
 
 let prep_import = erase_location.map_import erase_location 
-                       
+
 let import input expected = parser_test_case import_parser (import2str ~max:100) import2str prep_import input expected 
 
 let prep_extend = erase_location.map_extend erase_location 
@@ -128,7 +128,7 @@ let extend input expected = parser_test_case extends_parser (extend2str ~max:100
 let prep_texpr = erase_location.map_texp erase_location 
 
 let texpr input expected = parser_test_case texpr_parser (texpr2str ~max:100) texpr2str prep_texpr input expected
-                                            
+
 let prep_expr = erase_location.map_exp erase_location 
 
 let expr input expected = parser_test_case expr_parser (expr2str ~max:100) expr2str prep_expr input expected
@@ -166,9 +166,9 @@ let test_cases = [
   expr "foo /* comment */ " (ide "foo") ;
   expr "true" (bool true) ;
   expr "false" (bool false) ;
-  
+
   expr "\"foo\"" (string "foo") ;
-  
+
   expr "42" (int 42) ;
 
   expr "42 /* the answer*/" (int 42) ;
@@ -201,11 +201,11 @@ let test_cases = [
   expr "initial" initial ;
   expr "end" end_ ;
   expr "assert" assert_ ;
-  
+
   expr "a.b.c"  (name ["a"; "b"; "c"]) ;
   expr "a.'b'.c"  (name ["a"; "'b'"; "c"]) ;
   expr "a/* comment */.b.c"  (name ["a"; "b"; "c" ]) ;
-  
+
   expr ".x" (no_attr (ComponentReference {root = true; components = [any "x"]})) ;
   expr ".x.y" (no_attr (ComponentReference {root = true; components = [any "x"; any "y"]})) ;
 
@@ -242,14 +242,14 @@ let test_cases = [
   expr "x[1].y" (no_attr (ComponentReference (cr [{(any "x") with subscripts = [int 1]}; any "y"]))) ;
   expr "{true}" (array [bool true]);
   expr "[4,2;0,0]" (marray [[int 4; int 2];[int 0; int 0]]);
-    
+
   (* if/then *)
   expr "if true then false else true" (if_ { condition = bool true; then_ = bool false; else_if = []; else_ = bool true });
   expr "if true then false elseif false then true else true" (if_ { condition = bool true; then_ = bool false;
                                                                     else_if = [{guard=bool false; elsethen=bool true}];
                                                                     else_ = bool true });
 
-       
+
   (* comprehension *)
   expr "{x for x in foo}" (array[compr {exp = ide "x"; idxs = [{variable=nl "x"; range=Some (ide "foo")}]}]);
   expr "{x for x}" (array [compr {exp = ide "x"; idxs = [{variable=nl "x"; range=None}]}]);
@@ -259,10 +259,10 @@ let test_cases = [
   stmt "break;" (uncommented Break) ;
   stmt "assert();" (uncommented (Call {procedure=cr [assertc]; pargs=[]; pnamed_args = [] }));
   stmt "print(\"... testAllFunctions(..) is logged in \" + file);"
-       (uncommented (Call {procedure=cr [any "print"] ; pargs = [
-                             plus { left=string "... testAllFunctions(..) is logged in "; right = ide "file" }
-                           ]; pnamed_args =  [] }));
-  
+    (uncommented (Call {procedure=cr [any "print"] ; pargs = [
+         plus { left=string "... testAllFunctions(..) is logged in "; right = ide "file" }
+       ]; pnamed_args =  [] }));
+
   stmt "if true then break; end if;" (uncommented (IfStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [] ; else_ = [] }));
   stmt "if true then break; elseif true then break; end if;" (uncommented (IfStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [{guard=bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
   stmt "when true then break; elsewhen true then break; end when;" (uncommented (WhenStmt { condition = bool true ; then_ = [uncommented Break] ; else_if = [{guard=bool true; elsethen=[uncommented Break]}] ; else_ = [] }));
@@ -279,34 +279,34 @@ let test_cases = [
   eq "x = 0;" (uncommented (SimpleEquation { left = ide "x"; right = int 0 })) ;
 
   eq "if true then x.y = 0; end if;" (uncommented (IfEquation { condition= bool true; then_ = [uncommented (SimpleEquation { left = name ["x";"y"] ;
-                                                                                                                            right = int 0 } )] ;
+                                                                                                                             right = int 0 } )] ;
                                                                 else_if = []; else_ = [];
                                                               })) ;
 
   eq "if c(a[i]) then a[i].p.r = {0,0,0}; end if;"  (uncommented (IfEquation {
-                                                                      condition=app { fun_=cr [any "c"] ;
-                                                                                      args= [cre (cr [{(any "a") with subscripts = [ide "i"]}])];
-                                                                                      named_args=[] };
-                                                                      then_ = [
-                                                                          uncommented (
-                                                                              SimpleEquation {
-                                                                                  left = cre (cr [{(any "a")
-                                                                                                   with subscripts = [ide"i"] } ;
-                                                                                                   any "p"; any "r"]) ;
-                                                                                  right = array [int 0; int 0; int 0];
-                                                                                } ) ] ;
-                                                                      else_if = []; else_ = [];
-                                                                   })) ;
+      condition=app { fun_=cr [any "c"] ;
+                      args= [cre (cr [{(any "a") with subscripts = [ide "i"]}])];
+                      named_args=[] };
+      then_ = [
+        uncommented (
+          SimpleEquation {
+            left = cre (cr [{(any "a")
+                             with subscripts = [ide"i"] } ;
+                            any "p"; any "r"]) ;
+            right = array [int 0; int 0; int 0];
+          } ) ] ;
+      else_if = []; else_ = [];
+    })) ;
 
   eq "for i loop if true then x = 0; end if; end for;" (uncommented (ForEquation { idx= [{variable=nl "i" ; range=None}];
                                                                                    body=[uncommented (
-                                                                                             IfEquation {
-                                                                                                 condition= bool true;
-                                                                                                 then_ = [uncommented (SimpleEquation { left = ide "x" ;
-                                                                                                                                       right = int 0 })];
-                                                                                                                      else_if = []; else_ = []
-                                                                                                                      
-                                                                                               })] }));
+                                                                                       IfEquation {
+                                                                                         condition= bool true;
+                                                                                         then_ = [uncommented (SimpleEquation { left = ide "x" ;
+                                                                                                                                right = int 0 })];
+                                                                                         else_if = []; else_ = []
+
+                                                                                       })] }));
   eq "x = 23;" (uncommented (SimpleEquation { left=ide "x" ; right = int 23 } ));
   eq "(,) = 23;" (uncommented (SimpleEquation { left=outputexpression [None; None] ; right = int 23 } ));
   eq "() = 23;" (uncommented (SimpleEquation { left=outputexpression [None] ; right = int 23 } ));  
@@ -329,11 +329,11 @@ let test_cases = [
                                                                                                            flagged = type_name ["Real"] } } } } ) ;
   texpr "Real[2,3]" (TArray {base_type = type_name ["Real"]; dims = [int 2 ; int 3]} ) ;
   texpr "T()" (TMod { mod_type = type_name ["T"] ; modification = no_modification } ) ;
-  
+
 
   import "import X" (uncommented (Unnamed [nl "X"])) ;
   import "import Y=X" (uncommented (NamedImport {global = [nl "X"] ; local = nl "Y" }));
- 
+
   import "import X.*" (uncommented (UnqualifiedImport [nl "X"]));
 
 
@@ -347,7 +347,7 @@ let test_cases = [
                     uncommented {empty_def with def_name = "q" ; def_type = type_name ["Real"] ;}
                    ] ;  
 
-  
+
   defs "parameter FluidHeatFlow.Media.Medium medium" [uncommented { empty_def with def_name = "medium" ;
                                                                                    def_type = TVar { flag = Parameter ;
                                                                                                      flagged =
@@ -356,13 +356,13 @@ let test_cases = [
                                                                                                                   "Medium"];
                                                                                                    }
                                                                   }];
-                                                                                   
+
   defs "Medium medium := Medium()" [uncommented { empty_def with def_name = "medium" ;
                                                                  def_type = type_name ["Medium"] ;
                                                                  def_rhs = Some ( app ( empty_app (cr [any "Medium"]) ) ) ;
                                                 }] ;
 
-  
+
   defs "replaceable T t constrainedby S" [uncommented { empty_def with def_name = "t" ;
                                                                        def_type = type_name ["T"] ;
                                                                        def_constraint = Some (uncommented ( type_name ["S"])) ;
@@ -375,44 +375,44 @@ let test_cases = [
                                                                            def_rhs = Some (real 1.225) ;
                                                           } ;
                                               comment = unannotated ( Some (nl "Air Density")  )}];
-  
+
 
   defs "Real friction_pos[:, 2]=[0; 1] \"[w,tau] positive sliding friction characteristic (w>=0)\""
-       [{ commented = { empty_def with def_name = "friction_pos";
-                                       def_type = TArray { base_type=type_name ["Real"]; dims = [colon ; int 2] } ;
-                                       def_rhs = Some (marray [[int 0];[int 1]]) ;
-                      } ;
-          comment = unannotated ( Some (nl "[w,tau] positive sliding friction characteristic (w>=0)") ) 
-        }];
+    [{ commented = { empty_def with def_name = "friction_pos";
+                                    def_type = TArray { base_type=type_name ["Real"]; dims = [colon ; int 2] } ;
+                                    def_rhs = Some (marray [[int 0];[int 1]]) ;
+                   } ;
+       comment = unannotated ( Some (nl "[w,tau] positive sliding friction characteristic (w>=0)") ) 
+     }];
 
   typedef "type T = A" (uncommented (Short { empty_typedef with td_name = nl "T" ; type_exp = type_name ["A"] })) ;
 
   (let def = uncommented { empty_def with def_name = "x" ; def_type = type_name ["S"] } in
    typedef "class T S x; end T" (uncommented (Composition { empty_typedef with td_name = nl"T" ;
                                                                                type_exp = {empty_composition with public = {
-                                                                                            empty_elements with
-                                                                                            defs = [def] } };
+                                                                                   empty_elements with
+                                                                                   defs = [def] } };
                                                                                sort = Class ;
                                                           } )));
 
   (let def = uncommented { empty_def with def_name = "x" ; def_type = type_name ["S"] } in
-               typedef "class T \"comment\" S x; end T" { commented = Composition { empty_typedef with td_name = nl"T" ;
-                                                                                                       type_exp = {
-                                                                                                         empty_composition with
-                                                                                                         public = { empty_elements with
-                                                                                                                    defs = [def] }};
+   typedef "class T \"comment\" S x; end T" { commented = Composition { empty_typedef with td_name = nl"T" ;
+                                                                                           type_exp = {
+                                                                                             empty_composition with
+                                                                                             public = { empty_elements with
+                                                                                                        defs = [def] }};
                                                                                            sort = Class ;
                                                                       } ;
                                               comment = unannotated ( Some (nl "comment") ) ;
                                             } );
-  
+
   typedef "record A end A" (uncommented (Composition {empty_typedef with td_name =nl"A" ; sort=Record; type_exp = empty_composition})) ;
-  
+
   typedef "partial model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
-                                                                               type_exp = empty_composition;
-                                                                               sort = Model ;
-                                                                               type_options = { no_type_options with partial = true };
-                                                             } ));
+                                                                                 type_exp = empty_composition;
+                                                                                 sort = Model ;
+                                                                                 type_options = { no_type_options with partial = true };
+                                                            } ));
 
   typedef "replaceable model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                      type_exp = empty_composition;
@@ -425,85 +425,85 @@ let test_cases = [
                                                                                        type_exp = empty_composition;
                                                                                        sort = Package ;
                                                                                        type_options = {
-                                                                                       no_type_options with type_replaceable = true };
-                                                                } ));
-
-  
-  typedef "encapsulated model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
-                                                                                       type_exp = empty_composition;
-                                                                                       sort = Model ;
-                                                                                       type_options = {
-                                                                                         no_type_options with encapsulated = true };
+                                                                                         no_type_options with type_replaceable = true };
                                                                   } ));
 
+
+  typedef "encapsulated model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
+                                                                                      type_exp = empty_composition;
+                                                                                      sort = Model ;
+                                                                                      type_options = {
+                                                                                        no_type_options with encapsulated = true };
+                                                                 } ));
+
   typedef "replaceable encapsulated partial model A end A"
-          (uncommented (Composition { empty_typedef with td_name = nl"A" ;
-                                                         type_exp = empty_composition;
-                                                         sort = Model ;
-                                                         type_options = {
-                                                           no_type_options with encapsulated = true ;
-                                                                                partial = true ;
-                                                                                type_replaceable = true ;
-                                                         };
-                                                         
-                                    } ));
+    (uncommented (Composition { empty_typedef with td_name = nl"A" ;
+                                                   type_exp = empty_composition;
+                                                   sort = Model ;
+                                                   type_options = {
+                                                     no_type_options with encapsulated = true ;
+                                                                          partial = true ;
+                                                                          type_replaceable = true ;
+                                                   };
+
+                              } ));
 
 
   typedef "model X redeclare type T = S; end X"
-          (uncommented (Composition { empty_typedef with td_name = nl"X" ;
-                                                         type_exp = { empty_composition with
-                                                                      public = { empty_elements with
-                                                                                 redeclared_types = [
-                                                                                 uncommented (
-                                                                                     Short { empty_typedef with td_name = nl"T" ;
-                                                                                                                type_exp = type_name ["S"]
-                                                                                           }
-                                                                                   )] } 
-                                                                    } ;
-                                                         sort = Model ;
-                                    } ));
+    (uncommented (Composition { empty_typedef with td_name = nl"X" ;
+                                                   type_exp = { empty_composition with
+                                                                public = { empty_elements with
+                                                                           redeclared_types = [
+                                                                             uncommented (
+                                                                               Short { empty_typedef with td_name = nl"T" ;
+                                                                                                          type_exp = type_name ["S"]
+                                                                                     }
+                                                                             )] } 
+                                                              } ;
+                                                   sort = Model ;
+                              } ));
 
   typedef "model X replaceable package T = S; end X"
-          (uncommented (Composition { empty_typedef with td_name = nl"X" ;
-                                                         type_exp = { empty_composition with
-                                                                      public = { empty_elements with
-                                                                      typedefs = [ uncommented (
-                                                                                       Short { empty_typedef with td_name = nl"T" ;
-                                                                                                                  type_exp = type_name ["S"] ;
-                                                                                                                  sort = Package ;
-                                                                                                                  type_options = {
-                                                                                                                    no_type_options with
-                                                                                                                    type_replaceable =
-                                                                                                                      true
-                                                                                                                  }
-                                                                                             })]} ;
-                                                                    } ;
-                                                         sort = Model ;
-                                    } ));
-  
+    (uncommented (Composition { empty_typedef with td_name = nl"X" ;
+                                                   type_exp = { empty_composition with
+                                                                public = { empty_elements with
+                                                                           typedefs = [ uncommented (
+                                                                               Short { empty_typedef with td_name = nl"T" ;
+                                                                                                          type_exp = type_name ["S"] ;
+                                                                                                          sort = Package ;
+                                                                                                          type_options = {
+                                                                                                            no_type_options with
+                                                                                                            type_replaceable =
+                                                                                                              true
+                                                                                                          }
+                                                                                     })]} ;
+                                                              } ;
+                                                   sort = Model ;
+                              } ));
+
   typedef "model X equation 1 = 1; end X"
-          (uncommented (Composition { empty_typedef with td_name = nl"X" ;
-                                                         type_exp = { empty_composition with
-                                                                      cargo = { empty_behavior with
-                                                                                equations = [ uncommented (
-                                                                                                  SimpleEquation {
-                                                                                                      left=int 1;
-                                                                                                      right=int 1}
-                                                                                                )]
-                                                                              } ;
-                                                                    } ;
-                                                         sort = Model ;
-                                    } ));
-  
+    (uncommented (Composition { empty_typedef with td_name = nl"X" ;
+                                                   type_exp = { empty_composition with
+                                                                cargo = { empty_behavior with
+                                                                          equations = [ uncommented (
+                                                                              SimpleEquation {
+                                                                                left=int 1;
+                                                                                right=int 1}
+                                                                            )]
+                                                                        } ;
+                                                              } ;
+                                                   sort = Model ;
+                              } ));
+
   typedef "model X annotation ();  end X"
-          ({commented = (Composition { empty_typedef with td_name = nl"X" ;
-                                                         type_exp = empty_composition ;
-                                                         sort = Model ;
-                                    }) ;
-            comment = {annotated_elem = None; annotation = Some no_modification }
-           });
-  
-  
+    ({commented = (Composition { empty_typedef with td_name = nl"X" ;
+                                                    type_exp = empty_composition ;
+                                                    sort = Model ;
+                               }) ;
+      comment = {annotated_elem = None; annotation = Some no_modification }
+     });
+
+
   typedef "type E = enumeration(x)" (uncommented (Enumeration {empty_typedef with td_name = nl "E" ;
                                                                                   type_exp = [uncommented "x"];
 
@@ -511,174 +511,174 @@ let test_cases = [
 
   typedef "type E = enumeration(:)" (uncommented (OpenEnumeration {empty_typedef with td_name = nl "E" ;
                                                                                       type_exp = ();
-                                                                                      
+
                                                                   } )) ;
 
   typedef "type E = der(foo.bar, x, y)" (uncommented (DerSpec {empty_typedef with td_name = nl "E" ;
                                                                                   type_exp = { der_name = [nl "foo"; nl "bar"];
                                                                                                idents = [nl "x";nl "y"] }
-                                                                                      
-                                                                  } )) ;
+
+                                                              } )) ;
   typedef "class extends X Real p; end X"
-          (uncommented (Extension {empty_typedef with td_name = nl"X" ;
-                                                      sort = Class ;
-                                                      type_exp = ({ empty_composition with
-                                                                    public = { empty_elements with 
-                                                                               defs = [uncommented
-                                                                                         {empty_def with def_name = "p" ;
-                                                                                                         def_type = type_name ["Real"] ;}] ;
-                                                                             }
-                                                                  }, None);
-                                  }));
-                                  
-  
+    (uncommented (Extension {empty_typedef with td_name = nl"X" ;
+                                                sort = Class ;
+                                                type_exp = ({ empty_composition with
+                                                              public = { empty_elements with 
+                                                                         defs = [uncommented
+                                                                                   {empty_def with def_name = "p" ;
+                                                                                                   def_type = type_name ["Real"] ;}] ;
+                                                                       }
+                                                            }, None);
+                            }));
+
+
 
   typedef "function f external \"C\" f(); end f"
-          (uncommented (Composition {
-                            empty_typedef with td_name = nl"f" ;
-                                               type_exp = { empty_composition with
-                                                            cargo = { empty_behavior with
-                                                                      external_ = Some (
-                                                                                      unannotated {
-                                                                                          lang="C" ;
-                                                                                          ext_call=Some {                                                                                  ext_lhs=None;
-                                                                                                                                                                                           ext_ident = "f";
-                                                                                                                                                                                           ext_args = [] }
-                                                                                        }
-                                                                                    )
-                                                                    } ;
-                                                          } ;
-                                               sort = Function } ));
-                                                                            
+    (uncommented (Composition {
+         empty_typedef with td_name = nl"f" ;
+                            type_exp = { empty_composition with
+                                         cargo = { empty_behavior with
+                                                   external_ = Some (
+                                                       unannotated {
+                                                         lang="C" ;
+                                                         ext_call=Some {                                                                                  ext_lhs=None;
+                                                                                                                                                          ext_ident = "f";
+                                                                                                                                                          ext_args = [] }
+                                                       }
+                                                     )
+                                                 } ;
+                                       } ;
+                            sort = Function } ));
+
   typedef "function f external \"C\" x = f(); end f"
-          (uncommented (Composition { empty_typedef with td_name = nl"f" ;
-                                                         type_exp = { empty_composition with
-                                                                      cargo = { empty_behavior with
-                                                                                external_ = Some (
-                                                                                                unannotated {
-                                                                                                    lang="C" ;
-                  ext_call=Some{                                                                                  ext_lhs=Some (cr [any "x"]);
-                                                                                                                  ext_ident = "f";
-                                                                                                                  ext_args = [] }
-                                                                                                  }
-                                                                                              )
-                                                                              } ;
-                                                                    } ;
-                                                         sort = Function } ));
+    (uncommented (Composition { empty_typedef with td_name = nl"f" ;
+                                                   type_exp = { empty_composition with
+                                                                cargo = { empty_behavior with
+                                                                          external_ = Some (
+                                                                              unannotated {
+                                                                                lang="C" ;
+                                                                                ext_call=Some{                                                                                  ext_lhs=Some (cr [any "x"]);
+                                                                                                                                                                                ext_ident = "f";
+                                                                                                                                                                                ext_args = [] }
+                                                                              }
+                                                                            )
+                                                                        } ;
+                                                              } ;
+                                                   sort = Function } ));
 
   typedef "type A = B(redeclare type C = D)"
-          (uncommented (Short { empty_typedef with
-                                td_name = nl"A" ;
-                                type_exp = TMod { mod_type=type_name ["B"] ;
-                                                  modification = { no_modification with
-                                                                   types = [{ redecl_each = false ;
-                                                                              redecl_type =
-                                                                                uncommented ({
-                                                                                              empty_typedef with
-                                                                                              td_name = nl"C" ;
-                                                                                              type_exp = type_name ["D"]
-                                                                                            })
-                                                                            }]}
-                                                }
-                              }));                                                                 
-  
+    (uncommented (Short { empty_typedef with
+                          td_name = nl"A" ;
+                          type_exp = TMod { mod_type=type_name ["B"] ;
+                                            modification = { no_modification with
+                                                             types = [{ redecl_each = false ;
+                                                                        redecl_type =
+                                                                          uncommented ({
+                                                                              empty_typedef with
+                                                                              td_name = nl"C" ;
+                                                                              type_exp = type_name ["D"]
+                                                                            })
+                                                                      }]}
+                                          }
+                        }));                                                                 
+
   typedef "type A = B(replaceable type C = D)"
-          (uncommented (Short { empty_typedef with
-                                td_name = nl"A" ;
-                                type_exp = TMod { mod_type=type_name ["B"] ;
-                                                  modification = {
-                                                    no_modification with
-                                                    types = [{ redecl_each = false ;
-                                                               redecl_type =
-                                                                 uncommented { empty_typedef with
-                                                                               td_name = nl"C" ;
-                                                                               type_exp = type_name ["D"] ;
-                                                                               type_options = {
-                                                                                 no_type_options with
-                                                                                 type_replaceable = true;
-                                                                               }
-                                                                             }
-                                                             }];}
-                                                }
-                              }));             
+    (uncommented (Short { empty_typedef with
+                          td_name = nl"A" ;
+                          type_exp = TMod { mod_type=type_name ["B"] ;
+                                            modification = {
+                                              no_modification with
+                                              types = [{ redecl_each = false ;
+                                                         redecl_type =
+                                                           uncommented { empty_typedef with
+                                                                         td_name = nl"C" ;
+                                                                         type_exp = type_name ["D"] ;
+                                                                         type_options = {
+                                                                           no_type_options with
+                                                                           type_replaceable = true;
+                                                                         }
+                                                                       }
+                                                       }];}
+                                          }
+                        }));             
 
   typedef "type A = B(redeclare C c)"
-          (uncommented (Short { empty_typedef with
-                                td_name = nl"A" ;
-                                type_exp = TMod { mod_type=type_name ["B"] ;
-                                                  modification = { no_modification with
-                                                                   components = [{ each = false ;
-                                                                                   def = 
-                                                                                     uncommented ({
-                                                                                              empty_def with
-                                                                                              def_name = "c" ;
-                                                                                              def_type = type_name ["C"]
-                                                                                            })
-                                                                            }]}
-                                                }
-                              }));                                                                 
+    (uncommented (Short { empty_typedef with
+                          td_name = nl"A" ;
+                          type_exp = TMod { mod_type=type_name ["B"] ;
+                                            modification = { no_modification with
+                                                             components = [{ each = false ;
+                                                                             def = 
+                                                                               uncommented ({
+                                                                                   empty_def with
+                                                                                   def_name = "c" ;
+                                                                                   def_type = type_name ["C"]
+                                                                                 })
+                                                                           }]}
+                                          }
+                        }));                                                                 
 
   typedef "type A = B(replaceable C c)"
-          (uncommented (Short { empty_typedef with
-                                td_name = nl"A" ;
-                                type_exp = TMod { mod_type=type_name ["B"] ;
-                                                  modification = { no_modification with
-                                                                   components = [{ each = false ;
-                                                                                   def = 
-                                                                                     uncommented ({
-                                                                                              empty_def with
-                                                                                              def_name = "c" ;
-                                                                                              def_type = type_name ["C"];
-                                                                                              def_options = { no_def_options with
-                                                                                                              replaceable=true }
-                                                                                            })
-                                                                            }]}
-                                                }
-                              }));
+    (uncommented (Short { empty_typedef with
+                          td_name = nl"A" ;
+                          type_exp = TMod { mod_type=type_name ["B"] ;
+                                            modification = { no_modification with
+                                                             components = [{ each = false ;
+                                                                             def = 
+                                                                               uncommented ({
+                                                                                   empty_def with
+                                                                                   def_name = "c" ;
+                                                                                   def_type = type_name ["C"];
+                                                                                   def_options = { no_def_options with
+                                                                                                   replaceable=true }
+                                                                                 })
+                                                                           }]}
+                                          }
+                        }));
 
   typedef "function f algorithm print(\"hello, world!\"); end f"
-          (uncommented
-             (Composition { empty_typedef with td_name = nl "f" ;
-                                               type_exp = { empty_composition with
-                                                            cargo = { empty_behavior with
-                                                                      algorithms = [[uncommented (
-                                                                                       Call {procedure=cr [any "print"] ;
-                                                                                            pargs = [string "hello, world!"] ;
-                                                                                            pnamed_args = [] } ) ]];
-                                                                    } ;
-                                                          } ;
-                                               sort = Function } ));
+    (uncommented
+       (Composition { empty_typedef with td_name = nl "f" ;
+                                         type_exp = { empty_composition with
+                                                      cargo = { empty_behavior with
+                                                                algorithms = [[uncommented (
+                                                                    Call {procedure=cr [any "print"] ;
+                                                                          pargs = [string "hello, world!"] ;
+                                                                          pnamed_args = [] } ) ]];
+                                                              } ;
+                                                    } ;
+                                         sort = Function } ));
 
   unit_ "package Test end Test;" {within = None; toplevel_defs = [(uncommented (Composition {empty_typedef with td_name =nl"Test" ; sort=Package; type_exp = empty_composition}))]} ;
-  
+
   (let line = {
-     no_modification
-   with modifications =
-          [uncommented {mod_each=false;mod_final=false;
-                        mod_name=[nl "Line"];
-                        mod_value=Some (Nested {no_modification with
-                                                 modifications =
-                                                   [uncommented {mod_each=false;mod_final=false;
-                                                                 mod_name=[nl "points"];
-                                                                 mod_value= Some (Rebind (
-                                                                                      array [
-                                                                                          array [uminus (int 19); uminus (int 10)];
-                                                                                          array [int 20;uminus (int 10)];
-                                                                                          array [int 20;uminus (int 6)];
-                                                                                          array [int 38;uminus (int 6)];
-                                                                                        ]));
-                                                                };
-                                                    uncommented {mod_each=false;mod_final=false;
-                                                                 mod_name=[nl "color"];
-                                                                 mod_value=Some (Rebind (array [int 255;int 0;int 255]));
-                                                                }                                                                
-                                                   ]})
-                       }]}
+      no_modification
+      with modifications =
+             [uncommented {mod_each=false;mod_final=false;
+                           mod_name=[nl "Line"];
+                           mod_value=Some (Nested {no_modification with
+                                                   modifications =
+                                                     [uncommented {mod_each=false;mod_final=false;
+                                                                   mod_name=[nl "points"];
+                                                                   mod_value= Some (Rebind (
+                                                                       array [
+                                                                         array [uminus (int 19); uminus (int 10)];
+                                                                         array [int 20;uminus (int 10)];
+                                                                         array [int 20;uminus (int 6)];
+                                                                         array [int 38;uminus (int 6)];
+                                                                       ]));
+                                                                  };
+                                                      uncommented {mod_each=false;mod_final=false;
+                                                                   mod_name=[nl "color"];
+                                                                   mod_value=Some (Rebind (array [int 255;int 0;int 255]));
+                                                                  }                                                                
+                                                     ]})
+                          }]}
    in
    let annotation = Some line in
    eq "connect(not1.y, rSFlipFlop.R) annotation (Line(points={{-19,-10},{20,-10}, {20,-6},{38,-6}}, color={255,0,255}));" 
-      { commented = ExpEquation (app {(empty_app (cr [any "connect"])) with args=[name ["not1";"y"]; name ["rSFlipFlop"; "R"] ]}) ; 
-        comment = { annotated_elem = None ; annotation } } );
-  ]
-						  
+     { commented = ExpEquation (app {(empty_app (cr [any "connect"])) with args=[name ["not1";"y"]; name ["rSFlipFlop"; "R"] ]}) ; 
+       comment = { annotated_elem = None ; annotation } } );
+]
+
 let suite = "Parser" >::: test_cases

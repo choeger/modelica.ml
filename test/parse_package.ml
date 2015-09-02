@@ -35,14 +35,14 @@ open Batteries
 open Location
 open ClassTrans       
 open ClassNorm
-       
+
 let _ =
   Format.pp_set_margin Format.str_formatter (140);
   match (scan_root argv.(1)) with
   | {root_units = []; root_packages = []} -> Printf.eprintf "'%s' seems to contain no Modelica content.\n" argv.(1) ; 1
   | root -> begin match parse_root root with
-              Some root -> norm_pkg_root (translate_pkg_root root) ; 0
-            | None -> Printf.eprintf "Syntax Error\n" ; 1
-            end                                        
-              
-                  
+        Some root -> norm_pkg_root (translate_pkg_root root) ; 0
+      | None -> Printf.eprintf "Syntax Error\n" ; 1
+    end                                        
+
+

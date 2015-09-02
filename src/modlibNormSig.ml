@@ -44,7 +44,7 @@ open Normalized
 open Lookup
 open Compress
 open Deps
-    
+
 exception ExpansionException of string
 exception NonLeafRecursion
 exception Stratification of class_path * string
@@ -206,7 +206,7 @@ and norm lhs =
       | `NothingFound | `PrefixFound _ as result ->
         fail_unresolved {searching = DQ.cons x.txt name; result}
     end
-    
+
   | KnownPtr p -> Report.do_ ;
     path <-- stratify_ptr p ;
     return (GlobalReference path)
@@ -292,7 +292,7 @@ let rec norm_prog i p =
   else
     let {lhs;rhs} = p.(i) in
     Report.do_ ;
-    (*let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in*)
+    let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in
     lhs <-- stratify_ptr lhs ;
     norm <-- norm lhs rhs;
     let o' = update lhs (norm_cv norm) o in

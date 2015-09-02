@@ -52,6 +52,7 @@ let print_message i msg = BatLog.logf "%d: %s\n" i (Report.show_message msg)
 exception BadDependency of string
 
 let load global dep =
+  BatLog.logf "Loading %s\n" dep ;
   let js = Yojson.Safe.from_file dep in
   let o = Report.run (Compress.load_from_json js)
       {messages=[]; output=global}

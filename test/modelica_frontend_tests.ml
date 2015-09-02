@@ -27,16 +27,16 @@
  *)
 
 open OUnit2
-		  
+
 let suite = "Modelica Frontend" >:::
-	      [
-		(* Lexer_tests.suite ; *)
-		Parser_tests.suite ;
-                (* Class_tests.suite ; *)
-                Class_tests.suite ;
-	      ]
-		
+            [
+              (* Lexer_tests.suite ; *)
+              Parser_tests.suite ;
+              (* Class_tests.suite ; *)
+              Class_tests.suite ;
+            ]
+
 let _ =
   Format.pp_set_margin Format.str_formatter (240);
   run_test_tt_main suite
-                   
+

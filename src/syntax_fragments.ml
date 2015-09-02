@@ -31,23 +31,23 @@
 
 open Syntax
 open Utils
-       
+
 let empty_app f = { fun_ = f ; args = [] ; named_args = [] }
 
 let no_attr e = { term = e ; attr = () }
-                    
+
 let named x argument = {argument_name = Location.mknoloc x ; argument }
-                    
+
 let no_comment = { annotated_elem = None ; annotation = None }
 
 let unannotated annotated_elem = { annotated_elem ; annotation = None }
-                   
+
 let uncommented a = { commented = a ; comment = no_comment }
-                      
+
 let no_modification = { types = [] ; components = [] ; modifications = [] }
 
 let no_def_options = { final = false ; replaceable = false ; scope = Local }
-                        
+
 let empty_def  = { def_name ="" ; def_type = TName []; def_options = no_def_options ; def_constraint = None ; def_rhs = None ; def_if = None }
 
 let no_type_options = { partial = false ; encapsulated = false ;
@@ -59,10 +59,10 @@ let empty_behavior = { algorithms = [] ; initial_algorithms = [] ; equations = [
 
 let empty_elements = { defs = [] ; extensions = [] ; redeclared_defs = [] ;
                        typedefs = [] ; redeclared_types = [] }
-                        
-                       
+
+
 let empty_composition = { imports = [] ; public = empty_elements ; protected = empty_elements ; cargo = empty_behavior  }
-                        
+
 exception EmptyName
 
 let rec name_ components = function
@@ -72,8 +72,8 @@ let rec name_ components = function
 let name = function
   | [] -> raise EmptyName
   | n -> no_attr (ComponentReference (name_ [] n))
-                         
+
 let type_name xs = TName (List.map Location.mknoloc xs)
 
 let root_type xs = TRootName (List.map Location.mknoloc xs)
-                       
+

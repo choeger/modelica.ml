@@ -36,7 +36,7 @@ open Syntax.DefaultSyntax
 open Ast.Flags
 
 open ModlibInter
-    
+
 type constr = Array of int
             | Sort of sort
             | Var of variability
@@ -193,14 +193,14 @@ let rec follow_path global found_path found_value path = match DQ.front path wit
       | Constr {arg} -> follow_path global found_path arg path
       | _ -> `NothingFound
     end
-    
+
 and follow_path_os global found_path {protected; public} todo = function
     `Protected -> begin match DQ.front todo with
         None -> raise IllegalPath
       | Some(x,xs) -> follow_path_es global found_path protected xs x
     end    
   | x -> follow_path_es global found_path public todo x
-    
+
 and follow_path_es global found_path {class_members;super;fields} todo = function
     `SuperClass n when IntMap.mem n super ->
     follow_path global (DQ.snoc found_path (`SuperClass n))
