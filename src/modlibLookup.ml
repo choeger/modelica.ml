@@ -53,15 +53,15 @@ let rec get_class_element_in global current_path {Normalized.class_members; supe
     | r -> r
   end
   else (
-    pickfirst_class global 0 current_path (DQ.cons x xs) (IntMap.bindings super) )
+    pickfirst_class global current_path (DQ.cons x xs) (IntMap.bindings super) )
 
-and pickfirst_class global n current_path name = function
+and pickfirst_class global current_path name = function
     [] -> `NothingFound
   | (k,v)::vs ->
-    let next_path = DQ.snoc current_path (`SuperClass n) in
+    let next_path = DQ.snoc current_path (`SuperClass k) in
     let f = get_class_element global next_path v name in
     begin match f with
-        `NothingFound -> pickfirst_class global (n+1) current_path name vs
+        `NothingFound -> pickfirst_class global current_path name vs
       | r -> r
     end
 
