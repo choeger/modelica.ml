@@ -358,6 +358,7 @@ and mtranslate_def_redeclaration src {def} = do_ ;
 type translated_unit = {
   class_name : Name.t;
   class_code : class_stmt list;
+  impl_code : value_program ;
 } [@@deriving show,yojson]
 
 let name_of = function
@@ -377,7 +378,7 @@ let mtranslate_unit env {within; toplevel_defs=td::_} =
   mtranslate_typedef td ;
   down (`ClassMember (name_of td.commented).txt) ;
   s <-- get ;
-  return {class_code=s.class_code; class_name=Name.of_ptr s.current_path}
+  return {class_code=s.class_code; class_name=Name.of_ptr s.current_path; impl_code=s.value_code}
 
 let translate_unit env {scanned; parsed} =
   run (mtranslate_unit env parsed)

@@ -35,6 +35,7 @@ open Modlib
 let public_signatures = ref []
 let inputs = ref []
 let outfile = ref ""
+let compress = ref false
 
 let add_signature sign =
   public_signatures := sign :: (!public_signatures)
@@ -44,7 +45,8 @@ let add_input dir =
 
 let args = [
   "-s" , Arg.String add_signature, "The signature of a library this library depends on." ;
-  "-o", Arg.Set_string outfile, "The output file-name"
+  "-o", Arg.Set_string outfile, "The output file-name" ;
+  "-c", Arg.Set compress, "Compress the output files" ;
 ]
 
 let print_message i msg = BatLog.logf "%d: %s\n" i (Report.show_message msg)
@@ -90,10 +92,37 @@ let clean global c =
   (* remove the dependency parts *)
   StrMap.fold remove_cl global.class_members c
 
+let sig_file () =
+  if !compress then
+    !outfile ^ ".modlib.csign"
+  else
+    !outfile ^ ".modlib.sign"
+
+let impl_file () =
+  if !compress then
+    !outfile ^ ".modlib.cimpl"
+  else
+    !outfile ^ ".modlib.impl"
+
+let write_out content filename =
+  let f = open_out filename in
+  (* TODO: compress *)
+  IO.nwrite f content ;
+  close_out f 
+
+let rec collect_impl_pkg impl {FileSystem.package_unit; external_units; sub_packages} =
+  let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) impl sub_packages in 
+  List.fold_left (fun impl u -> u.Trans.impl_code @ impl) pkgs_impl (package_unit :: external_units)
+
+let collect_impl {FileSystem.root_units; root_packages} =
+  let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) [] root_packages in 
+  List.fold_left (fun impl u -> u.Trans.impl_code @ impl) pkgs_impl root_units
+        
 let run_compile global root =
   match FileSystem.parse_root root with
     Some root -> begin 
       let tr = Trans.translate_pkg_root root in
+      let impl = collect_impl tr in
       let o = Report.run (NormSig.norm_pkg_root tr)
           {messages=[]; output=global} in
       List.iteri print_message o.final_messages ;
@@ -102,12 +131,17 @@ let run_compile global root =
         let c = Compress.compress_elements o in
         BatLog.logf "Compression Ok.\n%!" ;
         let c' = clean global c in
+        
         let js = Normalized.elements_struct_to_yojson c' in
-        let dump = Yojson.Safe.pretty_to_string js in
-        BatLog.logf "Dump (%d) Ok.\n" (String.length dump);
-        let f = open_out !outfile in
-        IO.nwrite f dump ;
-        close_out f ;
+        let sig_dump = Yojson.Safe.pretty_to_string js in
+        write_out sig_dump (sig_file ()) ;
+        BatLog.logf "Signature Dump (%d) Ok.\n" (String.length sig_dump);
+
+        let js = Inter.value_program_to_yojson impl in
+        let impl_dump = Yojson.Safe.pretty_to_string js in
+        write_out impl_dump (impl_file ()) ;
+        BatLog.logf "Implementation Dump (%d) Ok.\n" (String.length impl_dump);
+
         0
       | Failed -> BatLog.logf "Normalization Error\n" ; 1 
     end 
