@@ -258,9 +258,20 @@ and mtranslate_texp post =
 and mtranslate_extends i {ext_type} =
   do_ ;
   down (`SuperClass i) ;
-  mtranslate_texp identity ext_type ;
-  up 
-
+  begin match ext_type with
+      TMod {mod_type; modification} -> 
+        (* In an extends-clause with modifications, we need to 
+           separate the superclass from the modification, since
+           the modification might use elements from the superclass *)
+      do_ ;
+      mtranslate_texp identity mod_type ;
+      up ;
+      state <-- get ;
+      let src = state.current_path in
+      redec <-- mtranslate_modification src modification ;
+      return ()
+    | _ -> do_; mtranslate_texp identity ext_type ; up
+  end
 and mtranslate_elements {extensions;typedefs;redeclared_types;defs;redeclared_defs} = 
   do_ ;
   mseqi mtranslate_extends extensions ;

@@ -218,7 +218,7 @@ let test_cases = [
               end D;
               D d;
             end A7"
-    (lookup (cl "A7") [fld "d" ; sup 0; fld "b"; cl "T"] (eq (replaceable (type_ real)))) ;
+    (lookup (cl "A7") [fld "d" ; fld "b"; cl "T"] (eq (replaceable (type_ real)))) ;
 
   class_ "class A8
               Real x(start = 2.0);
@@ -236,7 +236,7 @@ let test_cases = [
               model C extends B(x(start=42.0),redeclare type T = Real); end C;
               C c;
             end A10"
-    (lookup (cl "A10") [fld "c"; sup 0; sup 0; fld "x"] (eq Normalized.Real)) ;
+    (lookup (cl "A10") [fld "c"; sup 0; fld "x"] (eq Normalized.Real)) ;
 
   class_ "class A11
             model B replaceable type T = Real; T x(start = 2.0); end B;
@@ -245,7 +245,7 @@ let test_cases = [
             D d;
           end A11"
     (* No superclass in lookup, modification of b in inheritance should yield a redeclared element directly *)
-    (lookup (cl "A11") [fld "d"; fld "b"; cl "T";] (eq int)) ;
+    (lookup (cl "A11") [fld "d"; fld "b"; cl "T";] (eq (replaceable int))) ;
   
 ]
 
