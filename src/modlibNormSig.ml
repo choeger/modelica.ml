@@ -236,6 +236,12 @@ and norm lhs =
                 return (DynamicReference found_path)
               | `Found {found_path} when fs.found_replaceable ->
                 return (DynamicReference found_path)
+              | `Found {found_value=Class os} ->
+                (* Compress references to classes on-the-fly *)
+                let ptr = DQ.map (fun x -> `ClassMember x) os.source_name in
+                do_ ;
+                path <-- stratify_ptr ptr ;
+                return (GlobalReference path)                  
               | `Found {found_value} ->
                 return found_value
               | `NothingFound | `PrefixFound _ as result ->
