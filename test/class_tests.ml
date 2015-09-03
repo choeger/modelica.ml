@@ -238,6 +238,15 @@ let test_cases = [
             end A10"
     (lookup (cl "A10") [fld "c"; sup 0; sup 0; fld "x"] (eq Normalized.Real)) ;
 
+  class_ "class A11
+            model B replaceable type T = Real; T x(start = 2.0); end B;
+            model C type T = Integer; B b; end C;
+            model D extends C(b(redeclare type T = T)); end D;
+            D d;
+          end A11"
+    (* No superclass in lookup, modification of b in inheritance should yield a redeclared element directly *)
+    (lookup (cl "A11") [fld "d"; fld "b"; cl "T";] (eq int)) ;
+  
 ]
 
 let suite = "Normalization" >::: test_cases
