@@ -110,7 +110,7 @@ let open_class sort post state = ((), {state with class_code =
 
 let in_context m state =
   let (x, s') = m {state with anons = (Hashtbl.hash state.current_path)} in
-  (x, {state with class_code = s'.class_code})
+  (x, {state with class_code = s'.class_code; value_code = s'.value_code})
 
 let inside name m state =
   let (x, s') = m {state with current_path = name} in
@@ -234,44 +234,83 @@ and mtranslate_texp post =
     do_ ;
     state <-- get ;
     let s = state.current_path in
-    let src = match DQ.rear s with None -> raise InconsistentHierarchy | Some(xs,_) -> xs in
-    a <-- next_anon ;
-    let pullout = DQ.snoc src a in     
-    define (KnownPtr pullout) ;
-    up ;
-    down a ;
-    open_class Class (fun x -> x) ;
-    down (`SuperClass 0) ;
-    mtranslate_texp (fun x -> x) mod_type ;
-    up ;     
-    redec <-- mtranslate_modification src modification ;
+    let (src,ctxt) = match DQ.rear s with None -> raise InconsistentHierarchy | Some(xs,x) -> (xs,x) in
+    redec <-- 
+    begin match ctxt with
+        `SuperClass _ -> mtranslate_mod_superclass src ctxt {mod_type; modification}
+      | `FieldType _ -> mtranslate_mod_field src {mod_type; modification}
+      | `ClassMember _ -> mtranslate_mod_class src ctxt {mod_type; modification}
+      | `Protected | `Any _ -> raise InconsistentHierarchy
+    end ;
 
     (* Do not introduce a new class in case of (nested) modifications without redeclarations *)
     if (not redec) then begin
       do_ ;
       set state ;
-      mtranslate_texp (fun x -> x) mod_type 
+      mtranslate_texp (fun x -> x) mod_type ;
     end
-    else
-      return ()
+    else return () ;
 
+    (* value modifications go into different places, depending on context *)
+    begin match ctxt with
+        `SuperClass _ -> do_ ; up; mtranslate_modification_values modification; down ctxt 
+      | `FieldType x -> do_ ; up; down_field x; mtranslate_modification_values modification; up_field; down ctxt
+      | `ClassMember _ -> mtranslate_modification_values modification
+      | `Protected -> raise InconsistentHierarchy
+    end
+    
+and mtranslate_mod_class src name {mod_type; modification} =
+  (* Modification of a class binding, e.g. 
+     'model Pipe = MyCoolPipe(redeclare package Medium = MyCoolMedium)'
+  *)    
+  do_ ;
+  (* context is [..; 'model Pipe'] *)
+  open_class Class (fun x -> x) ;
+  down (`SuperClass 0) ;
+  mtranslate_texp (fun x -> x) mod_type ;
+  up ;     
+  mtranslate_modification src modification 
+
+and mtranslate_mod_field src {mod_type; modification} =
+  (* Modification of a field type, e.g.
+     'Pipe pipe(redeclare package Medium = MyCoolMedium)'
+     Introduce a new anonymous class, since
+     we do not want to create classes with field names
+     TODO: maybe use the field name for the anonymous class' name
+  *)
+  do_ ;
+  a <-- next_anon ;  
+  let pullout = DQ.snoc src a in     
+  (* context is [..; 'field pipe'] *)
+  define (KnownPtr pullout) ;
+  up ;
+  down a ;
+  open_class Class (fun x -> x) ;
+  down (`SuperClass 0) ;
+  mtranslate_texp (fun x -> x) mod_type ;
+  up ;     
+  mtranslate_modification src modification 
+  (* context is [..; 'class anon1234'] *)
+    
+and mtranslate_mod_superclass src name {mod_type; modification} =
+(* In an extends-clause with modifications, we need to 
+   separate the superclass from the modification, since
+   the modification might use elements from the superclass *)
+    do_ ;
+  (* context is [..; 'superclass i'] *)
+  mtranslate_texp identity mod_type ;
+  up ;
+  redec <-- mtranslate_modification src modification ;
+  (* restore context *)
+  down name ;
+  return redec 
+  
 and mtranslate_extends i {ext_type} =
   do_ ;
   down (`SuperClass i) ;
-  begin match ext_type with
-      TMod {mod_type; modification} -> 
-        (* In an extends-clause with modifications, we need to 
-           separate the superclass from the modification, since
-           the modification might use elements from the superclass *)
-      do_ ;
-      mtranslate_texp identity mod_type ;
-      up ;
-      state <-- get ;
-      let src = state.current_path in
-      redec <-- mtranslate_modification src modification ;
-      return ()
-    | _ -> do_; mtranslate_texp identity ext_type ; up
-  end
+  mtranslate_texp identity ext_type ;
+  up
+  
 and mtranslate_elements {extensions;typedefs;redeclared_types;defs;redeclared_defs} = 
   do_ ;
   mseqi mtranslate_extends extensions ;
@@ -285,12 +324,12 @@ and mtranslate_typedef td = mtranslate_tds td.commented
 and mtranslate_def def =
   do_ ;
   down (`FieldType def.commented.def_name) ;
-  down_field def.commented.def_name ;
   mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type ;  
+  up ;
+  down_field def.commented.def_name ;
   begin match def.commented.def_rhs with
       Some e -> bind_value e
     | None -> return () end ;
-  up ;
   up_field 
 
 and mtranslate_type_redeclaration src {redecl_type} =
@@ -315,20 +354,13 @@ and mtranslate_nested_modification src = function
   | {commented = {mod_name = []; mod_value = None}} -> return false
   | {commented = {mod_name = []; mod_value = Some (Nested nested)}} ->     
     mtranslate_modification src nested
-  | {commented = {mod_name =  []; mod_value = Some (NestedRebind {nested; new_value})}} ->
-    do_ ;
-    change <-- mtranslate_modification src nested ;
-    bind_value new_value ;
-    return change 
-  | {commented = {mod_name =  []; mod_value = Some (Rebind new_value)}} ->
-    do_ ;
-    bind_value new_value ;
+  | {commented = {mod_name =  []; mod_value = Some (NestedRebind {nested})}} ->
+    mtranslate_modification src nested ;
+  | {commented = {mod_name =  []; mod_value = Some (Rebind _)}} ->
     return false 
-
-  | {commented = {mod_name =  x::xs}} as nm ->
+  | {commented = {mod_name = x::xs}} as nm ->
     do_ ;
     state <-- get ;
-    down_field x.txt ;
     down (`Any x.txt) ;
     open_class Class (fun x -> x) ;
     down (`SuperClass 0) ;
@@ -337,7 +369,6 @@ and mtranslate_nested_modification src = function
     change <-- mtranslate_nested_modification src
       {nm with commented = {nm.commented with mod_name = xs}} ;
     up ;
-    up_field ;
     if (not change) then begin
       do_ ;
       set state ;
@@ -354,6 +385,24 @@ and mtranslate_def_redeclaration src {def} = do_ ;
   define (KnownPtr pullout) ;  
   up
 
+and mtranslate_nested_modification_values = function
+  | {commented = {mod_name = []; mod_value = None}} -> return ()
+  | {commented = {mod_name = []; mod_value = Some (Nested nested)}} ->     
+    mtranslate_modification_values nested
+  | {commented = {mod_name =  []; mod_value = Some (NestedRebind {nested; new_value})}} ->
+    do_ ;
+    mtranslate_modification_values nested ;
+    bind_value new_value
+  | {commented = {mod_name =  []; mod_value = Some (Rebind v)}} ->
+    bind_value v
+  | {commented = {mod_name = x::xs}} as nm ->
+    do_ ;
+    down_field x.txt;
+    mtranslate_nested_modification_values {nm with commented = {nm.commented with mod_name = xs}} ;
+    up_field 
+           
+and mtranslate_modification_values {modifications} =
+  mseq mtranslate_nested_modification_values modifications 
 
 type translated_unit = {
   class_name : Name.t;

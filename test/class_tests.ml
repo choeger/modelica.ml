@@ -246,6 +246,13 @@ let test_cases = [
           end A11"
     (* No superclass in lookup, modification of b in inheritance should yield a redeclared element directly *)
     (lookup (cl "A11") [fld "d"; fld "b"; cl "T";] (eq (replaceable int))) ;
+
+  class_ "class A12
+            model B replaceable type T = Integer; end B;
+            model C replaceable model B = B; end C;
+            model D extends C; redeclare model extends B redeclare type T = Real; T t(start=0.0); end B; end D;    
+          end A12"
+    (lookup (cl "A12") [cl "D"; cl "B"; cl "T"] (eq (real)));
   
 ]
 

@@ -172,7 +172,7 @@ let topological_order w r a =
       | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_empty_creator g i xs | None -> g end 
 
       (* In case of multiple writers there needs to be a Empty statement *)
-      | js -> (*BatLog.logf "searching opener for: %s\n%!" (Name.show lhs) ;*)
+      | js -> 
         let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
     else (BatLog.logf "Could not add %s to open-statement, no such statement found.\n" (Name.show lhs) ; g)
   in
