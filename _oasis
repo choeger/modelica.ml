@@ -25,10 +25,11 @@ Library modelica_ml
                   compiler-libs.common, ocamlgraph, ppx_deriving_yojson, ppx_monadic, ppx_import	
   Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
                   Syntax, Syntax_fragments, Ast, Mapper, Folder, FileSystem, Traversal,
-                  Stats, Modlib, Utils, Report
+                  Stats, Modlib, Utils, Report,
+                  ModlibInter, ModlibCompress, ModlibTrans,
+                  ModlibInterDeps, ModlibLookup, ModlibNormSig, ModlibNormalized
 
-  InternalModules: Generated_parser, ModlibInter, ModlibCompress, ModlibTrans,
-                   ModlibInterDeps, ModlibLookup, ModlibNormSig, ModlibNormalized
+  InternalModules: Generated_parser
   
 Test "Modelica Parser Tests"
   Command: $modelica_frontend_tests

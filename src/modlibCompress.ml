@@ -59,7 +59,7 @@ and compress_elements es = {fields = StrMap.map pack_class es.fields;
                             class_members = StrMap.map compress es.class_members }
 
 and pack_class = function
-    Class os -> GlobalReference (DQ.map (fun x -> `ClassMember x) os.source_name)
+    Class os -> GlobalReference os.source_path
   | Constr {constr; arg} -> Constr {constr; arg = pack_class arg}
   | Replaceable v -> Replaceable (pack_class v)
   | v -> v

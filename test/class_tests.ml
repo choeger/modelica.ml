@@ -31,6 +31,7 @@ open Utils
 open Batteries
 open Modelica_parser
 open Syntax       
+open Syntax_fragments
 open Syntax.DefaultSyntax
 open Syntax.Traversal       
 open Syntax_fragments
@@ -40,7 +41,8 @@ open Parser_tests
 open Report
 
 open Modlib
-
+open Modlib.Inter
+       
 let assert_result = function
   | Failed -> assert_failure "Result was not OK."
   | Ok a -> a
@@ -59,11 +61,12 @@ let assert_normalization expected td =
   expected cv 
 
 open Normalized
+let cm = Modlib.Inter.Path.cm
 
 let eq expected got = 
   assert_equal ~cmp:equal_class_value ~msg:(Printf.sprintf "equality of normalization result = %b" (expected = got)) ~printer:show_class_value (norm_cv expected) (norm_cv got)
 
-let eq_val name expected normalized = eq (expected (Name.singleton name)) (StrMap.find name normalized.class_members)
+let eq_val name expected normalized = eq (expected (Path.singleton (cm name))) (StrMap.find name normalized.class_members)
 
 let should_be_replaceable expected got =
   match got with
@@ -73,7 +76,7 @@ let should_be_replaceable expected got =
 (* Lookup a name and apply a predicate *)
 let rec lookup_ x xs f got =
   let m = try Normalized.follow_path_es got Name.empty got xs x
-    with IllegalPath -> Printf.eprintf "%s\n" (Normalized.show_elements_struct got) ; raise IllegalPath
+    with IllegalPath i -> Printf.eprintf "%s\n" (Normalized.show_elements_struct got) ; raise (IllegalPath i)
   in 
   match m with
   | `Found {found_value} ->
@@ -100,13 +103,14 @@ let lookup_cl x xs f got =
 let class_ input expected =
   (Printf.sprintf "Normalize '%s'" input) >:: (parse_test td_parser input (assert_normalization expected))
 
-let m_body source_name = {empty_object_struct with source_name; public = {empty_elements with fields = StrMap.singleton "x" Real}}
-let class_M source_name = Class (m_body source_name)
-let record_M source_name = Class {(m_body source_name) with object_sort = Record}
-let class_with_public_M source_name = Class {empty_object_struct with source_name ; public = {empty_elements with class_members = StrMap.singleton "M" (class_M (DQ.snoc source_name "M"))}}
-let class_with_protected_M source_name = Class {empty_object_struct with source_name ; protected = {empty_elements with class_members = StrMap.singleton "M" (class_M (DQ.snoc source_name "M"))}}
+let m_body source_path = {empty_object_struct with source_path; public = {empty_elements with fields = StrMap.singleton "x" Real}}
+let class_M source_path = Class (m_body source_path)
+let record_M source_path = Class {(m_body source_path) with object_sort = Record}
+let class_with_public_M source_path = Class {empty_object_struct with source_path ; public = {
+    empty_elements with class_members = StrMap.singleton "M" (class_M (DQ.snoc source_path (cm "M")))}}
+let class_with_protected_M source_path = Class {empty_object_struct with source_path ; protected = {empty_elements with class_members = StrMap.singleton "M" (class_M (DQ.snoc source_path (cm "M")))}}
 
-let empty object_sort source_name = (Class {empty_object_struct with object_sort; source_name })                                               
+let empty object_sort source_path = (Class {empty_object_struct with object_sort; source_path })                                               
 let type_ arg = Constr {constr=Sort Type; arg}
 let const arg = Constr {constr=Var Constant; arg}
 let real = type_ Real

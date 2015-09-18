@@ -31,7 +31,8 @@
 open Batteries
 open Utils
 open Modlib
-
+open Compress
+    
 let public_signatures = ref []
 let inputs = ref []
 let outfile = ref ""

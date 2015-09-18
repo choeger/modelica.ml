@@ -82,7 +82,7 @@ and stratify_elements global ({class_members; super; fields} as es) (done_:class
   | Some(`ClassMember x, xs) when StrMap.mem x class_members -> stratify global (StrMap.find x class_members) (DQ.snoc done_ (`ClassMember x)) xs 
   | Some(`SuperClass i, xs) when IntMap.mem i super -> stratify global (IntMap.find i super) (DQ.snoc done_ (`SuperClass i)) xs
 
-  | Some (`Protected, xs) -> raise IllegalPath
+  | Some (`Protected, xs) -> raise (IllegalPath "protected")
 
   | Some(`Any x, xs) -> begin match get_class_element_in global DQ.empty es x DQ.empty with
         `Found {found_value;found_path} -> begin match DQ.front found_path with
@@ -144,8 +144,9 @@ and norm lhs =
   let open Normalized in
   function
     Empty {class_sort; class_name} -> (if DQ.is_empty class_name then BatLog.logf "Empty class name for %s!\n" (show_class_path lhs) else ()) ;
-
-    return (Class {empty_object_struct with object_sort = class_sort ; source_name = class_name})
+    Report.do_ ;
+    source_path <-- stratify_ptr (DQ.map (fun x -> `ClassMember x) class_name) ;
+    return (Class {empty_object_struct with object_sort = class_sort ; source_path})
   | Delay rec_rhs -> return (Recursive {rec_lhs=lhs;rec_rhs})
 
   | Close ->
@@ -238,10 +239,7 @@ and norm lhs =
                 return (DynamicReference found_path)
               | `Found {found_value=Class os} ->
                 (* Compress references to classes on-the-fly *)
-                let ptr = DQ.map (fun x -> `ClassMember x) os.source_name in
-                do_ ;
-                path <-- stratify_ptr ptr ;
-                return (GlobalReference path)                  
+                return (GlobalReference os.source_path)                  
               | `Found {found_value} ->
                 return found_value
               | `NothingFound | `PrefixFound _ as result ->
@@ -281,7 +279,7 @@ and norm lhs =
 exception Check
 
 let rec check = function
-    Class os -> if os.source_name = empty_object_struct.source_name then raise Check else
+    Class os -> if os.source_path = empty_object_struct.source_path then raise Check else
       begin
         el_check os.public ;
         el_check os.protected

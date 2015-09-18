@@ -69,7 +69,7 @@ and rec_term = { rec_lhs : class_path; rec_rhs : class_term }
 and constr_value = { arg : class_value ; constr : constr }
 
 and object_struct = { object_sort : sort ;
-                      source_name : Name.t;
+                      source_path : Path.t ;
                       public : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }];
                       protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }] ;
                     }
@@ -116,7 +116,7 @@ let rec unflat = function
 
 let norm_cv = flat %> unflat											   												   
 let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
-let empty_object_struct = {object_sort=Class; source_name=Name.singleton "EMPTY"; public=empty_elements; protected=empty_elements}
+let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=empty_elements; protected=empty_elements}
 
 let empty_class = Class empty_object_struct 
 
@@ -159,7 +159,7 @@ type found_recursion = { rec_term : rec_term ; search_state : prefix_found_struc
 
 type search_result = [`Found of found_struct | `Recursion of found_recursion | search_error ] [@@deriving show,yojson]
 
-exception IllegalPath
+exception IllegalPath of string
 
 let rec follow_path global found_path found_value path = match DQ.front path with
     None ->
@@ -175,7 +175,7 @@ let rec follow_path global found_path found_value path = match DQ.front path wit
       (* follow global references *)
       | GlobalReference g -> begin
           match DQ.front g with
-            None -> raise IllegalPath
+            None -> raise (IllegalPath "")
           | Some (y,ys) -> begin 
               match follow_path_es global DQ.empty global ys y with
               | `Found {found_value} ->
@@ -196,7 +196,7 @@ let rec follow_path global found_path found_value path = match DQ.front path wit
 
 and follow_path_os global found_path {protected; public} todo = function
     `Protected -> begin match DQ.front todo with
-        None -> raise IllegalPath
+        None -> raise (IllegalPath "")
       | Some(x,xs) -> follow_path_es global found_path protected xs x
     end    
   | x -> follow_path_es global found_path public todo x
@@ -206,24 +206,24 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
     follow_path global (DQ.snoc found_path (`SuperClass n))
       (IntMap.find n super) todo
 
-  | `SuperClass n -> raise IllegalPath
+  | `SuperClass n -> raise (IllegalPath ("super(" ^ (string_of_int n) ^ ")"))
 
   | `FieldType x when StrMap.mem x fields ->
     follow_path global (DQ.snoc found_path (`FieldType x))
       (StrMap.find x fields) todo
 
-  | `FieldType x -> raise IllegalPath
+  | `FieldType x -> raise (IllegalPath x)
 
   | `ClassMember x when StrMap.mem x class_members ->
     follow_path global (DQ.snoc found_path (`ClassMember x))
       (StrMap.find x class_members) todo
 
-  | `ClassMember x -> raise IllegalPath
+  | `ClassMember x -> raise (IllegalPath x)
 
 
 let lookup_path global path = match DQ.front path with
     Some (x,xs) -> follow_path_es global DQ.empty global xs x
-  | None -> raise IllegalPath
+  | None -> raise (IllegalPath "")
 
 exception CannotUpdate of string * string * string
 
@@ -232,7 +232,7 @@ let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) 
   | Some (`SuperClass i, r) -> {elements with super = update_intmap r rhs i super} 
   | Some (`FieldType x, r) -> {elements with fields = update_map r rhs x fields}
   | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
-  | Some (`Protected,_) -> raise IllegalPath
+  | Some (`Protected,_) -> raise (IllegalPath "")
 
 and update_map lhs rhs x m =  
   StrMap.modify_def empty_class x (update_class_value lhs rhs) m

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 4f115c81fdf40d40cbf9d4b724df0e47)
+# DO NOT EDIT (digest: 05dd3b54a07ca09c0ab4b494fca297ed)
 Modelica_parser
 Modelica_lexer
 Pprint_modelica
@@ -14,7 +14,6 @@ Stats
 Modlib
 Utils
 Report
-Generated_parser
 ModlibInter
 ModlibCompress
 ModlibTrans
@@ -22,4 +21,5 @@ ModlibInterDeps
 ModlibLookup
 ModlibNormSig
 ModlibNormalized
+Generated_parser
 # OASIS_STOP

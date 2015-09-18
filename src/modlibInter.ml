@@ -48,6 +48,12 @@ module Path = struct
 
   (** Path to a element in the global class hierarchy *)
   type t = elem_t DQ.t [@@deriving eq,ord,show,yojson]
+
+  let empty : t = DQ.empty
+
+  let singleton : elem_t -> t = DQ.singleton
+  
+  let cm x = `ClassMember x
 end
 
 type class_path = Path.t [@@deriving eq,show,yojson]
