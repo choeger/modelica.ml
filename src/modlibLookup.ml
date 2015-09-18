@@ -86,7 +86,7 @@ and get_class_element global found_path e p =
           let f = get_class_element_in global found_path public x xs in
           begin
             match f with
-              `NothingFound -> get_class_element_in global found_path protected x xs
+              `NothingFound -> get_class_element_in global (DQ.snoc found_path `Protected) protected x xs
             | _ as r -> r
           end
         end

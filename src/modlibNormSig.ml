@@ -58,10 +58,7 @@ let rec stratify global c (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
     None -> done_
   | Some(`Any x,xs) -> begin match get_class_element global DQ.empty c (DQ.singleton x) with
-        `Found {found_value;found_path} -> begin match DQ.rear found_path with
-            None -> raise (Failure "internal error, succeeded lookup returned empty path") 
-          | Some (_,y) -> stratify global found_value (DQ.snoc done_ y) xs
-        end
+        `Found {found_value;found_path} -> stratify_continue global found_value done_ xs found_path
       | _ -> raise (Stratification (done_, x))
     end
 
@@ -75,6 +72,14 @@ let rec stratify global c (done_:class_path) (todo:class_ptr) =
       | _ -> stratify_non_existing done_ todo
     end
 
+and stratify_continue global found_value done_ todo found_path = match DQ.rear found_path with
+    None -> raise (Failure "internal error, succeeded lookup returned empty path") 
+  | Some (ys,y) -> stratify global found_value (DQ.snoc (stratify_append done_ ys) y) todo
+  
+and stratify_append done_ found_prefix = match DQ.rear found_prefix with 
+  | Some(_, (`Protected as x)) -> DQ.snoc done_ x
+  | _ -> done_
+
 and stratify_elements global ({class_members; super; fields} as es) (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
   | None -> done_
@@ -85,10 +90,7 @@ and stratify_elements global ({class_members; super; fields} as es) (done_:class
   | Some (`Protected, xs) -> raise (IllegalPath "protected")
 
   | Some(`Any x, xs) -> begin match get_class_element_in global DQ.empty es x DQ.empty with
-        `Found {found_value;found_path} -> begin match DQ.front found_path with
-            None -> raise (Failure "internal error, succeeded lookup returned empty path") 
-          | Some (y, ys) -> stratify global found_value (DQ.snoc done_ y) xs
-        end
+        `Found {found_value;found_path} -> stratify_continue global found_value done_ xs found_path
       | _ -> raise (Stratification (done_, x))
     end
   | Some _ -> stratify_non_existing done_ todo
@@ -145,8 +147,7 @@ and norm lhs =
   function
     Empty {class_sort; class_name} -> (if DQ.is_empty class_name then BatLog.logf "Empty class name for %s!\n" (show_class_path lhs) else ()) ;
     Report.do_ ;
-    source_path <-- stratify_ptr (DQ.map (fun x -> `ClassMember x) class_name) ;
-    return (Class {empty_object_struct with object_sort = class_sort ; source_path})
+    return (Class {empty_object_struct with object_sort = class_sort ; source_path = lhs})
   | Delay rec_rhs -> return (Recursive {rec_lhs=lhs;rec_rhs})
 
   | Close ->
