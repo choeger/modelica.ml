@@ -26,6 +26,7 @@
  *
  *)
 
+module Syntax = Syntax.DefaultSyntax
 module Trans = ModlibTrans
 module Inter = ModlibInter
 module Normalized = ModlibNormalized
