@@ -83,7 +83,7 @@ and stratify_append done_ found_prefix = match DQ.rear found_prefix with
 and stratify_elements global ({class_members; super; fields} as es) (done_:class_path) (todo:class_ptr) =
   match DQ.front todo with
   | None -> done_
-  | Some(`FieldType x, xs) when StrMap.mem x fields -> stratify global (StrMap.find x fields) (DQ.snoc done_ (`FieldType x)) xs 
+  | Some(`FieldType x, xs) when StrMap.mem x fields -> stratify global (StrMap.find x fields).field_class (DQ.snoc done_ (`FieldType x)) xs 
   | Some(`ClassMember x, xs) when StrMap.mem x class_members -> stratify global (StrMap.find x class_members) (DQ.snoc done_ (`ClassMember x)) xs 
   | Some(`SuperClass i, xs) when IntMap.mem i super -> stratify global (IntMap.find i super) (DQ.snoc done_ (`SuperClass i)) xs
 
@@ -405,7 +405,7 @@ let rec collect_recursive_terms p rts = function
 
 and elements_collect_recursive_terms p rts {class_members; fields;} =
   let rts' = StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`ClassMember k)) rts v) class_members rts in
-  StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`FieldType k)) rts v) fields rts'               
+  StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`FieldType k)) rts v.field_class) fields rts'               
 
 let rec close_terms i p =
   Report.do_ ;

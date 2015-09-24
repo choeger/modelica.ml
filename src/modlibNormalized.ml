@@ -43,7 +43,7 @@ type constr = Array of int
             | Cau of causality
             | Con of connectivity
             | Der of string list
-                  [@@deriving yojson,show,eq]                                 
+                  [@@deriving eq,yojson,show]                                 
 
 let norm_constr = function
     CArray i -> Array i
@@ -74,9 +74,22 @@ and object_struct = { object_sort : sort ;
                       protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }] ;
                     }
 
+and field_modification = Modify of modify_struct
+                       | Nested of nested_struct
+
+and nested_struct = { nested_name : string ;
+                      nested_mod : field_modification list }
+
+and modify_struct = { mod_name : string ;
+                      mod_value : exp }
+
+and class_field = { field_class : class_value ;
+                    field_binding : exp option [@default None] ;
+                    field_mod : field_modification option [@default None]}
+
 and elements_struct = { class_members : class_value StrMap.t [@default StrMap.empty];
                         super : class_value IntMap.t [@default IntMap.empty];
-                        fields : class_value StrMap.t [@default StrMap.empty]
+                        fields : class_field StrMap.t [@default StrMap.empty]
                       }
 
 type flat_attributes = {
@@ -84,12 +97,12 @@ type flat_attributes = {
   fa_var : variability option [@default None];
   fa_con : connectivity option [@default None];
   fa_cau : causality option [@default None];
-}	[@@deriving eq,show,yojson]		     
+}	[@@deriving show,yojson]		     
 
 type flat_repr = {
   flat_val : class_value ;
   flat_attr : flat_attributes [@default {fa_sort=None;fa_var=None;fa_con=None;fa_cau=None}]
-} [@@deriving eq,show,yojson]
+} [@@deriving show,yojson]
 
 let rec flat_ fa = function
   | Constr {arg; constr = Var v} when fa.fa_var = None -> flat_ {fa with fa_var = Some v} arg
@@ -133,7 +146,7 @@ type environment = {outside : type_environment ;
 let rec elements_env inside {class_members; super; fields} =
   let inside = IntMap.fold (fun k v e -> inherit_env e v) super inside in
   let add_class k v c = {c with classes = StrMap.add k v c.classes} in
-  let add_field k v c = {c with values = StrMap.add k v c.values} in
+  let add_field k v c = {c with values = StrMap.add k v.field_class c.values} in
   let env' = StrMap.fold add_class class_members inside in
   StrMap.fold add_field fields env'
 
@@ -210,7 +223,7 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
 
   | `FieldType x when StrMap.mem x fields ->
     follow_path global (DQ.snoc found_path (`FieldType x))
-      (StrMap.find x fields) todo
+      (StrMap.find x fields).field_class todo
 
   | `FieldType x -> raise (IllegalPath x)
 
@@ -230,12 +243,18 @@ exception CannotUpdate of string * string * string
 let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) = match DQ.front lhs with
     None -> elements
   | Some (`SuperClass i, r) -> {elements with super = update_intmap r rhs i super} 
-  | Some (`FieldType x, r) -> {elements with fields = update_map r rhs x fields}
+  | Some (`FieldType x, r) -> {elements with fields = update_field_map r rhs x fields}
   | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
   | Some (`Protected,_) -> raise (IllegalPath "")
 
 and update_map lhs rhs x m =  
   StrMap.modify_def empty_class x (update_class_value lhs rhs) m
+
+and update_field_map lhs rhs x m =  
+  StrMap.modify_def {field_class=empty_class;field_binding=None;field_mod=None}
+    x (update_field_class_value lhs rhs) m
+
+and update_field_class_value lhs rhs f = {f with field_class = update_class_value lhs rhs f.field_class}
 
 and update_intmap lhs rhs i map =  
   IntMap.modify_def empty_class i (update_class_value lhs rhs) map

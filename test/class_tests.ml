@@ -103,7 +103,7 @@ let lookup_cl x xs f got =
 let class_ input expected =
   (Printf.sprintf "Normalize '%s'" input) >:: (parse_test td_parser input (assert_normalization expected))
 
-let m_body source_path = {empty_object_struct with source_path; public = {empty_elements with fields = StrMap.singleton "x" Real}}
+let m_body source_path = {empty_object_struct with source_path; public = {empty_elements with fields = StrMap.singleton "x" {field_class=Real;field_binding=None; field_mod=None}}}
 let class_M source_path = Class (m_body source_path)
 let record_M source_path = Class {(m_body source_path) with object_sort = Record}
 let class_with_public_M source_path = Class {empty_object_struct with source_path ; public = {

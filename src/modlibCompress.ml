@@ -54,9 +54,11 @@ let rec compress = function
   | Replaceable v -> Replaceable (compress v)
   | v -> v
 
-and compress_elements es = {fields = StrMap.map pack_class es.fields;
+and compress_elements es = {fields = StrMap.map pack_field es.fields;
                             super = IntMap.map pack_class es.super;
                             class_members = StrMap.map compress es.class_members }
+
+and pack_field f = {f with field_class = pack_class f.field_class}
 
 and pack_class = function
     Class os -> GlobalReference os.source_path

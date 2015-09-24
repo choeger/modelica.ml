@@ -33,3 +33,4 @@ module Normalized = ModlibNormalized
 module Lookup = ModlibLookup
 module Compress = ModlibCompress
 module NormSig = ModlibNormSig
+module Utils = Utils

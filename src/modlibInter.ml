@@ -40,7 +40,7 @@ type constr = CArray of int
             | CCau of causality
             | CCon of connectivity
             | CDer of string list
-                  [@@deriving yojson,eq,show]
+                  [@@deriving eq,yojson,show]
 
 module Path = struct
   (** Known part of a path to a element in the global class hierarchy *)
@@ -77,19 +77,19 @@ type class_term = Reference of DS.name
                 | PEnumeration of StrSet.t
                 | Constr of class_constr
                 | Delay of class_term
-                    [@@deriving yojson,eq,show]
+                    [@@deriving eq,yojson,show]
 
 and open_class = { class_sort : sort ; class_name : Name.t }
 
 and  class_constr = { constr : constr ; arg : class_term }
 
-type ('lhs, 'rhs) stmt = {lhs : 'lhs ; rhs : 'rhs} [@@deriving eq,show,yojson]
+type ('lhs, 'rhs) stmt = {lhs : 'lhs ; rhs : 'rhs} [@@deriving show,yojson]
 
 (** Assignment of a class/type in the global hierachy *)
-type class_stmt = (class_ptr, class_term) stmt [@@deriving eq,show,yojson]
+type class_stmt = (class_ptr, class_term) stmt [@@deriving show,yojson]
 
 (** Path to a term in the global hierarchy *)
-type value_ptr = { scope : class_ptr ; field : string DQ.t } [@@deriving eq,show,yojson]
+type value_ptr = { scope : class_ptr ; field : string DQ.t } [@@deriving show,yojson]
 
 (** Assignment of term in the global hierachy *)
 type value_stmt = (value_ptr, Syntax.exp) stmt [@@deriving show,yojson]

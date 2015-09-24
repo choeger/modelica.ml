@@ -47,7 +47,7 @@ let rec get_class_element_in global current_path {Normalized.class_members; supe
   end
   else if StrMap.mem x fields then begin
     let found = (DQ.snoc current_path (`FieldType x)) in
-    let r = (get_class_element global found (StrMap.find x fields) xs) in
+    let r = (get_class_element global found (StrMap.find x fields).field_class xs) in
     match r with
       `NothingFound -> (`PrefixFound {not_found=xs; found})      
     | r -> r
