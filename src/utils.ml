@@ -143,6 +143,8 @@ module StrSet = struct include Set.Make(String)
 
   open StdFormat
   let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_print_string) (elements s)
+
+  let show s = pp (Format.str_formatter) s ; Format.flush_str_formatter ()
 end
 
 module IntSet = struct include Set.Make(Int) end
