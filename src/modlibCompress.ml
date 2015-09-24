@@ -119,32 +119,35 @@ let decompress_dep dcm g i {superclass_name} =
   else
     DepGraph.add_vertex g i
 
+let decompress es =
+  let dcs = Array.of_list (elements_decompressions DQ.empty [] es) in
+  BatLog.logf "Decompressing %d superclass-references\n" (Array.length dcs) ;
+  let dcm = Array.fold_lefti decompress_map PathMap.empty dcs in
+  let dcg = Array.fold_lefti (decompress_dep dcm) DepGraph.empty dcs in
+  let sccs = Scc.scc_list dcg in
+
+  let rec reorder_sccs = function
+    | [] -> return []
+    | []::sccs -> reorder_sccs sccs
+    | [i]::sccs -> Report.do_ ;
+      sccs' <-- (reorder_sccs sccs) ;
+      return (dcs.(i)::sccs')
+
+    | (i::is)::sccs -> let what = Printf.sprintf "Recursive inheritance involving %s" (Path.show dcs.(i).superclass_name) in
+      Report.do_ ;
+      log {level=Error;what;where=none}; fail
+  in  
+
+  Report.do_ ;
+  o <-- output ;
+  set_output {o with class_members = StrMap.union o.class_members es.class_members} ;     
+  dcs <-- reorder_sccs sccs;
+  do_decompression 0 (Array.of_list dcs)
+
 let load_from_json js =
   let cv = elements_struct_of_yojson js in
 
   match cv with
     `Error err -> Report.do_; log{where=none; level=Error; what=err} ; fail
   | `Ok es ->
-    let dcs = Array.of_list (elements_decompressions DQ.empty [] es) in
-    BatLog.logf "Decompressing %d superclass-references\n" (Array.length dcs) ;
-    let dcm = Array.fold_lefti decompress_map PathMap.empty dcs in
-    let dcg = Array.fold_lefti (decompress_dep dcm) DepGraph.empty dcs in
-    let sccs = Scc.scc_list dcg in
-
-    let rec reorder_sccs = function
-      | [] -> return []
-      | []::sccs -> reorder_sccs sccs
-      | [i]::sccs -> Report.do_ ;
-        sccs' <-- (reorder_sccs sccs) ;
-        return (dcs.(i)::sccs')
-
-      | (i::is)::sccs -> let what = Printf.sprintf "Recursive inheritance involving %s" (Path.show dcs.(i).superclass_name) in
-        Report.do_ ;
-        log {level=Error;what;where=none}; fail
-    in  
-
-    Report.do_ ;
-    o <-- output ;
-    set_output {o with class_members = StrMap.union o.class_members es.class_members} ;     
-    dcs <-- reorder_sccs sccs;
-    do_decompression 0 (Array.of_list dcs)
+    decompress es
