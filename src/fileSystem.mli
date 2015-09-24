@@ -59,4 +59,10 @@ val scan : string list -> string -> scanned package option
 (** Try to parse the diven directory as a Modelica package 
     Does not parse any files.
 *)
-                               
+
+val fold_root : ('stage -> 'a -> 'a) -> 'stage pkg_root -> 'a -> 'a
+(** Fold over a file-system *)
+  
+val fold_package : ('stage -> 'a -> 'a) -> 'stage package -> 'a -> 'a
+(** Fold over a package *)
+  

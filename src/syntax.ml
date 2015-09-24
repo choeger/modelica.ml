@@ -26,7 +26,7 @@
  *
  *)                                                                 
 
-module NoAttributes = struct type t = unit [@@deriving eq, show,yojson] let pp fmt unit = () end
+module NoAttributes = struct type t = unit [@@deriving eq,show,yojson] let pp fmt unit = () end
 
 module DefaultSyntax = Ast.Make(NoAttributes)
 

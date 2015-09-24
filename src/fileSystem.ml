@@ -139,3 +139,12 @@ let rec parse_root {root_units; root_packages} =
     end
   | None -> None
 
+
+let rec fold_package fn {sub_packages; external_units; package_unit} =
+  fn package_unit %>
+  List.fold_right fn external_units %>
+  List.fold_right (fold_package fn) sub_packages
+
+let fold_root fn {root_units; root_packages} =
+  List.fold_right fn root_units %>
+  List.fold_right (fold_package fn) root_packages
