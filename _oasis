@@ -27,7 +27,7 @@ Library modelica_ml
                   Syntax, Syntax_fragments, Ast, Mapper, Folder, FileSystem, Traversal,
                   Stats, Modlib, Utils, Report,
                   ModlibInter, ModlibCompress, ModlibTrans,
-                  ModlibInterDeps, ModlibLookup, ModlibNormSig, ModlibNormalized
+                  ModlibInterDeps, ModlibLookup, ModlibNormSig, ModlibNormalized, ModlibNormLib
 
   InternalModules: Generated_parser
   

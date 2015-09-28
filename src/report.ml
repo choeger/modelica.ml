@@ -68,6 +68,10 @@ let rec on_sequence f = function
   | x::xs ->
     bind (f x) (fun x' -> (bind (on_sequence f xs) (fun xs' -> (return (x'::xs') ) )  ) )
 
+let rec fold m a = function
+    [] -> return a
+  | x::xs -> do_ ; a' <-- (m a x) ; fold m a' xs
+
 let on_kv_pair f (k,v) = do_ ; v' <-- f v ; return (k,v')
 
 let on_strMap_values f map = do_ ;

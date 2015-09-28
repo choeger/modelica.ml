@@ -110,26 +110,17 @@ let write_out content filename =
   (* TODO: compress *)
   IO.nwrite f content ;
   close_out f 
-
-let rec collect_impl_pkg impl {FileSystem.package_unit; external_units; sub_packages} =
-  let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) impl sub_packages in 
-  List.fold_left (fun impl u -> u.Trans.impl_code @ impl) pkgs_impl (package_unit :: external_units)
-
-let collect_impl {FileSystem.root_units; root_packages} =
-  let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) [] root_packages in 
-  List.fold_left (fun impl u -> u.Trans.impl_code @ impl) pkgs_impl root_units
         
 let run_compile global root =
   match FileSystem.parse_root root with
     Some root -> begin 
       let tr = Trans.translate_pkg_root root in
-      let impl = collect_impl tr in
-      let o = Report.run (NormSig.norm_pkg_root tr)
+      let o = Report.run (NormLib.norm_pkg_root tr)
           {messages=[]; output=global} in
       List.iteri print_message o.final_messages ;
       match o.final_result with
-        Ok o -> BatLog.logf "Normalization Ok.\n%!" ;                
-        let c = Compress.compress_elements o in
+        Ok {signature;implementation} -> BatLog.logf "Normalization Ok.\n%!" ;                
+        let c = Compress.compress_elements signature in
         BatLog.logf "Compression Ok.\n%!" ;
         let c' = clean global c in
         
@@ -138,7 +129,7 @@ let run_compile global root =
         write_out sig_dump (sig_file ()) ;
         BatLog.logf "Signature Dump (%d) Ok.\n" (String.length sig_dump);
 
-        let js = Inter.value_program_to_yojson impl in
+        let js = Inter.value_program_to_yojson implementation in
         let impl_dump = Yojson.Safe.pretty_to_string js in
         write_out impl_dump (impl_file ()) ;
         BatLog.logf "Implementation Dump (%d) Ok.\n" (String.length impl_dump);

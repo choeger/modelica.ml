@@ -104,7 +104,6 @@ let assert_ = no_attr (ComponentReference (cr [assertc]))
 
 let any ident = {ident;kind=Any;subscripts=[]}                             
 
-
 let parser_test_case parser lprinter sprinter prep input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::

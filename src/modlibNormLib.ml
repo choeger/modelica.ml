@@ -26,13 +26,51 @@
  *
  *)
 
-module Traversal = Syntax.Traversal
-module Syntax = Syntax.DefaultSyntax
-module Trans = ModlibTrans
+(** Normalization of classLang expressions *)
+
+open Batteries
+open Utils
+open Location
+open Report
+
 module Inter = ModlibInter
 module Normalized = ModlibNormalized
 module Lookup = ModlibLookup
 module Compress = ModlibCompress
+module Trans = ModlibTrans
+module Deps = ModlibInterDeps
 module NormSig = ModlibNormSig
-module NormLib = ModlibNormLib
-module Utils = Utils
+open Inter
+open NormSig
+open Normalized
+
+type library = { signature : Normalized.elements_struct ; implementation : Inter.value_stmt list }
+
+let rec collect_impl_pkg impl {FileSystem.package_unit; external_units; sub_packages} =
+  let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) impl sub_packages in 
+  List.fold_left (fun impl u -> u.Trans.impl_code @ impl) pkgs_impl (package_unit :: external_units)
+
+let collect_impl {FileSystem.root_units; root_packages} =
+  let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) [] root_packages in 
+  List.fold_left (fun impl u -> u.Trans.impl_code @ impl) pkgs_impl root_units
+
+let sort_impl map stmt =
+  Report.do_ ;
+  scope <-- stratify_ptr stmt.lhs.scope ;
+  return (
+  PathMap.add scope 
+  begin if PathMap.mem scope map then
+    stmt :: (PathMap.find scope map)
+  else
+    [stmt]
+  end map) 
+    
+let norm_pkg_root root =
+  Report.do_ ;
+  (* normalize signature *)
+  signature <-- NormSig.norm_pkg_root root ;
+  (* collect statements and sort by context *)
+  implementation <-- Report.fold sort_impl PathMap.empty (collect_impl root) ;
+  return {signature; implementation=[]}
+  
+      

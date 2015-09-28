@@ -100,7 +100,27 @@ let down_field x state = ((), {state with current_field = DQ.snoc state.current_
 
 let up_field state = ((), {state with current_field = match DQ.rear state.current_field with None -> DQ.empty | Some (xs,_) -> xs})
 
-let bind_value rhs state = ((), {state with value_code = {lhs = {scope = state.current_path; field = state.current_field}; rhs} :: state.value_code})
+let apply_imports env =
+  (* resolve imports in expressions *)
+  let rec merge x = function
+    (* Need to merge all subscripts when replacing an imported name, e.g.,
+      import b.a |= a[3] =>  b.a[3] *)
+      [] -> raise InconsistentHierarchy
+    | [y] -> [{x with ident=y.txt}]
+    | y::ys -> {ident=y.txt; kind=Any;subscripts=[]}::(merge x ys)
+  in                  
+  let map_cr self = function
+      {root=true} as cr -> cr
+    | {components=x::xs} when StrMap.mem x.ident env ->
+      {root=true; components=(merge x (StrMap.find x.ident env)) @ xs}
+    | c -> c
+  in  
+  let mapper = {Syntax.Traversal.default_mapper with map_cr} in
+  (mapper.map_exp mapper)
+
+let bind_value rhs state =
+  let rhs = apply_imports state.env rhs in
+  ((), {state with value_code = {lhs = {scope = state.current_path; field = state.current_field}; rhs} :: state.value_code})
 
 let open_class sort post state = ((), {state with class_code =
                                                     {lhs = state.current_path ;
