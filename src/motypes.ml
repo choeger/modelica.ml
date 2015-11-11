@@ -34,12 +34,10 @@ module StdFormat = Format
 open Batteries
 module Format = StdFormat
 open Utils
-open Ast.Flags
 module DS = Syntax
-
+open DS.Flags
 
 module Normalized = struct
-
 
 end
 

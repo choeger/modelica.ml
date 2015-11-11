@@ -70,9 +70,9 @@
 %left DOT LBRACKET /* highest precedence */
 
 %{
-    open Ast.Flags
     open Syntax
     open Syntax_fragments
+    open Flags
     open Utils
 
     (* cannot open Location due to menhir's Error exception *)
@@ -138,86 +138,86 @@ str : x=STRING { mkloc x $startpos $endpos }
       
 expr : e = simple_expr { e }
      | IF condition = expr THEN then_ = expr else_if = list(else_if) ELSE else_=expr
-       { no_attr (If { condition ; then_ ; else_if ; else_ }) }
+       { If { condition ; then_ ; else_if ; else_ } }
      | start = simple_expr COLON first=simple_expr second=option(preceded(COLON, simple_expr))
-        { no_attr (Range (match second with Some end_ -> { start; step=Some first; end_ } 
-                                          | None -> {start; step=None; end_=first} ) )
+        { Range (match second with Some end_ -> { start; step=Some first; end_ } 
+                                          | None -> {start; step=None; end_=first}  )
         }   
 
 simple_expr:
-  | TRUE { no_attr (Bool(true)) }
-  | FALSE { no_attr (Bool(false)) }
+  | TRUE { (Bool(true)) }
+  | FALSE { (Bool(false)) }
   | i = INT 
-        { no_attr (Int (i)) }
+        { (Int (i)) }
   | f = FLOAT
-        { no_attr (Real (f)) }
+        { (Real (f)) }
   | s = STRING
-        { no_attr (String(s)) }
+        { (String(s)) }
   | LPAREN e = expr RPAREN
         { e }
-  | LPAREN RPAREN { no_attr (OutputExpression [None]) } 
-  | LPAREN e=expr COMMA ps=patterns RPAREN { no_attr (OutputExpression ((Some e)::ps)) }
-  | LPAREN COMMA ps=patterns RPAREN { no_attr (OutputExpression (None::ps)) }
+  | LPAREN RPAREN { (OutputExpression [None]) } 
+  | LPAREN e=expr COMMA ps=patterns RPAREN { (OutputExpression ((Some e)::ps)) }
+  | LPAREN COMMA ps=patterns RPAREN { (OutputExpression (None::ps)) }
 
   | LBRACE es=array_args RBRACE
-        { no_attr (Array es) }
+        { (Array es) }
   | LBRACKET els = separated_nonempty_list(SEMICOLON, separated_nonempty_list(COMMA, expr)) RBRACKET
-        { no_attr (MArray els) }
+        { (MArray els) }
   | FUNCTION e = simple_expr
-        { no_attr (ExplicitClosure e) }           
-  | END { no_attr (End) } %prec END
-  | COLON { no_attr (Colon) }
+        { (ExplicitClosure e) }           
+  | END { (End) } %prec END
+  | COLON { (Colon) }
 
-  | cr = component_reference { no_attr (ComponentReference cr) }
+  | cr = component_reference { (ComponentReference cr) }
   | fun_ = component_reference LPAREN arguments = function_args RPAREN
-        { let (args, named_args) = arguments in no_attr (App { fun_ ; args; named_args }) }
+        { let (args, named_args) = arguments in (App { fun_ ; args; named_args }) }
                                                                       
   | left = simple_expr PLUS right = simple_expr
-       { no_attr (Plus ( {left ; right} )) } 
+       { (Plus ( {left ; right} )) } 
   | left = simple_expr MINUS right = simple_expr
-       { no_attr (Minus ( {left ; right} )) } 
+       { (Minus ( {left ; right} )) } 
   | left = simple_expr TIMES right = simple_expr
-       { no_attr (Mul ( {left ; right} )) } 
+       { (Mul ( {left ; right} )) } 
   | left = simple_expr DIV right = simple_expr
-       { no_attr (Div ( {left ; right} )) } 
+       { (Div ( {left ; right} )) } 
   | left = simple_expr POWER right = simple_expr
-       { no_attr (Pow ( {left ; right} )) } 
+       { (Pow ( {left ; right} )) } 
 
        
   | left = simple_expr DOTPLUS right = simple_expr
-       { no_attr (DPlus ( {left ; right} )) } 
+       { (DPlus ( {left ; right} )) } 
   | left = simple_expr DOTMINUS right = simple_expr
-       { no_attr (DMinus ( {left ; right} )) } 
+       { (DMinus ( {left ; right} )) } 
   | left = simple_expr DOTTIMES right = simple_expr
-       { no_attr (DMul ( {left ; right} )) } 
+       { (DMul ( {left ; right} )) } 
   | left = simple_expr DOTDIV right = simple_expr
-       { no_attr (DDiv ( {left ; right} )) } 
+       { (DDiv ( {left ; right} )) } 
   | left = simple_expr DOTPOWER right = simple_expr
-       { no_attr (DPow ( {left ; right} )) } 
+       { (DPow ( {left ; right} )) } 
 
   | left = simple_expr LT right = simple_expr
-       { no_attr (Lt ( {left ; right} )) } 
+       { (Lt ( {left ; right} )) } 
   | left = simple_expr GT right = simple_expr
-       { no_attr (Gt ( {left ; right} )) } 
+       { (Gt ( {left ; right} )) } 
   | left = simple_expr GEQ right = simple_expr
-       { no_attr (Geq ( {left ; right} )) } 
+       { (Geq ( {left ; right} )) } 
   | left = simple_expr LEQ right = simple_expr
-       { no_attr (Leq ( {left ; right} )) } 
+       { (Leq ( {left ; right} )) } 
   | left = simple_expr NEQ right = simple_expr
-       { no_attr (Neq ( {left ; right} )) } 
+       { (Neq ( {left ; right} )) } 
   | left = simple_expr EQEQ right = simple_expr
-       { no_attr (Eq ( {left ; right} )) } 
+       { (Eq ( {left ; right} )) } 
 
   | left = simple_expr AND right = simple_expr
-       { no_attr (And ( {left ; right} )) }
+       { (And ( {left ; right} )) }
   | left = simple_expr OR right = simple_expr
-       { no_attr (Or ( {left ; right} )) }
+       { (Or ( {left ; right} )) }
 
-  | MINUS e = simple_expr { no_attr (UMinus e) } %prec UMinus
-  | PLUS e = simple_expr { no_attr (UPlus e) } %prec UMinus
-  | DOTMINUS e = simple_expr { no_attr (UDMinus e) } %prec UMinus
-  | DOTPLUS e = simple_expr { no_attr (UDPlus e) } %prec UMinus
-  | NOT e = simple_expr { no_attr (Not e) } %prec Not
+  | MINUS e = simple_expr { (UMinus e) } %prec UMinus
+  | PLUS e = simple_expr { (UPlus e) } %prec UMinus
+  | DOTMINUS e = simple_expr { (UDMinus e) } %prec UMinus
+  | DOTPLUS e = simple_expr { (UDPlus e) } %prec UMinus
+  | NOT e = simple_expr { (Not e) } %prec Not
   
 
 else_if : ELSEIF guard=expr THEN elsethen = expr { {guard; elsethen} }
@@ -227,13 +227,13 @@ index_range : IN e = expr { e }
 index : variable = ident range = option(index_range) { { variable ; range } }
 
 array_args : es=separated_list(COMMA, expr) { es }
-           | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { [no_attr (Compr { exp ; idxs })] }
+           | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { [(Compr { exp ; idxs })] }
 
 
 function_args : e = expr COMMA fs = function_args { let (args, named_args) = fs in (e::args, named_args) }
               | e = expr { ([e], []) }
               | m = named_function_args { ([], m) }
-              | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { ([no_attr (Compr { exp ; idxs })], []) }  
+              | exp = expr FOR idxs = separated_nonempty_list(COMMA, index) { ([(Compr { exp ; idxs })], []) }  
                
 named_argument : argument_name=ident EQ argument=expr { {argument_name ; argument } }
 

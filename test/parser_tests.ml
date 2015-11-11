@@ -31,8 +31,6 @@ open Utils
 open Batteries
 open Modelica_parser
 open Syntax       
-open Syntax.DefaultSyntax
-open Syntax.Traversal       
 open Syntax_fragments
 open Modelica_lexer
 open Pprint_modelica
@@ -53,54 +51,54 @@ let expr_test input f =
 
 let nl = mknoloc
 
-let int x = no_attr (Int x)
-let real x = no_attr (Real x)
+let int x =  (Int x)
+let real x =  (Real x)
 let ide x = name [x]
-let bool x = no_attr (Bool x)
-let string x = no_attr (String x)
-let colon = no_attr Colon
-let end_ = no_attr End
-let app x = no_attr (App x)
-let pow x = no_attr (Pow x)
-let dpow x = no_attr (DPow x)
-let mul x = no_attr (Mul x)
-let dmul x = no_attr (DMul x)
-let div x = no_attr (Div x)
-let ddiv x = no_attr (DDiv x)
-let plus x = no_attr (Plus x)
-let dplus x = no_attr (DPlus x)
-let minus x = no_attr (Minus x)
-let dminus x = no_attr (DMinus x)
-let uminus x = no_attr (UMinus x)
-let uplus x = no_attr (UPlus x)
-let udminus x = no_attr (UDMinus x)
-let udplus x = no_attr (UDPlus x)
-let gt x = no_attr (Gt x)
-let lt x = no_attr (Lt x)
-let leq x = no_attr (Leq x)
-let geq x = no_attr (Geq x)
-let neq x = no_attr (Neq x)
-let eq_ x = no_attr (Eq x)
-let and_ x = no_attr (And x)
-let or_ x = no_attr (Or x)
-let not_ x = no_attr (Not x)
-let if_ x = no_attr (If x)
-let range x = no_attr (Range x)
-let compr x = no_attr (Compr x)
-let array x = no_attr (Array x)
-let marray x = no_attr (MArray x)
-let explicitclosure x = no_attr (ExplicitClosure x)
-let outputexpression x = no_attr (OutputExpression x)
+let bool x =  (Bool x)
+let string x =  (String x)
+let colon =  Colon
+let end_ =  End
+let app x =  (App x)
+let pow x =  (Pow x)
+let dpow x =  (DPow x)
+let mul x =  (Mul x)
+let dmul x =  (DMul x)
+let div x =  (Div x)
+let ddiv x =  (DDiv x)
+let plus x =  (Plus x)
+let dplus x =  (DPlus x)
+let minus x =  (Minus x)
+let dminus x =  (DMinus x)
+let uminus x =  (UMinus x)
+let uplus x =  (UPlus x)
+let udminus x =  (UDMinus x)
+let udplus x =  (UDPlus x)
+let gt x =  (Gt x)
+let lt x =  (Lt x)
+let leq x =  (Leq x)
+let geq x =  (Geq x)
+let neq x =  (Neq x)
+let eq_ x =  (Eq x)
+let and_ x =  (And x)
+let or_ x =  (Or x)
+let not_ x =  (Not x)
+let if_ x =  (If x)
+let range x =  (Range x)
+let compr x =  (Compr x)
+let array x =  (Array x)
+let marray x =  (MArray x)
+let explicitclosure x =  (ExplicitClosure x)
+let outputexpression x =  (OutputExpression x)
 
 let cr components = {root=false; components}
-let cre cr = no_attr (ComponentReference cr)
+let cre cr =  (ComponentReference cr)
 
 let derc = {ident="der";kind=Der;subscripts=[]}
 let initialc = {ident="initial";kind=Initial;subscripts=[]}
 let assertc = {ident="assert";kind=Assert;subscripts=[]}
-let der = no_attr (ComponentReference (cr [derc]))
-let initial = no_attr (ComponentReference (cr [initialc]))
-let assert_ = no_attr (ComponentReference (cr [assertc]))                   
+let der =  (ComponentReference (cr [derc]))
+let initial =  (ComponentReference (cr [initialc]))
+let assert_ =  (ComponentReference (cr [assertc]))                   
 
 let any ident = {ident;kind=Any;subscripts=[]}                             
 
@@ -114,7 +112,7 @@ let parser_test_case parser lprinter sprinter prep input expected =
            (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter (prep firstpass) (prep e)) ())) ; 
   ]
 
-let erase_location = { Traversal.default_mapper with Mapper.map_location = (fun _ _ -> Location.none) }
+let erase_location = { identity_mapper with map_loc_t = (fun _ _ -> Location.none) }
 
 let prep_import = erase_location.map_import erase_location 
 
@@ -140,7 +138,7 @@ let prep_eq = erase_location.map_equation erase_location
 
 let eq input expected = parser_test_case eq_parser (eq2str ~max:100) (eq2str ~max:20) prep_eq input expected
 
-let prep_defs = Mapper.map_list erase_location.map_def erase_location 
+let prep_defs = List.map (erase_location.map_definition erase_location)
 
 let defs input expected = parser_test_case defs_parser (defs2str ~max:100) (defs2str ~max:20) prep_defs input expected
 
@@ -205,8 +203,8 @@ let test_cases = [
   expr "a.'b'.c"  (name ["a"; "'b'"; "c"]) ;
   expr "a/* comment */.b.c"  (name ["a"; "b"; "c" ]) ;
 
-  expr ".x" (no_attr (ComponentReference {root = true; components = [any "x"]})) ;
-  expr ".x.y" (no_attr (ComponentReference {root = true; components = [any "x"; any "y"]})) ;
+  expr ".x" ( (ComponentReference {root = true; components = [any "x"]})) ;
+  expr ".x.y" ( (ComponentReference {root = true; components = [any "x"; any "y"]})) ;
 
   (* functions *)
   expr "f()" (app {fun_= (cr [any "f"]); args=[]; named_args=[] });
@@ -237,8 +235,8 @@ let test_cases = [
   expr "1 < 2 and x or y" (or_ {left=and_ {left= (lt { left = int 1 ; right = int 2 }) ; right=ide "x" }; right=ide "y"}) ;
 
   (* arrays *)
-  expr "x[1]" (no_attr (ComponentReference (cr [{(any "x") with subscripts = [int 1]}]))) ;
-  expr "x[1].y" (no_attr (ComponentReference (cr [{(any "x") with subscripts = [int 1]}; any "y"]))) ;
+  expr "x[1]" ( (ComponentReference (cr [{(any "x") with subscripts = [int 1]}]))) ;
+  expr "x[1].y" ( (ComponentReference (cr [{(any "x") with subscripts = [int 1]}; any "y"]))) ;
   expr "{true}" (array [bool true]);
   expr "[4,2;0,0]" (marray [[int 4; int 2];[int 0; int 0]]);
 

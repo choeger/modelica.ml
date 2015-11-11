@@ -29,8 +29,8 @@
 
 (** Translation of Modelica units to intermediate representation *)
 
-open Ast.Flags
 open Syntax
+open Flags
 open Utils
 open Location
 
@@ -109,13 +109,13 @@ let apply_imports env =
     | [y] -> [{x with ident=y.txt}]
     | y::ys -> {ident=y.txt; kind=Any;subscripts=[]}::(merge x ys)
   in                  
-  let map_cr self = function
+  let map_component_reference self = function
       {root=true} as cr -> cr
     | {components=x::xs} when StrMap.mem x.ident env ->
       {root=true; components=(merge x (StrMap.find x.ident env)) @ xs}
     | c -> c
   in  
-  let mapper = {Syntax.Traversal.default_mapper with map_cr} in
+  let mapper = {Syntax.identity_mapper with map_component_reference} in
   (mapper.map_exp mapper)
 
 let bind_value rhs state =

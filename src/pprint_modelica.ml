@@ -29,8 +29,8 @@
 module Enum = BatEnum
 open Format
 open Utils
-open Ast.Flags
 open Syntax
+open Flags
 open Location
 
 let pp_paren pp fmt x = fprintf fmt "(%a)" pp x
@@ -69,7 +69,7 @@ let pp_str fmt {Location.txt;loc} = pp_print_string fmt txt
 
 let pp_name = (pp_list ~sep:"." pp_str)
 
-let rec pp_expr_struct fmt = function
+let rec pp_expr fmt = function
   | If c -> pp_complete_conditional pp_expr "if" pp_expr fmt c
   | Int(i) -> fprintf fmt "@[%d@]" i
   | Real(f) -> fprintf fmt "@[%f@]" f
@@ -126,8 +126,6 @@ and pp_cr fmt = function
 and pp_component fmt = function
     {ident; subscripts = []} -> fprintf fmt "%s" ident
   | {ident; subscripts} -> fprintf fmt "@[%s[%a]@]" ident (pp_list ~sep:", " pp_expr) subscripts
-
-and pp_expr fmt {term} = fprintf fmt "%a" pp_expr_struct term
 
 and pp_named_arg fmt ({argument_name;argument}) =
   fprintf fmt "@[%s = %a@]" argument_name.txt pp_expr argument
@@ -270,7 +268,7 @@ and pp_target fmt = function
 
 and pp_statement_desc fmt = function
     Assignment { target; source} -> fprintf fmt "@[%a@ :=@ %a@]" pp_target target pp_expr source 
-  | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr_struct (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
+  | Call { procedure ; pargs ; pnamed_args } -> fprintf fmt "@[%a@]" pp_expr (App {fun_=procedure ; args=pargs; named_args=pnamed_args })
 
   | IfStmt c -> pp_conditional "if" pp_statements fmt c 
   | WhenStmt c -> pp_conditional "when" ~else_:"" pp_statements fmt c 

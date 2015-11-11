@@ -26,9 +26,8 @@
  *
  *)
 
-module Traversal = Traversal.Make(Syntax.DefaultSyntax)
-open Traversal
-
+open Syntax
+    
 type source_statistics = {
   def_count : int;
   type_count : int;
@@ -36,11 +35,11 @@ type source_statistics = {
 
 let count_definition _ _ ({def_count} as s) = {s with def_count = def_count + 1}
 
-let count_typedef this def  ({type_count} as s) =
-  TD.fold this def {s with type_count = type_count + 1}
+let count_typedef this typedef ({type_count} as s) =
+  identity_folder.fold_typedef this typedef {s with type_count = type_count + 1}
 
-let counter = { default_folder with
-                fold_def = count_definition ;
+let counter = { identity_folder with
+                fold_definition = count_definition ;
                 fold_typedef = count_typedef ;
               }
 

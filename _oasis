@@ -8,7 +8,7 @@ Plugins:     META (0.4), DevFiles (0.4)
 Maintainers: "Christoph Höger <christoph.hoeger@tu-berlin.de>"
 Authors:     "Christoph Höger <christoph.hoeger@tu-berlin.de>"
 Homepage:    http://github.com/choeger/modelica.ml
-OCamlVersion:  >= 4.02.1
+OCamlVersion:  >= 4.02.3
 Description: Modelica_ml is a Modelica frontend implemented in OCaml.
              It is written with compilation in mind, but should also be
              useful for other applications.
@@ -21,10 +21,10 @@ Library modelica_ml
   CompiledObject: best
   BuildTools:     ocamlbuild
   BuildDepends:   batteries, menhirLib, sedlex, yojson,
-                  ppx_deriving.show, ppx_deriving.eq, ppx_deriving.ord,
+                  ppx_deriving.show, ppx_deriving.eq, ppx_deriving.ord, ppx_deriving_morphism,
                   compiler-libs.common, ocamlgraph, ppx_deriving_yojson, ppx_monadic, ppx_import	
   Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
-                  Syntax, Syntax_fragments, Ast, Mapper, Folder, FileSystem, Traversal,
+                  Syntax, Syntax_fragments, FileSystem,
                   Stats, Modlib, Utils, Report,
                   ModlibInter, ModlibCompress, ModlibTrans,
                   ModlibInterDeps, ModlibLookup, ModlibNormSig, ModlibNormalized, ModlibNormLib

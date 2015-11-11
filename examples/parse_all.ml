@@ -31,13 +31,11 @@ open Unix
 open Modelica_parser
 open Modelica_lexer
 open Syntax       
-open Syntax.DefaultSyntax
-open Syntax.Traversal       
 open Syntax_fragments
 
 let hidden dir = String.starts_with (Filename.basename dir) "."
 
-let erase_location = { Traversal.default_mapper with Mapper.map_location = (fun _ _ -> Location.none) }
+let erase_location = { identity_mapper with map_loc_t = (fun _ _ -> Location.none) }
 
 let parse file =
   let start = Sys.time () in

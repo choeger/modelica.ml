@@ -32,8 +32,8 @@
 
 open Batteries
 open Utils
-open Syntax.DefaultSyntax
-open Ast.Flags
+open Syntax
+open Flags
 
 open ModlibInter
 

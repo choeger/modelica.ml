@@ -19,8 +19,8 @@ depends: [
   "menhir"
   "ocamlfind"
   "ocamlgraph"
-  "ppx_deriving" {>= "1.0"}
-  "ppx_deriving_yojson" {>= "2.0"}
+  "ppx_deriving" {>= "3.0" & < "4.0"}
+  "ppx_deriving_yojson" {>= "2.4"}
   "ppx_import"
   "ppx_monadic"
   "sedlex"
@@ -28,4 +28,4 @@ depends: [
 depopts: [
   "ounit"
 ]
-ocaml-version: [ >= "4.02.1" ]
+ocaml-version: [ >= "4.02.3" ]

@@ -34,8 +34,6 @@ open Utils
 
 let empty_app f = { fun_ = f ; args = [] ; named_args = [] }
 
-let no_attr e = { term = e ; attr = () }
-
 let named x argument = {argument_name = Location.mknoloc x ; argument }
 
 let no_comment = { annotated_elem = None ; annotation = None }
@@ -71,7 +69,7 @@ let rec name_ components = function
 
 let name = function
   | [] -> raise EmptyName
-  | n -> no_attr (ComponentReference (name_ [] n))
+  | n -> ComponentReference (name_ [] n)
 
 let type_name xs = TName (List.map Location.mknoloc xs)
 

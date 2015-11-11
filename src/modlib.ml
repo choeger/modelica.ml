@@ -26,8 +26,7 @@
  *
  *)
 
-module Traversal = Syntax.Traversal
-module Syntax = Syntax.DefaultSyntax
+module Syntax = Syntax
 module Trans = ModlibTrans
 module Inter = ModlibInter
 module Normalized = ModlibNormalized

@@ -32,8 +32,6 @@ open Batteries
 open Modelica_parser
 open Syntax       
 open Syntax_fragments
-open Syntax.DefaultSyntax
-open Syntax.Traversal       
 open Syntax_fragments
 open Modelica_lexer
 open Location

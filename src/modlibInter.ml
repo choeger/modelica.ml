@@ -29,7 +29,7 @@
 (** Intermediate representation of Modelica libraries *)
 
 open Utils
-open Ast.Flags
+open Syntax.Flags
 module DS = Syntax
 
 (** Class/Type constructors *)
