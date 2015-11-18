@@ -34,6 +34,8 @@ let suite = "Modelica Frontend" >:::
               Parser_tests.suite ;
               (* Class_tests.suite ; *)
               Class_tests.suite ;
+              (* Impl tests suite *)
+              Impl_tests.suite ;
             ]
 
 let _ =

@@ -27,11 +27,13 @@
  *)
 
 module Syntax = Syntax
+module Parser = Modelica_parser
 module Trans = ModlibTrans
 module Inter = ModlibInter
 module Normalized = ModlibNormalized
 module Lookup = ModlibLookup
 module Compress = ModlibCompress
 module NormSig = ModlibNormSig
+module NormImpl = ModlibNormImpl
 module NormLib = ModlibNormLib
 module Utils = Utils

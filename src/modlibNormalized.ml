@@ -62,7 +62,7 @@ type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                  | GlobalReference of class_path
                  | Recursive of rec_term
                  | DynamicReference of class_path
-                       [@@deriving eq,show,yojson]
+  [@@deriving eq,show,yojson,folder,mapper]
 
 and rec_term = { rec_lhs : class_path; rec_rhs : class_term }
 
