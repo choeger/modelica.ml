@@ -133,33 +133,6 @@ let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=emp
 
 let empty_class = Class empty_object_struct 
 
-type type_environment = { classes : class_value StrMap.t ;
-                          values : class_value StrMap.t } [@@deriving show]
-
-let empty_env = { classes = StrMap.empty; values = StrMap.empty }
-
-let env_merge a b = {classes = StrMap.union a.classes b.classes; values = StrMap.union a.values b.values}
-
-type environment = {outside : type_environment ;
-                    inside : type_environment } [@@deriving show]
-
-let rec elements_env inside {class_members; super; fields} =
-  let inside = IntMap.fold (fun k v e -> inherit_env e v) super inside in
-  let add_class k v c = {c with classes = StrMap.add k v c.classes} in
-  let add_field k v c = {c with values = StrMap.add k v.field_class c.values} in
-  let env' = StrMap.fold add_class class_members inside in
-  StrMap.fold add_field fields env'
-
-and inherit_env env = function
-    Class os -> elements_env (elements_env empty_env os.public) os.protected
-  | _ -> empty_env
-
-and lexical_env outside xs v =
-  let inside = inherit_env empty_env v in
-  match DQ.front xs with
-    Some(y,ys) -> lexical_env (env_merge inside outside) ys (StrMap.find y inside.classes)
-  | None -> {inside; outside}
-
 type prefix_found_struct = { found : class_path ; not_found : Name.t } [@@deriving show,yojson]
 
 let show_prefix_found {found; not_found} = "No element named " ^ (Name.show not_found) ^ " in " ^ (Name.show (Name.of_ptr found))
