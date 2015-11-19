@@ -111,5 +111,72 @@ let lexical_env lib path =
   let ctxt = lexical_ctxt lib path in
   List.map (os_env lib) ctxt.ctxt_classes
 
-let lookup_mapper env = Syntax.identity_mapper
+(** A stratified value binding *)
+type strat_stmt = { field_name : string DQ.t;
+                    exp : Syntax.exp }
 
+type strat_stmts = strat_stmt list PathMap.t
+
+type impl_state = { strat_stmts : strat_stmts ; current_env : lexical_env ; current_path : Path.t }
+
+exception NoSuchField of string
+exception DoubleModification of string
+
+let rec lookup lib env exp = exp
+
+let rec merge_mod exp mod_name nested_name mods =
+  if StrMap.mem mod_name mods then
+    match StrMap.find mod_name mods with
+      Modify _ -> raise (DoubleModification mod_name)
+    | Nested mods -> 
+      begin match DQ.front nested_name with
+          None -> raise (DoubleModification mod_name)
+        | Some (x,xs) -> merge_mod exp x xs mods
+      end
+  else
+    merge_mod exp mod_name nested_name (StrMap.add mod_name (Nested StrMap.empty) mods)
+      
+let rec normalize_stmts lib env class_fields = function
+  | [] -> class_fields
+  | {field_name;exp}::stmts ->
+    let exp = lookup lib env exp in
+    begin match DQ.front field_name with    
+      | Some (x,xs) when StrMap.mem x class_fields ->
+        let fld = StrMap.find x class_fields in
+        let class_field = 
+        match DQ.front xs with
+          None -> {fld with field_binding = Some exp}
+        | _ -> {fld with field_mod = merge_mod exp x xs fld.field_mod} 
+        in normalize_stmts lib env (StrMap.add x class_field class_fields) stmts
+      | None -> normalize_stmts lib env class_fields stmts (* bogus stmt *)
+      | Some (x, xs) -> raise (NoSuchField x) (* Error TODO: move to Report Monad? *)
+    end
+
+let rec impl_mapper lib {strat_stmts; current_env; current_path} =
+  { ModlibNormalized.identity_mapper with
+    
+    map_object_struct = (fun self os ->
+        (* Update the environment for each object struct *)
+        let s = impl_mapper lib {
+            strat_stmts ;
+            current_env = (os_env lib os)::current_env;
+            current_path = os.source_path }
+        in
+        
+        let public = s.map_elements_struct s os.public in
+        let protected = s.map_elements_struct s os.protected in
+        {os with public; protected});
+
+    map_elements_struct = (fun self {class_members; super; fields} ->
+        let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in 
+        (* proceed through the tree *)
+        let class_members = StrMap.map (self.map_class_value self) class_members in
+
+        (* normalize and attach statements to fields *)
+        let fields = normalize_stmts lib current_env fields stmts in
+        {class_members; super; fields}
+      );
+  }
+
+                                      
+                                      

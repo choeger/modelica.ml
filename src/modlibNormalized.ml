@@ -74,18 +74,12 @@ and object_struct = { object_sort : sort ;
                       protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }] ;
                     }
 
-and field_modification = Modify of modify_struct
-                       | Nested of nested_struct
-
-and nested_struct = { nested_name : string ;
-                      nested_mod : field_modification list }
-
-and modify_struct = { mod_name : string ;
-                      mod_value : exp }
+and field_modification = Modify of exp
+                       | Nested of field_modification StrMap.t
 
 and class_field = { field_class : class_value ;
                     field_binding : exp option [@default None] ;
-                    field_mod : field_modification option [@default None]}
+                    field_mod : field_modification StrMap.t [@default StrMap.empty]}
 
 and elements_struct = { class_members : class_value StrMap.t [@default StrMap.empty];
                         super : class_value IntMap.t [@default IntMap.empty];
@@ -224,7 +218,7 @@ and update_map lhs rhs x m =
   StrMap.modify_def empty_class x (update_class_value lhs rhs) m
 
 and update_field_map lhs rhs x m =  
-  StrMap.modify_def {field_class=empty_class;field_binding=None;field_mod=None}
+  StrMap.modify_def {field_class=empty_class;field_binding=None;field_mod=StrMap.empty}
     x (update_field_class_value lhs rhs) m
 
 and update_field_class_value lhs rhs f = {f with field_class = update_class_value lhs rhs f.field_class}
