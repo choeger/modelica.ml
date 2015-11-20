@@ -65,11 +65,11 @@ exception EmptyName
 
 let rec name_ components = function
   | [] -> {components = List.rev components; root=false}
-  | ident::r -> name_ ({ident; kind=Any; subscripts=[]}::components) r
+  | txt::r -> name_ ({ident = {txt; loc = Location.none}; subscripts=[]}::components) r
 
 let name = function
   | [] -> raise EmptyName
-  | n -> ComponentReference (name_ [] n)
+  | n -> ComponentReference (UnknownRef (name_ [] n))
 
 let type_name xs = TName (List.map Location.mknoloc xs)
 

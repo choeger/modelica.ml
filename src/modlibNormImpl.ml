@@ -35,7 +35,7 @@ open ModlibNormalized
     
 type environment_entry = EnvClass of class_value
                        | EnvField of class_value
-                       | EnvVar
+                       | EnvVar of class_value
                          [@@deriving show,eq]
 
 type environment = { public_env : environment_entry StrMap.t ;
@@ -121,6 +121,23 @@ type impl_state = { strat_stmts : strat_stmts ; current_env : lexical_env ; curr
 
 exception NoSuchField of string
 exception DoubleModification of string
+exception IllegalUseOfBuiltin
+  
+let lookup_cr lib env cr = (*if cr.root then cr else
+    match cr.components with
+      [{ident="der"; subscripts=[]; kind=Any}] -> [{cr with root=true; components={ident="der"; subscripts=[]; kind=Der}}]
+    | [{ident="initial"; subscripts=[]; kind=Any}] -> [{cr with root=true; components={ident="initial"; subscripts=[]; kind=Initial}}]
+    | [{ident="assert";  subscripts=[]; kind=Any}] -> [{cr with root=true; components={ident="assert"; subscripts=[]; kind=Assert}}]
+    | ({ident="der"} | {ident="initial"} | {ident="assert"})::_ -> raise IllegalUseOfBuiltin
+    (*| {ident; subscripts; kind=Any} :: cs ->
+      begin match lookup_ident env ident with
+        Some (EnvVar cv) -> {ident; subscripts; kind=Var} :: (lookup_
+                             end*)*) cr
+
+let lookup_mapper lib env = { Syntax.identity_mapper with
+                              map_component_reference =
+                                (fun _ cr -> lookup_cr lib env cr);
+                            }
 
 let rec lookup lib env exp = exp
 

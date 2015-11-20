@@ -272,12 +272,13 @@ type loc_t = Location.t = {
                  | ComponentReference of component_reference
                  | OutputExpression of exp option list
                      
+  and component_reference = Der | Assert | Initial | UnknownRef of unknown_ref | KnownRef of known_ref | Var of str
 
-  and component_reference = { root : bool ; components : component list }
+  and unknown_ref = { root : bool ; components : component list }
 
-  and component_kind = Der | Assert | Initial | ClassComponent | Field | Any | Var
+  and known_ref = { class_name : string DQ.t; fields : component DQ.t }
 
-  and component = { ident : string ; kind : component_kind ; subscripts : exp list }
+  and component = { ident : str ; subscripts : exp list }
 
   and idx = { variable : str ; range : exp option } 
 

@@ -253,16 +253,16 @@ elseif_statement : ELSEIF guard = expr THEN elsethen=list(statement) { { guard ;
 
 elsewhen_statement : ELSEWHEN guard = expr THEN elsethen=list(statement) { { guard ; elsethen } }
                     
-component_reference : DOT components = separated_nonempty_list(DOT, component) { {root = true ; components } }
-                    | components = separated_nonempty_list(DOT, component) { {root = false ; components } }
+component_reference : DOT components = separated_nonempty_list(DOT, component) { UnknownRef{root = true ; components } }
+                    | components = separated_nonempty_list(DOT, component) { UnknownRef {root = false ; components } }
+                    | DER { Der }
+                    | ASSERT { Assert }
+                    | INITIAL { Initial }
                     
 subscripts : LBRACKET indices=separated_nonempty_list(COMMA, expr) RBRACKET { indices }
            | { [] }
 
-component : ident = IDENT subscripts = subscripts { { ident; kind = Any; subscripts } }
-          | ASSERT subscripts = subscripts { { ident = "assert"; kind = Assert; subscripts } }
-          | DER subscripts = subscripts { { ident = "der"; kind = Der; subscripts } }
-          | INITIAL subscripts = subscripts { { ident = "initial"; kind = Initial; subscripts } }
+component : ident = ident subscripts = subscripts { { ident; subscripts } }
           
 lexpr : r = component_reference { Single r }
       | LPAREN ps=patterns RPAREN { Multiple ps }

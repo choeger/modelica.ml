@@ -106,16 +106,17 @@ let apply_imports env =
     (* Need to merge all subscripts when replacing an imported name, e.g.,
       import b.a |= a[3] =>  b.a[3] *)
       [] -> raise InconsistentHierarchy
-    | [y] -> [{x with ident=y.txt}]
-    | y::ys -> {ident=y.txt; kind=Any;subscripts=[]}::(merge x ys)
+    | [y] -> [{x with ident=y}]
+    | y::ys -> {ident=y; subscripts=[]}::(merge x ys)
   in                  
-  let map_component_reference self = function
+  let map_unknown_ref self = function
       {root=true} as cr -> cr
-    | {components=x::xs} when StrMap.mem x.ident env ->
-      {root=true; components=(merge x (StrMap.find x.ident env)) @ xs}
+    | {components=x::xs} when StrMap.mem x.ident.txt env ->
+      {root=true; components=(merge x (StrMap.find x.ident.txt env)) @ xs}
     | c -> c
-  in  
-  let mapper = {Syntax.identity_mapper with map_component_reference} in
+  in
+  (* TODO: implement shadowing of imported names by local variables *)
+  let mapper = {Syntax.identity_mapper with map_unknown_ref} in
   (mapper.map_exp mapper)
 
 let bind_value rhs state =

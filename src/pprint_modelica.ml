@@ -41,7 +41,7 @@ let rec pp_list ?(sep="") pp_element fmt = function
     Format.fprintf fmt "%a%s@,%a"
       pp_element h sep (pp_list ~sep pp_element) t
   | [] -> ()
-
+        
 let pp_option ?(default="") pp_element fmt = function
   | Some a -> Format.fprintf fmt "%a" pp_element a
   | None -> Format.fprintf fmt "%s" default
@@ -53,6 +53,9 @@ let rec pp_enum ?(sep="") pp_element fmt enum = match (Enum.get enum) with
       | Some(h) -> Format.fprintf fmt "%s@,%a" sep (pp_enum ~sep pp_element) enum
     end
   | None -> ()
+
+let pp_dq ?(sep="") pp_element fmt dq =
+  pp_enum ~sep:sep pp_element fmt (DQ.enum dq)
 
 let rec pp_elseif pp_expr pp_then kw fmt {guard; elsethen} =
   fprintf fmt "@[ else%s@ %a@ then@ %a@]" kw pp_expr guard pp_then elsethen
@@ -120,12 +123,17 @@ let rec pp_expr fmt = function
   | ComponentReference cr -> pp_cr fmt cr
 
 and pp_cr fmt = function
-    {root=true ; components} -> fprintf fmt "@[.%a@]" (pp_list ~sep:"." pp_component) components
-  | {root=false ; components} -> fprintf fmt "@[%a@]" (pp_list ~sep:"." pp_component) components
+  | UnknownRef {root=true ; components} -> fprintf fmt "@[.%a@]" (pp_list ~sep:"." pp_component) components
+  | UnknownRef {root=false ; components} -> fprintf fmt "@[%a@]" (pp_list ~sep:"." pp_component) components
+  | KnownRef {class_name; fields} -> fprintf fmt "@[.%a.%a@]" (pp_dq ~sep:"." pp_print_string) class_name (pp_dq ~sep:"." pp_component) fields
+  | Var x -> pp_str fmt x
+  | Assert -> fprintf fmt "assert"
+  | Der -> fprintf fmt "der"
+  | Initial -> fprintf fmt "initial"         
 
 and pp_component fmt = function
-    {ident; subscripts = []} -> fprintf fmt "%s" ident
-  | {ident; subscripts} -> fprintf fmt "@[%s[%a]@]" ident (pp_list ~sep:", " pp_expr) subscripts
+    {ident; subscripts = []} -> fprintf fmt "%a" pp_str ident
+  | {ident; subscripts} -> fprintf fmt "@[%a[%a]@]" pp_str ident (pp_list ~sep:", " pp_expr) subscripts
 
 and pp_named_arg fmt ({argument_name;argument}) =
   fprintf fmt "@[%s = %a@]" argument_name.txt pp_expr argument

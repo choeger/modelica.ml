@@ -90,17 +90,14 @@ let marray x =  (MArray x)
 let explicitclosure x =  (ExplicitClosure x)
 let outputexpression x =  (OutputExpression x)
 
-let cr components = {root=false; components}
+let cr components = UnknownRef {root=false; components}
 let cre cr =  (ComponentReference cr)
 
-let derc = {ident="der";kind=Der;subscripts=[]}
-let initialc = {ident="initial";kind=Initial;subscripts=[]}
-let assertc = {ident="assert";kind=Assert;subscripts=[]}
-let der =  (ComponentReference (cr [derc]))
-let initial =  (ComponentReference (cr [initialc]))
-let assert_ =  (ComponentReference (cr [assertc]))                   
+let der =  (ComponentReference Der)
+let initial =  (ComponentReference Initial)
+let assert_ =  (ComponentReference Assert)                   
 
-let any ident = {ident;kind=Any;subscripts=[]}                             
+let any x = {ident = nl x;subscripts=[]}                             
 
 let parser_test_case parser lprinter sprinter prep input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
@@ -203,8 +200,8 @@ let test_cases = [
   expr "a.'b'.c"  (name ["a"; "'b'"; "c"]) ;
   expr "a/* comment */.b.c"  (name ["a"; "b"; "c" ]) ;
 
-  expr ".x" ( (ComponentReference {root = true; components = [any "x"]})) ;
-  expr ".x.y" ( (ComponentReference {root = true; components = [any "x"; any "y"]})) ;
+  expr ".x" ( cre (UnknownRef {root = true; components = [any "x"]})) ;
+  expr ".x.y" ( (cre (UnknownRef {root = true; components = [any "x"; any "y"]}))) ;
 
   (* functions *)
   expr "f()" (app {fun_= (cr [any "f"]); args=[]; named_args=[] });
@@ -254,7 +251,7 @@ let test_cases = [
   (* statements *)
   stmt "return;" (uncommented Return) ;
   stmt "break;" (uncommented Break) ;
-  stmt "assert();" (uncommented (Call {procedure=cr [assertc]; pargs=[]; pnamed_args = [] }));
+  stmt "assert();" (uncommented (Call {procedure=Assert; pargs=[]; pnamed_args = [] }));
   stmt "print(\"... testAllFunctions(..) is logged in \" + file);"
     (uncommented (Call {procedure=cr [any "print"] ; pargs = [
          plus { left=string "... testAllFunctions(..) is logged in "; right = ide "file" }
