@@ -34,6 +34,7 @@ open Syntax
 
 open Normalized
 open NormImpl
+open NormLib
 open Class_tests
     
 let assert_path lib path =
@@ -79,6 +80,26 @@ let assert_lex_env path expected td =
   let lib = assert_result final_result in
   assert_equal ~cmp:equal_lexical_env ~printer:show_lexical_env expected (lexical_env lib path)
 
+let assert_fld fld = function
+  | Class {public} when StrMap.mem fld public.fields -> StrMap.find fld public.fields
+  | Class {protected} when StrMap.mem fld protected.fields -> StrMap.find fld protected.fields
+  | cv -> assert_failure ("No field: '"^fld^"' in: " ^ (show_class_value cv)) 
+
+let assert_norm path pred fld td =  
+  let parsed = {within = Some []; toplevel_defs = [td] } in
+  let {Report.final_messages; final_result} = Report.run (NormLib.norm_pkg_root (Trans.translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=empty_elements} in
+  IO.flush (!BatLog.output) ;
+  let () = assert_equal ~msg:"No warnings and errors expected" ~printer:show_messages [] final_messages in (* TODO: filter warnings / errors *)
+  let impl = (assert_result final_result).implementation in
+  let cv = assert_path impl path in
+  let fld = assert_fld fld cv in
+  pred fld
+
+let show_option f = function None -> "None" | Some x -> "(Some " ^ (f x) ^ ")"
+
+let has_binding exp {field_binding} =
+    assert_equal ~printer:(show_option show_exp) (Some exp) field_binding
+
 let test_ctxt descr input path =
   descr >:: (Parser_tests.parse_test Parser.td_parser input (assert_ctxt_names (DQ.of_list path)))
 
@@ -87,6 +108,9 @@ let test_env descr input classname expected =
 
 let test_lex_env descr input classname expected =
   descr >:: (Parser_tests.parse_test Parser.td_parser input (assert_lex_env (Inter.Path.of_list classname) expected))  
+
+let test_norm descr input classname fld pred =
+  descr >:: (Parser_tests.parse_test Parser.td_parser input (assert_norm (Inter.Path.of_list classname) pred fld))
 
 let test_cases = [
   test_env "Empty class" "class A end A" [`ClassMember "A"] NormImpl.empty_env ;
@@ -118,6 +142,10 @@ let test_cases = [
     "class A constant Real x = 42.; class B end B; end A"
     [`ClassMember "A"; `ClassMember "B"] 
     [ empty_env; {empty_env with public_env = StrMap.of_list ["B", EnvClass b; "x", EnvField (const Real)]} ] ; 
+
+  test_norm "Normalize Simple Binding"
+    "class A constant Real x = 42.; end A"
+    [`ClassMember "A"] "x" (has_binding (Real 42.)) ;
   
 ]
 

@@ -129,7 +129,7 @@ let run_compile global root =
         write_out sig_dump (sig_file ()) ;
         BatLog.logf "Signature Dump (%d) Ok.\n" (String.length sig_dump);
 
-        let js = Inter.value_program_to_yojson implementation in
+        let js = Normalized.elements_struct_to_yojson implementation in
         let impl_dump = Yojson.Safe.pretty_to_string js in
         write_out impl_dump (impl_file ()) ;
         BatLog.logf "Implementation Dump (%d) Ok.\n" (String.length impl_dump);

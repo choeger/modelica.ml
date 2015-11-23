@@ -242,5 +242,7 @@ let rec impl_mapper lib {strat_stmts; current_env; current_path} =
       );
   }
 
-                                      
+let norm lib strat_stmts =
+  let m = impl_mapper lib {strat_stmts; current_env = []; current_path = DQ.empty} in
+  m.map_elements_struct m lib
                                       
