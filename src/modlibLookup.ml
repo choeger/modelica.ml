@@ -55,6 +55,12 @@ let rec get_class_element_in global current_path {Normalized.class_members; supe
   else (
     pickfirst_class global current_path (DQ.cons x xs) (IntMap.bindings super) )
 
+and get_class_element_os global found_path {public;protected} x xs =
+  let f = get_class_element_in global found_path public x xs in
+  match f with
+    `NothingFound -> get_class_element_in global (DQ.snoc found_path `Protected) protected x xs
+  | _ as r -> r
+
 and pickfirst_class global current_path name = function
     [] -> `NothingFound
   | (k,v)::vs ->
@@ -81,15 +87,7 @@ and get_class_element global found_path e p =
 
   | Some (x, xs) -> begin
       match e with
-      | Class {protected;public} ->
-        begin
-          let f = get_class_element_in global found_path public x xs in
-          begin
-            match f with
-              `NothingFound -> get_class_element_in global (DQ.snoc found_path `Protected) protected x xs
-            | _ as r -> r
-          end
-        end
+      | Class os -> get_class_element_os global found_path os x xs
 
       (* we might encounter recursive elements *)
       | Recursive rec_term -> `Recursion {rec_term; search_state={found = found_path; not_found = p}}

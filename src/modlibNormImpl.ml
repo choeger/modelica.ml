@@ -35,15 +35,19 @@ open ModlibNormalized
     
 type environment_entry = EnvClass of class_value
                        | EnvField of class_value
-                       | EnvVar of class_value
+                       | EnvVar
                          [@@deriving show,eq]
 
 type environment = { public_env : environment_entry StrMap.t ;
                      protected_env : environment_entry StrMap.t }
   [@@deriving show,eq]
-  
+
 let empty_env = {public_env = StrMap.empty ; protected_env = StrMap.empty}
-  
+
+let env_mem x {public_env; protected_env} = StrMap.mem x public_env || StrMap.mem x protected_env
+
+let env_find x {public_env; protected_env} = try StrMap.find x public_env with Not_found -> StrMap.find x protected_env
+
 (** Environment of a class *)
 let env_folder lib = { ModlibNormalized.identity_folder with
 
@@ -119,27 +123,68 @@ type strat_stmts = strat_stmt list PathMap.t
 
 type impl_state = { strat_stmts : strat_stmts ; current_env : lexical_env ; current_path : Path.t }
 
-exception NoSuchField of string
+exception NoSuchField of str
 exception DoubleModification of string
-exception IllegalUseOfBuiltin
-  
-let lookup_cr lib env cr = (*if cr.root then cr else
-    match cr.components with
-      [{ident="der"; subscripts=[]; kind=Any}] -> [{cr with root=true; components={ident="der"; subscripts=[]; kind=Der}}]
-    | [{ident="initial"; subscripts=[]; kind=Any}] -> [{cr with root=true; components={ident="initial"; subscripts=[]; kind=Initial}}]
-    | [{ident="assert";  subscripts=[]; kind=Any}] -> [{cr with root=true; components={ident="assert"; subscripts=[]; kind=Assert}}]
-    | ({ident="der"} | {ident="initial"} | {ident="assert"})::_ -> raise IllegalUseOfBuiltin
-    (*| {ident; subscripts; kind=Any} :: cs ->
-      begin match lookup_ident env ident with
-        Some (EnvVar cv) -> {ident; subscripts; kind=Var} :: (lookup_
-                             end*)*) cr
+exception AstInvariant
+exception SubscriptsOnClass of str
+exception NoSuchClass of str
+exception ProjectFromFunction of str
 
-let lookup_mapper lib env = { Syntax.identity_mapper with
-                              map_component_reference =
-                                (fun _ cr -> lookup_cr lib env cr);
-                            }
+let rec resolve_os lib class_name os x xs =
+  (* Resolve a reference in an object structure *)
+  match ModlibLookup.get_class_element_os lib DQ.empty os x.ident.txt DQ.empty with
+    `Found {found_value; found_path} ->
+    begin match DQ.rear found_path with
+      | Some(_, `ClassMember _) -> resolve_in lib (DQ.snoc class_name x.ident.txt) found_value xs
+      | Some(_, `FieldType _) -> {class_name; fields=DQ.of_list (x::xs)}
+      | _ -> raise AstInvariant
+    end
+  | _ -> raise (NoSuchField x.ident)
 
-let rec lookup lib env exp = exp
+and resolve_in lib class_name cv (components : component list) = match components with
+    [] -> {class_name; fields = DQ.empty}
+  | x :: xs -> begin match cv with
+      | Class os when x.subscripts=[] -> resolve_os lib class_name os x xs
+      (* Everything else cannot denote a class or function *)
+      | Class _ 
+      | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ -> {class_name; fields=DQ.of_list components}
+    end
+
+let rec resolve_env lib class_name first rest = function
+    [] -> resolve_os lib DQ.empty {empty_object_struct with public=lib} first rest
+  | env :: envs when env_mem first.ident.txt env ->
+    begin
+    match env_find first.ident.txt env with
+      EnvClass cv when first.subscripts = [] -> resolve_in lib (DQ.snoc class_name first.ident.txt) cv rest
+    | EnvClass cv -> raise (SubscriptsOnClass first.ident)
+    | EnvField cv -> {class_name; fields = DQ.of_list rest}
+    | EnvVar -> {class_name = DQ.empty; fields = DQ.of_list (first :: rest)}
+    end
+  | env :: envs -> begin
+      (* try next scope *)
+      match DQ.rear class_name with None -> raise AstInvariant
+                                  | Some (xs,_) -> resolve_env lib xs first rest envs
+    end
+    
+let resolve_ur lib src env {root;components} =
+  match components with
+    cmp :: components ->
+      if root then
+        resolve_os lib DQ.empty {empty_object_struct with public=lib} cmp components
+      else
+        resolve_env lib src cmp components env 
+  | [] -> raise AstInvariant
+
+let resolution_mapper lib src env = { Syntax.identity_mapper with
+                                      on_component_reference = {
+                                        Syntax.identity_mapper.on_component_reference with
+                                        map_UnknownRef =
+                                          (fun _ ur -> KnownRef (resolve_ur lib src env ur));
+                                      }
+                                    }
+
+let rec resolve lib src env exp = let m = resolution_mapper lib src env in
+  m.map_exp m exp
 
 let rec merge_mod exp mod_name nested_name mods =
   if StrMap.mem mod_name mods then
@@ -153,10 +198,10 @@ let rec merge_mod exp mod_name nested_name mods =
   else
     merge_mod exp mod_name nested_name (StrMap.add mod_name (Nested StrMap.empty) mods)
       
-let rec normalize_stmts lib env class_fields = function
+let rec normalize_stmts lib src env class_fields = function
   | [] -> class_fields
   | {field_name;exp}::stmts ->
-    let exp = lookup lib env exp in
+    let exp = resolve lib src env exp in
     begin match DQ.front field_name with    
       | Some (x,xs) when StrMap.mem x class_fields ->
         let fld = StrMap.find x class_fields in
@@ -164,12 +209,14 @@ let rec normalize_stmts lib env class_fields = function
         match DQ.front xs with
           None -> {fld with field_binding = Some exp}
         | _ -> {fld with field_mod = merge_mod exp x xs fld.field_mod} 
-        in normalize_stmts lib env (StrMap.add x class_field class_fields) stmts
-      | None -> normalize_stmts lib env class_fields stmts (* bogus stmt *)
-      | Some (x, xs) -> raise (NoSuchField x) (* Error TODO: move to Report Monad? *)
+        in normalize_stmts lib src env (StrMap.add x class_field class_fields) stmts
+      | None -> normalize_stmts lib src env class_fields stmts (* bogus stmt *)
+      | Some (x, xs) -> raise (NoSuchField ({txt=x;loc=Location.none})) (* Error TODO: move to Report Monad? *)
     end
 
 let rec impl_mapper lib {strat_stmts; current_env; current_path} =
+  let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some x | _ -> None) (DQ.enum path)) in
+  
   { ModlibNormalized.identity_mapper with
     
     map_object_struct = (fun self os ->
@@ -190,7 +237,7 @@ let rec impl_mapper lib {strat_stmts; current_env; current_path} =
         let class_members = StrMap.map (self.map_class_value self) class_members in
 
         (* normalize and attach statements to fields *)
-        let fields = normalize_stmts lib current_env fields stmts in
+        let fields = normalize_stmts lib (class_name current_path) current_env fields stmts in
         {class_members; super; fields}
       );
   }
