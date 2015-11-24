@@ -157,7 +157,7 @@ let rec resolve_env lib class_name first rest = function
     match env_find first.ident.txt env with
       EnvClass cv when first.subscripts = [] -> resolve_in lib (DQ.snoc class_name first.ident.txt) cv rest
     | EnvClass cv -> raise (SubscriptsOnClass first.ident)
-    | EnvField cv -> {class_name; fields = DQ.of_list rest}
+    | EnvField cv -> {class_name; fields = DQ.of_list (first :: rest)}
     | EnvVar -> {class_name = DQ.empty; fields = DQ.of_list (first :: rest)}
     end
   | env :: envs -> begin

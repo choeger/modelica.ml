@@ -36,7 +36,9 @@ open Normalized
 open NormImpl
 open NormLib
 open Class_tests
-    
+
+let nl = Location.mknoloc
+
 let assert_path lib path =
   match lookup_path lib path with
     `Found f -> f.found_value
@@ -100,8 +102,10 @@ let assert_norm path pred vis fld td =
 
 let show_option f = function None -> "None" | Some x -> "(Some " ^ (f x) ^ ")"
 
+let equal_option f x = function None -> x = None | Some y -> begin match x with Some x -> f x y | _ -> false end 
+
 let has_binding exp {field_binding} =
-    assert_equal ~printer:(show_option show_exp) (Some exp) field_binding
+    assert_equal ~printer:(show_option show_exp) ~cmp:(equal_option Syntax.equal_exp) (Some exp) (Option.map Parser_tests.prep_expr field_binding)
 
 let is_modified_to exp =
   assert_equal ~printer:show_field_modification (Modify exp)  
@@ -170,6 +174,11 @@ let test_cases = [
   test_norm "Normalize Simple Protected Modification"
     "class A protected constant Real x(start = 42.); end A"
     [`ClassMember "A"] protected "x" (has_modification "start" (is_modified_to (Real 42.))) ;
+
+  test_norm "Name Resolution Inside Binding"
+    "class A constant Real y = x; protected constant Real x = 42.; end A"
+    [`ClassMember "A"] public "y" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"];
+                                                                              fields = DQ.of_list [{ident = nl "x";subscripts=[]}]}))) ;
 ]
 
 let suite = "Implementation Normalization" >::: test_cases

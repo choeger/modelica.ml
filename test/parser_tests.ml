@@ -109,7 +109,9 @@ let parser_test_case parser lprinter sprinter prep input expected =
            (fun e -> assert_equal ~msg:"equality of re-parsed result" ~printer:sprinter (prep firstpass) (prep e)) ())) ; 
   ]
 
-let erase_location = { identity_mapper with map_loc_t = (fun _ _ -> Location.none) }
+let erase_location = { identity_mapper with map_loc_t = (fun _ _ -> Location.none) ;
+                                            map_known_ref = (fun s {class_name; fields} -> {class_name; fields = DQ.map (s.map_component s) fields}) ;
+                     }
 
 let prep_import = erase_location.map_import erase_location 
 
