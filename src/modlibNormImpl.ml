@@ -117,7 +117,7 @@ let lexical_env lib path =
 
 (** A stratified value binding *)
 type strat_stmt = { field_name : string DQ.t;
-                    exp : Syntax.exp }
+                    exp : Syntax.exp } [@@deriving show]
 
 type strat_stmts = strat_stmt list PathMap.t
 
@@ -188,13 +188,16 @@ let rec resolve lib src env exp = let m = resolution_mapper lib src env in
 
 let rec merge_mod exp mod_name nested_name mods =
   if StrMap.mem mod_name mods then
+    let new_mod =
     match StrMap.find mod_name mods with
       Modify _ -> raise (DoubleModification mod_name)
     | Nested mods -> 
       begin match DQ.front nested_name with
-          None -> raise (DoubleModification mod_name)
-        | Some (x,xs) -> merge_mod exp x xs mods
+        | None when mods = StrMap.empty -> Modify exp
+        | None -> raise (DoubleModification mod_name)
+        | Some (x,xs) -> Nested (merge_mod exp x xs mods)
       end
+      in StrMap.add mod_name new_mod mods
   else
     merge_mod exp mod_name nested_name (StrMap.add mod_name (Nested StrMap.empty) mods)
       
@@ -208,10 +211,12 @@ let rec normalize_stmts lib src env class_fields = function
         let class_field = 
         match DQ.front xs with
           None -> {fld with field_binding = Some exp}
-        | _ -> {fld with field_mod = merge_mod exp x xs fld.field_mod} 
+        | Some(y,ys) -> {fld with field_mod = merge_mod exp y ys fld.field_mod} 
         in normalize_stmts lib src env (StrMap.add x class_field class_fields) stmts
       | None -> normalize_stmts lib src env class_fields stmts (* bogus stmt *)
-      | Some (x, xs) -> raise (NoSuchField ({txt=x;loc=Location.none})) (* Error TODO: move to Report Monad? *)
+      | Some (x, xs) ->        
+        BatLog.logf "No field %s in %a\n" x (DQ.print IO.write_string) src ;
+        raise (NoSuchField ({txt=x;loc=Location.none})) (* Error TODO: move to Report Monad? *)
     end
 
 let rec impl_mapper lib {strat_stmts; current_env; current_path} =
@@ -219,20 +224,22 @@ let rec impl_mapper lib {strat_stmts; current_env; current_path} =
   
   { ModlibNormalized.identity_mapper with
     
-    map_object_struct = (fun self os ->
+    map_object_struct = (fun self os ->       
         (* Update the environment for each object struct *)
-        let s = impl_mapper lib {
+        let pub_state = {
             strat_stmts ;
             current_env = (os_env lib os)::current_env;
             current_path = os.source_path }
         in
-        
+        let s = impl_mapper lib pub_state in
         let public = s.map_elements_struct s os.public in
+
+        let s = impl_mapper lib {pub_state with current_path = DQ.snoc pub_state.current_path `Protected} in
         let protected = s.map_elements_struct s os.protected in
         {os with public; protected});
 
     map_elements_struct = (fun self {class_members; super; fields} ->
-        let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in 
+        let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in        
         (* proceed through the tree *)
         let class_members = StrMap.map (self.map_class_value self) class_members in
 
