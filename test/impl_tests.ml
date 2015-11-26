@@ -179,6 +179,18 @@ let test_cases = [
     "class A constant Real y = x; protected constant Real x = 42.; end A"
     [`ClassMember "A"] public "y" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"];
                                                                               fields = DQ.of_list [{ident = nl "x";subscripts=[]}]}))) ;
+
+  test_norm "Inherited Name Resolution Inside Binding"
+    "class A class B constant Real x = 42.; end B; class C extends B; protected constant Real y = x; end C; end A"
+    [`ClassMember "A"; `ClassMember "C"] protected "y"
+    (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"; "C"];
+                                                fields = DQ.of_list [{ident = nl "x";subscripts=[]}]}))) ;
+
+  test_norm
+    "Lookup a modified constant in a simple Modelica class using extensions" 
+    "package A model C extends B(x = 21.); end C; model B constant Real x = 42.; end B; end A" 
+    [`ClassMember "A"; `ClassMember "C"] public "x"
+    (has_binding  (Real 21.)) ;   
 ]
 
 let suite = "Implementation Normalization" >::: test_cases

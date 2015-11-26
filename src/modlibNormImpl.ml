@@ -200,23 +200,50 @@ let rec merge_mod exp mod_name nested_name mods =
       in StrMap.add mod_name new_mod mods
   else
     merge_mod exp mod_name nested_name (StrMap.add mod_name (Nested StrMap.empty) mods)
-      
-let rec normalize_stmts lib src env class_fields = function
+
+let rec find_super_field lib x super =
+  (* Get the first inherited class field named x or None *)
+  let rec take enum = Enum.get (Enum.filter_map get_fld enum)
+  and get_fld = function
+      Class os when StrMap.mem x os.public.fields -> Some (StrMap.find x os.public.fields)
+    | Class os when StrMap.mem x os.protected.fields -> Some (StrMap.find x os.protected.fields)
+    | Class os -> take (Enum.append (IntMap.values os.public.super) (IntMap.values os.protected.super))
+    | GlobalReference r ->
+      begin match lookup_path lib r with
+          `Found {found_value} -> get_fld found_value
+        | _ -> None
+      end
+    | _ -> None
+  in
+  take (IntMap.values super)
+
+let rec normalize_stmts lib src env super class_fields =      
+  function
   | [] -> class_fields
-  | {field_name;exp}::stmts ->
+  | {field_name;exp}::stmts ->    
     let exp = resolve lib src env exp in
+
+    let insert fld xs = match DQ.front xs with
+        None -> {fld with field_binding = Some exp}
+      | Some(y,ys) -> {fld with field_mod = merge_mod exp y ys fld.field_mod} 
+    in
+    
     begin match DQ.front field_name with    
       | Some (x,xs) when StrMap.mem x class_fields ->
         let fld = StrMap.find x class_fields in
-        let class_field = 
-        match DQ.front xs with
-          None -> {fld with field_binding = Some exp}
-        | Some(y,ys) -> {fld with field_mod = merge_mod exp y ys fld.field_mod} 
-        in normalize_stmts lib src env (StrMap.add x class_field class_fields) stmts
-      | None -> normalize_stmts lib src env class_fields stmts (* bogus stmt *)
-      | Some (x, xs) ->        
-        BatLog.logf "No field %s in %a\n" x (DQ.print IO.write_string) src ;
-        raise (NoSuchField ({txt=x;loc=Location.none})) (* Error TODO: move to Report Monad? *)
+        let class_field = insert fld xs 
+        in normalize_stmts lib src env super (StrMap.add x class_field class_fields) stmts
+      | None -> normalize_stmts lib src env super class_fields stmts (* bogus stmt *)                  
+
+      | Some (x, xs) ->
+        (* Search superclasses *)
+        begin match find_super_field lib x super with
+            None -> BatLog.logf "No field %s in %a\n" x (DQ.print IO.write_string) src ;
+            raise (NoSuchField ({txt=x;loc=Location.none})) (* Error TODO: move to Report Monad? *)
+          | Some fld ->
+            let class_field = insert fld xs 
+            in normalize_stmts lib src env super (StrMap.add x class_field class_fields) stmts
+        end
     end
 
 let rec impl_mapper lib {strat_stmts; current_env; current_path} =
@@ -244,7 +271,7 @@ let rec impl_mapper lib {strat_stmts; current_env; current_path} =
         let class_members = StrMap.map (self.map_class_value self) class_members in
 
         (* normalize and attach statements to fields *)
-        let fields = normalize_stmts lib (class_name current_path) current_env fields stmts in
+        let fields = normalize_stmts lib (class_name current_path) current_env super fields stmts in
         {class_members; super; fields}
       );
   }
