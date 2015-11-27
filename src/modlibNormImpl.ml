@@ -121,7 +121,10 @@ type strat_stmt = { field_name : string DQ.t;
 
 type strat_stmts = strat_stmt list PathMap.t
 
-type impl_state = { strat_stmts : strat_stmts ; current_env : lexical_env ; current_path : Path.t }
+type payload_stmts = Syntax.behavior PathMap.t
+
+type impl_state = { strat_stmts : strat_stmts ; payload : payload_stmts ;
+                    current_env : lexical_env ; current_path : Path.t }
 
 exception NoSuchField of str
 exception DoubleModification of string
@@ -183,9 +186,13 @@ let resolution_mapper lib src env = { Syntax.identity_mapper with
                                       }
                                     }
 
-let rec resolve lib src env exp = let m = resolution_mapper lib src env in
+let resolve lib src env exp = let m = resolution_mapper lib src env in
   m.map_exp m exp
 
+let resolve_behavior lib src env =
+  let m = resolution_mapper lib src env in
+  m.map_behavior m
+    
 let rec merge_mod exp mod_name nested_name mods =
   if StrMap.mem mod_name mods then
     let new_mod =
@@ -246,24 +253,34 @@ let rec normalize_stmts lib src env super class_fields =
         end
     end
 
-let rec impl_mapper lib {strat_stmts; current_env; current_path} =
+let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
   let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some x | _ -> None) (DQ.enum path)) in
   
   { ModlibNormalized.identity_mapper with
     
-    map_object_struct = (fun self os ->       
+    map_object_struct = (fun self os ->
+        let behavior =
+          if PathMap.mem os.source_path payload
+          then
+            resolve_behavior lib (class_name os.source_path) current_env (PathMap.find os.source_path payload)
+          else
+            os.behavior
+        in
+
         (* Update the environment for each object struct *)
         let pub_state = {
             strat_stmts ;
+            payload;
             current_env = (os_env lib os)::current_env;
             current_path = os.source_path }
         in
         let s = impl_mapper lib pub_state in
+
         let public = s.map_elements_struct s os.public in
 
         let s = impl_mapper lib {pub_state with current_path = DQ.snoc pub_state.current_path `Protected} in
         let protected = s.map_elements_struct s os.protected in
-        {os with public; protected});
+        {os with public; protected; behavior});
 
     map_elements_struct = (fun self {class_members; super; fields} ->
         let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in        
@@ -276,7 +293,7 @@ let rec impl_mapper lib {strat_stmts; current_env; current_path} =
       );
   }
 
-let norm lib strat_stmts =
-  let m = impl_mapper lib {strat_stmts; current_env = []; current_path = DQ.empty} in
+let norm lib payload strat_stmts =
+  let m = impl_mapper lib {strat_stmts; payload; current_env = []; current_path = DQ.empty} in
   m.map_elements_struct m lib
                                       

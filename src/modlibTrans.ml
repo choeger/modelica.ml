@@ -73,6 +73,7 @@ type translation_state = {
   class_code : class_stmt list ;
   current_field : string DQ.t ;
   value_code : value_stmt list ;
+  payload_code : payload_stmt list;
 }
 
 let rec add_imports imports state = match imports with
@@ -84,7 +85,8 @@ let return x = fun s -> (x, s)
 let bind ma f = fun s -> let (a, s') = ma s in
   (f a s') 
 
-let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; anons = 0; class_code = []; current_field = DQ.empty ; value_code = []} in a
+let run m = let (a,s) = m {env = StrMap.empty ; current_path = DQ.empty ; anons = 0; class_code = [];
+                           current_field = DQ.empty ; value_code = []; payload_code = []} in a
 
 let down pe state = ((), {state with current_path = DQ.snoc state.current_path pe})
 
@@ -95,6 +97,14 @@ let within_path = function
 let up state = ((), {state with current_path = match DQ.rear state.current_path with None -> DQ.empty | Some (xs,_) -> xs})
 
 let define rhs state = ((), {state with class_code = {lhs=state.current_path; rhs} :: state.class_code})
+
+let payload rhs state =
+  (* Small optimization: Only cover actual payload *)
+  if rhs = Syntax_fragments.empty_behavior then
+    ((), state)
+  else
+    let state' = {state with payload_code = {lhs=state.current_path; rhs} :: state.payload_code} in
+    ((), state')
 
 let down_field x state = ((), {state with current_field = DQ.snoc state.current_field x})
 
@@ -131,7 +141,7 @@ let open_class sort post state = ((), {state with class_code =
 
 let in_context m state =
   let (x, s') = m {state with anons = (Hashtbl.hash state.current_path)} in
-  (x, {state with class_code = s'.class_code; value_code = s'.value_code})
+  (x, {state with class_code = s'.class_code; value_code = s'.value_code; payload_code = s'.payload_code})
 
 let inside name m state =
   let (x, s') = m {state with current_path = name} in
@@ -191,6 +201,9 @@ let rec mtranslate_tds = function
       down (`ClassMember tds.td_name.txt) ;
       (* Class skeleton *)
       open_class tds.sort (repl tds.type_options) ;
+      (* Payload *)
+      let () = BatLog.logf "Adding payload\n" in
+      payload tds.type_exp.cargo ;
       (* Public elements *)
       mtranslate_elements tds.type_exp.public ;	 
       (* Protected elements *)
@@ -429,6 +442,7 @@ type translated_unit = {
   class_name : Name.t;
   class_code : class_stmt list;
   impl_code : value_program ;
+  payload : payload_stmt list;
 } [@@deriving show,yojson]
 
 let name_of = function
@@ -442,13 +456,14 @@ let name_of = function
 open FileSystem
 
 let mtranslate_unit env {within; toplevel_defs=td::_} =
+  let () = BatLog.logf "Translating unit.\n" in 
   do_ ;
   set_env env ;
   within_path within ;
   mtranslate_typedef td ;
-  down (`ClassMember (name_of td.commented).txt) ;
   s <-- get ;
-  return {class_code=s.class_code; class_name=Name.of_ptr s.current_path; impl_code=s.value_code}
+  let () = BatLog.logf "Collected %d payloads.\n" (List.length s.payload_code) in
+  return {class_code=s.class_code; class_name=Name.of_ptr s.current_path; impl_code=s.value_code; payload=s.payload_code}
 
 let translate_unit env {scanned; parsed} =
   run (mtranslate_unit env parsed)

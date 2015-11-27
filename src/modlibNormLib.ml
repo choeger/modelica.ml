@@ -48,11 +48,11 @@ type library = { signature : Normalized.elements_struct ; implementation : Norma
 
 let rec collect_impl_pkg impl {FileSystem.package_unit; external_units; sub_packages} =
   let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) impl sub_packages in 
-  List.fold_left (fun impl u -> u.Trans.impl_code @ impl) pkgs_impl (package_unit :: external_units)
+  List.fold_left (fun (payload, impl) u -> (u.Trans.payload @ payload, u.Trans.impl_code @ impl)) pkgs_impl (package_unit :: external_units)
 
 let collect_impl {FileSystem.root_units; root_packages} =
-  let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) [] root_packages in 
-  List.fold_left (fun impl u -> u.Trans.impl_code @ impl) pkgs_impl root_units
+  let pkgs_impl = List.fold_left (fun impl pkg -> collect_impl_pkg impl pkg) ([],[]) root_packages in 
+  List.fold_left (fun (payload,impl) u -> (u.Trans.payload @ payload, u.Trans.impl_code @ impl)) pkgs_impl root_units
 
 open ModlibNormImpl
 
@@ -67,13 +67,22 @@ let sort_impl map stmt =
   else
     [strat_stmt]
   end map) 
-    
+
+let stratify_payload map stmt =
+  (* This should actually never fail, but the typechecker demands it *)
+  Report.do_ ;
+  scope <-- stratify_ptr stmt.lhs ;
+  return (PathMap.add scope stmt.rhs map) 
+
 let norm_pkg_root root =
   Report.do_ ;
   (* normalize signature *)
   signature <-- NormSig.norm_pkg_root root ;
-  (* collect statements and sort by context *)
-  stmts <-- Report.fold sort_impl PathMap.empty (collect_impl root) ;
-  return {signature; implementation = ModlibNormImpl.norm signature stmts}
+  let (payloads, rhss) = collect_impl root in
+  let () = BatLog.logf "Got %d payloads.\n" (List.length payloads) in
+  (* collect rhs-statements and stratify *)
+  stmts <-- Report.fold sort_impl PathMap.empty rhss;
+  payloads <-- Report.fold stratify_payload PathMap.empty payloads ;
+  return {signature; implementation = ModlibNormImpl.norm signature payloads stmts}
   
       

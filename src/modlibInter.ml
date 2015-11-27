@@ -96,6 +96,9 @@ type value_ptr = { scope : class_ptr ; field : string DQ.t } [@@deriving eq,show
 (** Assignment of term in the global hierachy *)
 type value_stmt = (value_ptr, Syntax.exp) stmt [@@deriving show,yojson]
 
+(** Payload storage *)
+type payload_stmt = (class_ptr, Syntax.behavior) stmt [@@deriving show,yojson]
+
 type class_program = class_stmt list [@@deriving show,yojson]
 
 type value_program = value_stmt list [@@deriving show,yojson]
