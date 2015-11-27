@@ -85,24 +85,34 @@ let assert_lex_env path expected td =
 let protected = false
 let public = true
 
-let assert_fld vis fld = function
-  | Class {public} when vis && StrMap.mem fld public.fields -> StrMap.find fld public.fields
-  | Class {protected} when (not vis) && StrMap.mem fld protected.fields -> StrMap.find fld protected.fields
+let assert_fld vis fld pred = function
+  | Class {public} when vis && StrMap.mem fld public.fields -> pred (StrMap.find fld public.fields)
+  | Class {protected} when (not vis) && StrMap.mem fld protected.fields -> pred (StrMap.find fld protected.fields)
   | cv -> assert_failure ("No field: '"^fld^"' in: " ^ (show_class_value cv)) 
 
-let assert_norm path pred vis fld td =  
+let field = assert_fld
+    
+let assert_norm path pred td =  
   let parsed = {within = Some []; toplevel_defs = [td] } in
   let {Report.final_messages; final_result} = Report.run (NormLib.norm_pkg_root (Trans.translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=empty_elements} in
   IO.flush (!BatLog.output) ;
   let () = assert_equal ~msg:"No warnings and errors expected" ~printer:show_messages [] final_messages in (* TODO: filter warnings / errors *)
   let impl = (assert_result final_result).implementation in
   let cv = assert_path impl path in
-  let fld = assert_fld vis fld cv in
-  pred fld
+  pred cv
 
 let show_option f = function None -> "None" | Some x -> "(Some " ^ (f x) ^ ")"
 
+let show_list f l =
+  let o = IO.output_string () in
+  (List.print (fun o x -> IO.write_string o (f x))) o l ;
+  IO.close_out o
+
 let equal_option f x = function None -> x = None | Some y -> begin match x with Some x -> f x y | _ -> false end 
+
+let has_equation eq = function
+    Class {behavior} -> assert_equal ~printer:(show_list show_equation) [eq] behavior.equations
+  | cv -> assert_failure ("Expected a class. Got: " ^ (show_class_value cv))
 
 let has_binding exp {field_binding} =
     assert_equal ~printer:(show_option show_exp) ~cmp:(equal_option Syntax.equal_exp) (Some exp) (Option.map Parser_tests.prep_expr field_binding)
@@ -125,8 +135,10 @@ let test_env descr input classname expected =
 let test_lex_env descr input classname expected =
   descr >:: (Parser_tests.parse_test Parser.td_parser input (assert_lex_env (Inter.Path.of_list classname) expected))  
 
-let test_norm descr input classname vis fld pred =
-  descr >:: (Parser_tests.parse_test Parser.td_parser input (assert_norm (Inter.Path.of_list classname) pred vis fld))
+let test_norm descr input classname pred =
+  descr >:: (Parser_tests.parse_test Parser.td_parser input (assert_norm (Inter.Path.of_list classname) pred))
+
+open Syntax_fragments
 
 let test_cases = [
   test_env "Empty class" "class A end A" [`ClassMember "A"] NormImpl.empty_env ;
@@ -161,36 +173,45 @@ let test_cases = [
 
   test_norm "Normalize Simple Binding"
     "class A constant Real x = 42.; end A"
-    [`ClassMember "A"] public "x" (has_binding (Real 42.)) ;
+    [`ClassMember "A"] (field public "x" (has_binding (Real 42.))) ;
 
   test_norm "Normalize Simple Protected Binding"
     "class A protected constant Real x = 42.; end A"
-    [`ClassMember "A"] protected "x" (has_binding (Real 42.)) ;
+    [`ClassMember "A"] (field protected "x" (has_binding (Real 42.))) ;
 
   test_norm "Normalize Simple Modification"
     "class A constant Real x(start = 42.); end A"
-    [`ClassMember "A"] public "x" (has_modification "start" (is_modified_to (Real 42.))) ;
+    [`ClassMember "A"] (field public "x" (has_modification "start" (is_modified_to (Real 42.)))) ;
 
   test_norm "Normalize Simple Protected Modification"
     "class A protected constant Real x(start = 42.); end A"
-    [`ClassMember "A"] protected "x" (has_modification "start" (is_modified_to (Real 42.))) ;
-
+    [`ClassMember "A"] (field protected "x" (has_modification "start" (is_modified_to (Real 42.)))) ;
+                              
   test_norm "Name Resolution Inside Binding"
     "class A constant Real y = x; protected constant Real x = 42.; end A"
-    [`ClassMember "A"] public "y" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"];
-                                                                              fields = DQ.of_list [{ident = nl "x";subscripts=[]}]}))) ;
+    [`ClassMember "A"] (field public "y" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"];
+                                                                                     fields = DQ.of_list [{ident = nl "x";subscripts=[]}]})))) ;
 
   test_norm "Inherited Name Resolution Inside Binding"
     "class A class B constant Real x = 42.; end B; class C extends B; protected constant Real y = x; end C; end A"
-    [`ClassMember "A"; `ClassMember "C"] protected "y"
-    (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"; "C"];
-                                                fields = DQ.of_list [{ident = nl "x";subscripts=[]}]}))) ;
+    [`ClassMember "A"; `ClassMember "C"]
+    (field protected "y"
+       (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"; "C"];
+                                                   fields = DQ.of_list [{ident = nl "x";subscripts=[]}]}))))  ;
 
   test_norm
     "Lookup a modified constant in a simple Modelica class using extensions" 
     "package A model C extends B(x = 21.); end C; model B constant Real x = 42.; end B; end A" 
-    [`ClassMember "A"; `ClassMember "C"] public "x"
-    (has_binding  (Real 21.)) ;   
+    [`ClassMember "A"; `ClassMember "C"] (field public "x"  
+    (has_binding (Real 21.))) ;   
+
+  let expected_ref = KnownRef { class_name=DQ.of_list ["A"];
+                                fields = DQ.of_list [{ident=nl "x"; subscripts=[]}] }
+  in 
+  test_norm
+    "Lookup an unknown in an equation"
+    "model A Real x; equation x = 0.0; end A"
+    [`ClassMember "A"] (has_equation {comment = no_comment; commented = SimpleEquation {left=ComponentReference expected_ref; right=Real 0.0}});
 ]
 
 let suite = "Implementation Normalization" >::: test_cases

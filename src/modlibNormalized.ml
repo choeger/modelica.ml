@@ -72,6 +72,7 @@ and object_struct = { object_sort : sort ;
                       source_path : Path.t ;
                       public : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }];
                       protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }] ;
+                      behavior : behavior [@default {algorithms=[]; equations=[]; initial_algorithms=[]; initial_equations=[]; external_=None}] ;
                     }
 
 and field_modification = Modify of exp
@@ -121,9 +122,11 @@ let rec unflat = function
     let unflat_var v cv = match v with None -> cv | Some v -> Constr {arg=cv; constr=Var v} in
     flat_val |> (unflat_sort fa_sort) |> (unflat_var fa_var) |> (unflat_con fa_con) |> (unflat_cau fa_cau)
 
-let norm_cv = flat %> unflat											   												   
+let norm_cv = flat %> unflat
+
+let no_behavior = {algorithms=[]; equations=[]; initial_algorithms=[]; initial_equations=[]; external_=None}
 let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
-let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=empty_elements; protected=empty_elements}
+let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=empty_elements; protected=empty_elements; behavior=no_behavior}
 
 let empty_class = Class empty_object_struct 
 
