@@ -259,6 +259,8 @@ let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
   { ModlibNormalized.identity_mapper with
     
     map_object_struct = (fun self os ->
+        (* Update the environment with the object struct *)
+        let current_env = (os_env lib os)::current_env in
         let behavior =
           if PathMap.mem os.source_path payload
           then
@@ -267,11 +269,10 @@ let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
             os.behavior
         in
 
-        (* Update the environment for each object struct *)
         let pub_state = {
             strat_stmts ;
             payload;
-            current_env = (os_env lib os)::current_env;
+            current_env ;
             current_path = os.source_path }
         in
         let s = impl_mapper lib pub_state in

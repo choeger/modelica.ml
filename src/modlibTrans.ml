@@ -202,7 +202,6 @@ let rec mtranslate_tds = function
       (* Class skeleton *)
       open_class tds.sort (repl tds.type_options) ;
       (* Payload *)
-      let () = BatLog.logf "Adding payload\n" in
       payload tds.type_exp.cargo ;
       (* Public elements *)
       mtranslate_elements tds.type_exp.public ;	 
@@ -456,13 +455,11 @@ let name_of = function
 open FileSystem
 
 let mtranslate_unit env {within; toplevel_defs=td::_} =
-  let () = BatLog.logf "Translating unit.\n" in 
   do_ ;
   set_env env ;
   within_path within ;
   mtranslate_typedef td ;
   s <-- get ;
-  let () = BatLog.logf "Collected %d payloads.\n" (List.length s.payload_code) in
   return {class_code=s.class_code; class_name=Name.of_ptr s.current_path; impl_code=s.value_code; payload=s.payload_code}
 
 let translate_unit env {scanned; parsed} =

@@ -79,7 +79,6 @@ let norm_pkg_root root =
   (* normalize signature *)
   signature <-- NormSig.norm_pkg_root root ;
   let (payloads, rhss) = collect_impl root in
-  let () = BatLog.logf "Got %d payloads.\n" (List.length payloads) in
   (* collect rhs-statements and stratify *)
   stmts <-- Report.fold sort_impl PathMap.empty rhss;
   payloads <-- Report.fold stratify_payload PathMap.empty payloads ;

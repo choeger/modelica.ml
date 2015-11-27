@@ -110,8 +110,10 @@ let show_list f l =
 
 let equal_option f x = function None -> x = None | Some y -> begin match x with Some x -> f x y | _ -> false end 
 
+let equal_list f as_ bs = try List.fold_left2 (fun a b c -> a && (f b c)) true as_ bs with _ -> false
+
 let has_equation eq = function
-    Class {behavior} -> assert_equal ~printer:(show_list show_equation) [eq] behavior.equations
+    Class {behavior} -> assert_equal ~printer:(show_list show_equation) ~cmp:(equal_list Syntax.equal_equation) [eq] (List.map Parser_tests.prep_eq behavior.equations)
   | cv -> assert_failure ("Expected a class. Got: " ^ (show_class_value cv))
 
 let has_binding exp {field_binding} =
