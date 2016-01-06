@@ -297,7 +297,6 @@ let rec norm_prog i p =
   else
     let {lhs;rhs} = p.(i) in
     Report.do_ ;
-    let () = BatLog.logf "[%d / %d] %s\n" i (Array.length p) (show_class_stmt p.(i)) in
     lhs <-- stratify_ptr lhs ;
     norm <-- norm lhs rhs;
     let o' = update lhs (norm_cv norm) o in
@@ -430,7 +429,6 @@ let norm_pkg_root root =
   (* close recursive terms *)
   let ct = Array.of_list (elements_collect_recursive_terms DQ.empty [] c) in
   o <-- close_terms 0 ct ;
-  let () = BatLog.logf "Done.\n%!" in
   return o
 
 

@@ -246,9 +246,6 @@ let topological_order w r a =
 
   let sccs = Scc.scc_list g in
 
-  BatLog.logf "Got %d vertices and %d edges in %d strongly connected components in the dependency graph out of %d statements\n"
-    (DepGraph.nb_vertex g) (DepGraph.nb_edges g) (List.length sccs) (Array.length a) ;      
-
   (* SCC processing:
        * non-trivial SCC?
        |

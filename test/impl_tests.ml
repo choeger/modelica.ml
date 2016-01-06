@@ -91,12 +91,22 @@ let assert_fld vis fld pred = function
   | cv -> assert_failure ("No field: '"^fld^"' in: " ^ (show_class_value cv)) 
 
 let field = assert_fld
-    
+
+let assert_cm vis cm pred = function
+  | Class {public} when vis && StrMap.mem cm public.class_members -> pred (StrMap.find cm public.class_members)
+  | Class {protected} when (not vis) && StrMap.mem cm protected.class_members -> pred (StrMap.find cm protected.class_members)
+  | cv -> assert_failure ("No class: '"^cm^"' in: " ^ (show_class_value cv)) 
+  
+let class_member = assert_cm
+
 let assert_norm path pred td =  
   let parsed = {within = Some []; toplevel_defs = [td] } in
-  let {Report.final_messages; final_result} = Report.run (NormLib.norm_pkg_root (Trans.translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=empty_elements} in
+
+  let {Report.final_messages; final_result} =
+    Report.run (NormLib.norm_pkg_root (Trans.translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=empty_elements} in
   IO.flush (!BatLog.output) ;
-  let () = assert_equal ~msg:"No warnings and errors expected" ~printer:show_messages [] final_messages in (* TODO: filter warnings / errors *)
+  assert_equal ~msg:"No warnings and errors expected" ~printer:show_messages [] final_messages ; (* TODO: filter warnings / errors *)
+
   let impl = (assert_result final_result).implementation in
   let cv = assert_path impl path in
   pred cv
@@ -122,11 +132,17 @@ let has_binding exp {field_binding} =
 let is_modified_to exp =
   assert_equal ~printer:show_field_modification (Modify exp)  
 
-let has_modification fld pred {field_mod} =
-  if StrMap.mem fld field_mod then
-    pred (StrMap.find fld field_mod)
+let assert_modification name pred mods =
+  if StrMap.mem name mods then
+    pred (StrMap.find name mods)
   else
-    assert_failure ("No modification to '" ^ fld ^ "'")  
+    assert_failure ("No modification to '" ^ name ^ "'")  
+
+let has_modification fld pred {field_mod} =
+  assert_modification fld pred field_mod
+    
+let has_class_modification fld pred {class_mod} =
+  assert_modification fld pred class_mod
 
 let test_ctxt descr input path =
   descr >:: (Parser_tests.parse_test Parser.td_parser input (assert_ctxt_names (DQ.of_list path)))
@@ -167,11 +183,12 @@ let test_cases = [
     "class A class B class C end C; end B; end A"
     [`ClassMember "A"; `ClassMember "B"; `ClassMember "C"] ;
 
+  (
   let b = Class {empty_object_struct with source_path = Inter.Path.of_list [`ClassMember "A"; `ClassMember "B"] } in 
   test_lex_env "Simple lexical environment"
     "class A constant Real x = 42.; class B end B; end A"
     [`ClassMember "A"; `ClassMember "B"] 
-    [ empty_env; {empty_env with public_env = StrMap.of_list ["B", EnvClass b; "x", EnvField (const Real)]} ] ; 
+    [ empty_env; {empty_env with public_env = StrMap.of_list ["B", EnvClass b; "x", EnvField (const Real)]} ] ) ; 
 
   test_norm "Normalize Simple Binding"
     "class A constant Real x = 42.; end A"
@@ -183,13 +200,27 @@ let test_cases = [
 
   test_norm "Normalize Simple Modification"
     "class A constant Real x(start = 42.); end A"
-    [`ClassMember "A"] (field public "x" (has_modification "start" (is_modified_to (Real 42.)))) ;
-
+    [`ClassMember "A"] (field public "x" (has_modification "start" (is_modified_to (Real 42.)))) ;  
+  
   test_norm "Normalize Simple Protected Modification"
     "class A protected constant Real x(start = 42.); end A"
     [`ClassMember "A"] (field protected "x" (has_modification "start" (is_modified_to (Real 42.)))) ;
-                              
+
+  test_norm "Normalize Class Modification"
+    "class A type T = Real(start = 42.); end A"
+    [`ClassMember "A"] (class_member public "T" (has_class_modification "start" (is_modified_to (Real 42.)))) ;
+
+  test_norm "Self Name Resolution Inside Binding"
+    "class A class B constant Real x = x; end B; protected constant Real x = 42.; end A"
+    [`ClassMember "A"; `ClassMember "B"] (field public "x" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"; "B"];
+                                                                                                       fields = DQ.of_list [{ident = nl "x";subscripts=[]}]})))) ;  
+
   test_norm "Name Resolution Inside Binding"
+    "class A constant Real y = x; constant Real x = 42.; end A"
+    [`ClassMember "A"] (field public "y" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"];
+                                                                                     fields = DQ.of_list [{ident = nl "x";subscripts=[]}]})))) ;
+
+  test_norm "Protected Name Resolution Inside Binding"
     "class A constant Real y = x; protected constant Real x = 42.; end A"
     [`ClassMember "A"] (field public "y" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"];
                                                                                      fields = DQ.of_list [{ident = nl "x";subscripts=[]}]})))) ;
@@ -207,13 +238,14 @@ let test_cases = [
     [`ClassMember "A"; `ClassMember "C"] (field public "x"  
     (has_binding (Real 21.))) ;   
 
+  (
   let expected_ref = KnownRef { class_name=DQ.of_list ["A"];
                                 fields = DQ.of_list [{ident=nl "x"; subscripts=[]}] }
   in 
   test_norm
     "Lookup an unknown in an equation"
     "model A Real x; equation x = 0.0; end A"
-    [`ClassMember "A"] (has_equation {comment = no_comment; commented = SimpleEquation {left=ComponentReference expected_ref; right=Real 0.0}});
+    [`ClassMember "A"] (has_equation {comment = no_comment; commented = SimpleEquation {left=ComponentReference expected_ref; right=Real 0.0}}) );
 ]
 
 let suite = "Implementation Normalization" >::: test_cases

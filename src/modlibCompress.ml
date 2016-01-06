@@ -89,7 +89,6 @@ let rec do_decompression i dcs =
     match DQ.front n with
       None -> Report.do_ ; log {where=none; level=Error; what="Inconsistent normal form: Empty superclass name."} ; fail
     | Some (x,xs) ->
-      BatLog.logf "[%d/%d] Superclass %d of %s = %s\n" i (Array.length dcs) dcs.(i).superclass_nr (show_class_path dcs.(i).parent_class) (show_class_path n);
       Report.do_ ;
       o <-- output ;
       match follow_path_es o DQ.empty o xs x with
@@ -123,7 +122,6 @@ let decompress_dep dcm g i {superclass_name} =
 
 let decompress es =
   let dcs = Array.of_list (elements_decompressions DQ.empty [] es) in
-  BatLog.logf "Decompressing %d superclass-references\n" (Array.length dcs) ;
   let dcm = Array.fold_lefti decompress_map PathMap.empty dcs in
   let dcg = Array.fold_lefti (decompress_dep dcm) DepGraph.empty dcs in
   let sccs = Scc.scc_list dcg in

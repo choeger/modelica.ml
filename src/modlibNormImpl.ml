@@ -142,7 +142,8 @@ let rec resolve_os lib class_name os x xs =
       | Some(_, `FieldType _) -> {class_name; fields=DQ.of_list (x::xs)}
       | _ -> raise AstInvariant
     end
-  | _ -> raise (NoSuchField x.ident)
+  | _ ->
+    raise (NoSuchField x.ident)
 
 and resolve_in lib class_name cv (components : component list) = match components with
     [] -> {class_name; fields = DQ.empty}
@@ -175,7 +176,7 @@ let resolve_ur lib src env {root;components} =
       if root then
         resolve_os lib DQ.empty {empty_object_struct with public=lib} cmp components
       else
-        resolve_env lib src cmp components env 
+        resolve_env lib src cmp components env
   | [] -> raise AstInvariant
 
 let resolution_mapper lib src env = { Syntax.identity_mapper with
@@ -186,7 +187,8 @@ let resolution_mapper lib src env = { Syntax.identity_mapper with
                                       }
                                     }
 
-let resolve lib src env exp = let m = resolution_mapper lib src env in
+let resolve lib src env exp =
+  let m = resolution_mapper lib src env in
   m.map_exp m exp
 
 let resolve_behavior lib src env =
@@ -224,7 +226,22 @@ let rec find_super_field lib x super =
   in
   take (IntMap.values super)
 
-let rec normalize_stmts lib src env super class_fields =      
+(* Normalize all statements in a direct class modification *)
+let rec normalize_classmod_stmts lib src env class_mod =
+  function
+  | [] -> class_mod
+  | {field_name; exp}::stmts ->
+    let exp = resolve lib src env exp in
+    (* merge modification and continue *)
+    let class_mod =
+    begin match DQ.front field_name with
+        None -> raise (Failure "empty modification on class")
+      | Some(y,ys) -> merge_mod exp y ys class_mod
+    end in
+    normalize_classmod_stmts lib src env class_mod stmts
+
+(* Normalize all statements in class_fields *)
+let rec normalize_stmts lib src env super class_fields =
   function
   | [] -> class_fields
   | {field_name;exp}::stmts ->    
@@ -285,11 +302,31 @@ let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
 
     map_elements_struct = (fun self {class_members; super; fields} ->
         let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in        
-        (* proceed through the tree *)
-        let class_members = StrMap.map (self.map_class_member self) class_members in
 
+        (* deal with modified short-defined classes *)
+        let map_cm name {class_; class_mod} =
+          (* filter out classes with own scope *)
+          let rec own_scope = function
+              Class _ | Enumeration _ -> true
+            | Replaceable arg | Constr {arg} -> own_scope arg
+            | _ -> false
+          in
+          if own_scope class_ then
+            (* proceed through the tree *)
+            let class_ = self.map_class_value self class_ in
+            {class_; class_mod}
+          else
+            let current_path = DQ.snoc current_path (`ClassMember name) in
+            let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in
+            let class_mod = normalize_classmod_stmts lib (class_name current_path) current_env class_mod stmts in
+            {class_; class_mod}
+        in
+            
+        let class_members = StrMap.mapi map_cm class_members in
+          
         (* normalize and attach statements to fields *)
-        let fields = normalize_stmts lib (class_name current_path) current_env super fields stmts in
+        let current_class = class_name current_path in
+        let fields = normalize_stmts lib current_class current_env super fields stmts in
         {class_members; super; fields}
       );
   }
