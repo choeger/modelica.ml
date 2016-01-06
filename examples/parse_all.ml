@@ -49,7 +49,7 @@ let parse file =
           let last () = last_token ucs in
           let result = (unit_parser next last) in
           ANSITerminal.printf [ANSITerminal.green] "%fs parsing: '%s'\n" (Sys.time () -. start) file ;
-          let pp = Pprint_modelica.unit2str result in
+          (*let pp = Pprint_modelica.unit2str result in
           let ucs = state_from_utf8_string file input in
           let next () = next_token ucs in
           let last () = last_token ucs in
@@ -63,9 +63,9 @@ let parse file =
               ANSITerminal.printf [ANSITerminal.red] "parsing != unparsing '%s'\n" file ;
               Printf.printf "%s\n%s\n" (show_unit_ result_noloc) (show_unit_ result'_noloc) ;
             end ;
-
+          *)
             Some result
-          with 
+          (*with 
           | Sedlexing.MalFormed -> Printf.eprintf "Lexical error in unparse of %s\n" file ;
             ANSITerminal.printf [ANSITerminal.red] "%fs parsing: '%s'\n" (Sys.time () -. start) file ;
             None
@@ -73,7 +73,7 @@ let parse file =
             Printf.eprintf "Syntax Error in unparse at %s:\n%s" (show_location e) (error_message e input) ;
             ANSITerminal.printf [ANSITerminal.red] "%fs re-parsing: '%s'\n" (Sys.time () -. start) file ;
             None
-          end
+            end*)
         with
         | SyntaxError e -> Printf.eprintf "Syntax Error at %s:\n%s" (show_location e) (error_message e input) ;
                            ANSITerminal.printf [ANSITerminal.red] "%fs parsing: '%s'\n" (Sys.time () -. start) file ;

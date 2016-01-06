@@ -54,9 +54,11 @@ let rec compress = function
   | Replaceable v -> Replaceable (compress v)
   | v -> v
 
+and compress_member cm = {cm with class_ = compress cm.class_}
+
 and compress_elements es = {fields = StrMap.map pack_field es.fields;
                             super = IntMap.map pack_class es.super;
-                            class_members = StrMap.map compress es.class_members }
+                            class_members = StrMap.map compress_member es.class_members }
 
 and pack_field f = {f with field_class = pack_class f.field_class}
 
@@ -79,7 +81,7 @@ and superclass_to_decompress parent_class superclass_nr dcs = function
 
 and elements_decompressions p dcs es =
   let dcs' = IntMap.fold (fun k v dcs -> superclass_to_decompress p k dcs v) es.super dcs in
-  StrMap.fold (fun k v dcs -> decompressions (DQ.snoc p (`ClassMember k)) dcs v) es.class_members dcs'
+  StrMap.fold (fun k v dcs -> decompressions (DQ.snoc p (`ClassMember k)) dcs v.class_) es.class_members dcs'
 
 let rec do_decompression i dcs =
   if i >= Array.length dcs then (Report.do_ ; log{where=none;level=Info;what="Finished Decompression"} ; output) else

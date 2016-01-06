@@ -64,7 +64,7 @@ let cm = Modlib.Inter.Path.cm
 let eq expected got = 
   assert_equal ~cmp:equal_class_value ~msg:(Printf.sprintf "equality of normalization result = %b" (expected = got)) ~printer:show_class_value (norm_cv expected) (norm_cv got)
 
-let eq_val name expected normalized = eq (expected (Path.singleton (cm name))) (StrMap.find name normalized.class_members)
+let eq_val name expected normalized = eq (expected (Path.singleton (cm name))) (StrMap.find name normalized.class_members).class_
 
 let should_be_replaceable expected got =
   match got with
@@ -105,8 +105,8 @@ let m_body source_path = {empty_object_struct with source_path; public = {empty_
 let class_M source_path = Class (m_body source_path)
 let record_M source_path = Class {(m_body source_path) with object_sort = Record}
 let class_with_public_M source_path = Class {empty_object_struct with source_path ; public = {
-    empty_elements with class_members = StrMap.singleton "M" (class_M (DQ.snoc source_path (cm "M")))}}
-let class_with_protected_M source_path = Class {empty_object_struct with source_path ; protected = {empty_elements with class_members = StrMap.singleton "M" (class_M (DQ.snoc (DQ.snoc source_path `Protected) (cm "M")))}}
+    empty_elements with class_members = StrMap.singleton "M" {empty_class_member with class_ = class_M (DQ.snoc source_path (cm "M"))}}}
+let class_with_protected_M source_path = Class {empty_object_struct with source_path ; protected = {empty_elements with class_members = StrMap.singleton "M" {empty_class_member with class_ = class_M (DQ.snoc (DQ.snoc source_path `Protected) (cm "M"))}}}
 
 let empty object_sort source_path = (Class {empty_object_struct with object_sort; source_path })                                               
 let type_ arg = Constr {constr=Sort Type; arg}

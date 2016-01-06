@@ -40,7 +40,7 @@ exception EmptyName
 let rec get_class_element_in global current_path {Normalized.class_members; super; fields} x xs =
   if StrMap.mem x class_members then begin
     let found = (DQ.snoc current_path (`ClassMember x)) in
-    let r = (get_class_element global found (StrMap.find x class_members) xs) in
+    let r = (get_class_element global found (StrMap.find x class_members).class_ xs) in
     match r with
       `NothingFound -> (`PrefixFound {not_found=xs; found})      
     | r -> r

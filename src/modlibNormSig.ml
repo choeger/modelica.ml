@@ -84,7 +84,7 @@ and stratify_elements global ({class_members; super; fields} as es) (done_:class
   match DQ.front todo with
   | None -> done_
   | Some(`FieldType x, xs) when StrMap.mem x fields -> stratify global (StrMap.find x fields).field_class (DQ.snoc done_ (`FieldType x)) xs 
-  | Some(`ClassMember x, xs) when StrMap.mem x class_members -> stratify global (StrMap.find x class_members) (DQ.snoc done_ (`ClassMember x)) xs 
+  | Some(`ClassMember x, xs) when StrMap.mem x class_members -> stratify global (StrMap.find x class_members).class_ (DQ.snoc done_ (`ClassMember x)) xs 
   | Some(`SuperClass i, xs) when IntMap.mem i super -> stratify global (IntMap.find i super) (DQ.snoc done_ (`SuperClass i)) xs
 
   | Some (`Protected, xs) -> raise (IllegalPath "protected")
@@ -288,7 +288,7 @@ let rec check = function
   | Constr {arg} -> check arg
   | _ -> ()               
 
-and el_check {class_members} = StrMap.iter (fun k v -> check v) class_members
+and el_check {class_members} = StrMap.iter (fun k v -> check v.class_) class_members
 
 let rec norm_prog i p =
   Report.do_ ;
@@ -404,7 +404,7 @@ let rec collect_recursive_terms p rts = function
   | v -> rts
 
 and elements_collect_recursive_terms p rts {class_members; fields;} =
-  let rts' = StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`ClassMember k)) rts v) class_members rts in
+  let rts' = StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`ClassMember k)) rts v.class_) class_members rts in
   StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`FieldType k)) rts v.field_class) fields rts'               
 
 let rec close_terms i p =

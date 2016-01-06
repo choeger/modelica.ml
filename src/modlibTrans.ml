@@ -268,7 +268,7 @@ and mtranslate_texp post =
     state <-- get ;
     let s = state.current_path in
     let (src,ctxt) = match DQ.rear s with None -> raise InconsistentHierarchy | Some(xs,x) -> (xs,x) in
-    redec <-- 
+    redec <--
     begin match ctxt with
         `SuperClass _ -> mtranslate_mod_superclass src ctxt {mod_type; modification}
       | `FieldType _ -> mtranslate_mod_field src {mod_type; modification}
@@ -276,6 +276,7 @@ and mtranslate_texp post =
       | `Protected | `Any _ -> raise InconsistentHierarchy
     end ;
 
+    begin
     (* Do not introduce a new class in case of (nested) modifications without redeclarations *)
     if (not redec) then begin
       do_ ;
@@ -283,7 +284,8 @@ and mtranslate_texp post =
       mtranslate_texp (fun x -> x) mod_type ;
     end
     else return () ;
-
+    end ;
+    
     (* value modifications go into different places, depending on context *)
     begin match ctxt with
         `SuperClass _ -> do_ ; up; mtranslate_modification_values modification; down ctxt 

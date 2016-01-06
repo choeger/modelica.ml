@@ -72,7 +72,7 @@ let env_folder lib = { ModlibNormalized.identity_folder with
                             let env' = IntMap.fold (fun _ -> self.fold_class_value self) super env in
                             (* Put parts into public environment by default (see above for the part sorting it out) *)
                             {env' with public_env =
-                                         StrMap.union (StrMap.union env'.public_env (StrMap.map (fun v -> EnvClass v) class_members))
+                                         StrMap.union (StrMap.union env'.public_env (StrMap.map (fun v -> EnvClass v.class_) class_members))
                                            (StrMap.map (fun v -> EnvField v.field_class) fields)}
                          )
                      }
@@ -100,7 +100,7 @@ let ctxt_folder lib = { ModlibNormalized.identity_folder with
 
                         fold_elements_struct = (fun self {class_members} ctxt -> match DQ.front ctxt.ctxt_todo with
                             | Some(`ClassMember x, ctxt_todo) when StrMap.mem x class_members ->
-                              self.fold_class_value self (StrMap.find x class_members) {ctxt with ctxt_todo}
+                              self.fold_class_value self (StrMap.find x class_members).class_ {ctxt with ctxt_todo}
                             | _ -> ctxt
                           );
                       }
@@ -286,7 +286,7 @@ let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
     map_elements_struct = (fun self {class_members; super; fields} ->
         let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in        
         (* proceed through the tree *)
-        let class_members = StrMap.map (self.map_class_value self) class_members in
+        let class_members = StrMap.map (self.map_class_member self) class_members in
 
         (* normalize and attach statements to fields *)
         let fields = normalize_stmts lib (class_name current_path) current_env super fields stmts in

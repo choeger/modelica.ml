@@ -82,7 +82,10 @@ and class_field = { field_class : class_value ;
                     field_binding : exp option [@default None] ;
                     field_mod : field_modification StrMap.t [@default StrMap.empty]}
 
-and elements_struct = { class_members : class_value StrMap.t [@default StrMap.empty];
+and class_member = { class_ : class_value ;
+                     class_mod : field_modification StrMap.t [@default StrMap.empty]}
+
+and elements_struct = { class_members : class_member StrMap.t [@default StrMap.empty];
                         super : class_value IntMap.t [@default IntMap.empty];
                         fields : class_field StrMap.t [@default StrMap.empty]
                       }
@@ -128,7 +131,8 @@ let no_behavior = {algorithms=[]; equations=[]; initial_algorithms=[]; initial_e
 let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
 let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=empty_elements; protected=empty_elements; behavior=no_behavior}
 
-let empty_class = Class empty_object_struct 
+let empty_class = Class empty_object_struct
+let empty_class_member = {class_ = empty_class; class_mod = StrMap.empty}
 
 type prefix_found_struct = { found : class_path ; not_found : Name.t } [@@deriving show,yojson]
 
@@ -199,7 +203,7 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
 
   | `ClassMember x when StrMap.mem x class_members ->
     follow_path global (DQ.snoc found_path (`ClassMember x))
-      (StrMap.find x class_members) todo
+      (StrMap.find x class_members).class_ todo
 
   | `ClassMember x -> raise (IllegalPath x)
 
@@ -217,8 +221,11 @@ let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) 
   | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
   | Some (`Protected,_) -> raise (IllegalPath "")
 
+and update_class_member lhs rhs ({class_} as cm) =
+  {cm with class_ = update_class_value lhs rhs class_}
+
 and update_map lhs rhs x m =  
-  StrMap.modify_def empty_class x (update_class_value lhs rhs) m
+  StrMap.modify_def empty_class_member x (update_class_member lhs rhs) m
 
 and update_field_map lhs rhs x m =  
   StrMap.modify_def {field_class=empty_class;field_binding=None;field_mod=StrMap.empty}
