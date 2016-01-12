@@ -122,10 +122,12 @@ let rec pp_expr fmt = function
   | OutputExpression ps -> fprintf fmt "(@[%a@])" (pp_list ~sep:", " (pp_option pp_expr)) ps
   | ComponentReference cr -> pp_cr fmt cr
 
+and pp_known_component fmt {component} = pp_component fmt component
+
 and pp_cr fmt = function
   | UnknownRef {root=true ; components} -> fprintf fmt "@[.%a@]" (pp_list ~sep:"." pp_component) components
   | UnknownRef {root=false ; components} -> fprintf fmt "@[%a@]" (pp_list ~sep:"." pp_component) components
-  | KnownRef {class_name; fields} -> fprintf fmt "@[.%a.%a@]" (pp_dq ~sep:"." pp_print_string) class_name (pp_dq ~sep:"." pp_component) fields
+  | KnownRef kcs -> fprintf fmt "@[.%a@]" (pp_dq ~sep:"." pp_known_component) kcs
   | Var x -> pp_str fmt x
   | Assert -> fprintf fmt "assert"
   | Der -> fprintf fmt "der"

@@ -275,7 +275,11 @@ type loc_t = Location.t = {
 
   and unknown_ref = { root : bool ; components : component list }
 
-  and known_ref = { class_name : string DQ.t; fields : component DQ.t }
+  and known_ref = known_component DQ.t
+
+  and component_kind = CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete | CK_Class | CK_BuiltinAttr | CK_BuiltinClass
+                     
+  and known_component = { kind : component_kind ; component : component }
 
   and component = { ident : str ; subscripts : exp list }
 

@@ -133,40 +133,56 @@ exception SubscriptsOnClass of str
 exception NoSuchClass of str
 exception ProjectFromFunction of str
 
-let rec resolve_os lib class_name os x xs =
+let ck_of_var = 
+  let open Flags in
+  function None -> CK_Continuous | Some Constant -> CK_Constant | Some Parameter -> CK_Parameter | Some Discrete -> CK_Discrete
+
+let rec resolve_os lib found os x xs =
   (* Resolve a reference in an object structure *)
   match ModlibLookup.get_class_element_os lib DQ.empty os x.ident.txt DQ.empty with
     `Found {found_value; found_path} ->
     begin match DQ.rear found_path with
-      | Some(_, `ClassMember _) -> resolve_in lib (DQ.snoc class_name x.ident.txt) found_value xs
-      | Some(_, `FieldType _) -> {class_name; fields=DQ.of_list (x::xs)}
+      | Some(_, `ClassMember _) ->
+        resolve_in lib (DQ.snoc found {kind = CK_Class ; component=x}) found_value xs
+          
+      | Some(_, `FieldType _) ->
+        let {flat_attr={fa_var}} = flat found_value in
+        let kind = ck_of_var fa_var in
+        resolve_in lib (DQ.snoc found {kind ; component=x}) found_value xs
       | _ -> raise AstInvariant
     end
   | _ ->
     raise (NoSuchField x.ident)
 
-and resolve_in lib class_name cv (components : component list) = match components with
-    [] -> {class_name; fields = DQ.empty}
+and resolve_in lib found cv (components : component list) = match components with
+    [] -> found
   | x :: xs -> begin match cv with
-      | Class os when x.subscripts=[] -> resolve_os lib class_name os x xs
-      (* Everything else cannot denote a class or function *)
+      | Class os when x.subscripts=[] -> resolve_os lib found os x xs
+      (* Everything else has only builtin attributes *)
       | Class _ 
-      | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ -> {class_name; fields=DQ.of_list components}
+      | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ ->
+        DQ.append (DQ.snoc found {kind=CK_BuiltinClass; component=x})
+          (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) xs ))
     end
 
-let rec resolve_env lib class_name first rest = function
+let rec resolve_env lib found first rest = function
     [] -> resolve_os lib DQ.empty {empty_object_struct with public=lib} first rest
   | env :: envs when env_mem first.ident.txt env ->
     begin
     match env_find first.ident.txt env with
-      EnvClass cv when first.subscripts = [] -> resolve_in lib (DQ.snoc class_name first.ident.txt) cv rest
+      EnvClass cv when first.subscripts = [] -> resolve_in lib (DQ.snoc found {kind=CK_Class; component=first}) cv rest
     | EnvClass cv -> raise (SubscriptsOnClass first.ident)
-    | EnvField cv -> {class_name; fields = DQ.of_list (first :: rest)}
-    | EnvVar -> {class_name = DQ.empty; fields = DQ.of_list (first :: rest)}
+    | EnvField cv ->
+      let {flat_attr={fa_var}} = flat cv in
+      let kind = ck_of_var fa_var in      
+      resolve_in lib (DQ.snoc found {kind; component=first}) cv rest                                                     
+    | EnvVar -> raise (Failure "Variable found in component lookup") (* searching for a known_ref, variables need to be figured out earlier *)
     end
   | env :: envs -> begin
-      (* try next scope *)
-      match DQ.rear class_name with None -> raise AstInvariant
+      (* try next scope 
+         variable found contains the candidate prefix, i.e. the name of the class of the current scope
+      *)
+      match DQ.rear found with None -> raise AstInvariant
                                   | Some (xs,_) -> resolve_env lib xs first rest envs
     end
     
@@ -262,7 +278,7 @@ let rec normalize_stmts lib src env super class_fields =
       | Some (x, xs) ->
         (* Search superclasses *)
         begin match find_super_field lib x super with
-            None -> BatLog.logf "No field %s in %a\n" x (DQ.print IO.write_string) src ;
+            None -> BatLog.logf "No field %s in %a\n" x (DQ.print (fun x c -> IO.write_string x (show_known_component c))) src ;
             raise (NoSuchField ({txt=x;loc=Location.none})) (* Error TODO: move to Report Monad? *)
           | Some fld ->
             let class_field = insert fld xs 
@@ -271,7 +287,7 @@ let rec normalize_stmts lib src env super class_fields =
     end
 
 let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
-  let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some x | _ -> None) (DQ.enum path)) in
+  let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some {kind=CK_Class;component={ident={txt=x;loc=Location.none};subscripts=[]}} | _ -> None) (DQ.enum path)) in
   
   { ModlibNormalized.identity_mapper with
     

@@ -158,6 +158,16 @@ let test_norm descr input classname pred =
 
 open Syntax_fragments
 
+let known_component kind x = {kind;component={ident=nl x; subscripts=[]}}
+
+let cclass = known_component CK_Class
+
+let cconstfld = known_component CK_Constant 
+
+let cfld = known_component CK_Continuous
+
+let knownref cks = KnownRef (DQ.of_list cks)
+                  
 let test_cases = [
   test_env "Empty class" "class A end A" [`ClassMember "A"] NormImpl.empty_env ;
 
@@ -212,25 +222,21 @@ let test_cases = [
 
   test_norm "Self Name Resolution Inside Binding"
     "class A class B constant Real x = x; end B; protected constant Real x = 42.; end A"
-    [`ClassMember "A"; `ClassMember "B"] (field public "x" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"; "B"];
-                                                                                                       fields = DQ.of_list [{ident = nl "x";subscripts=[]}]})))) ;  
+    [`ClassMember "A"; `ClassMember "B"] (field public "x" (has_binding (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"]))));
 
   test_norm "Name Resolution Inside Binding"
     "class A constant Real y = x; constant Real x = 42.; end A"
-    [`ClassMember "A"] (field public "y" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"];
-                                                                                     fields = DQ.of_list [{ident = nl "x";subscripts=[]}]})))) ;
+    [`ClassMember "A"] (field public "y" (has_binding (ComponentReference (knownref [cclass "A"; cconstfld "x"])))) ;
 
   test_norm "Protected Name Resolution Inside Binding"
     "class A constant Real y = x; protected constant Real x = 42.; end A"
-    [`ClassMember "A"] (field public "y" (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"];
-                                                                                     fields = DQ.of_list [{ident = nl "x";subscripts=[]}]})))) ;
+    [`ClassMember "A"] (field public "y" (has_binding (ComponentReference (knownref [cclass "A"; cconstfld "x"])))) ;
 
   test_norm "Inherited Name Resolution Inside Binding"
     "class A class B constant Real x = 42.; end B; class C extends B; protected constant Real y = x; end C; end A"
     [`ClassMember "A"; `ClassMember "C"]
     (field protected "y"
-       (has_binding (ComponentReference (KnownRef {class_name = DQ.of_list ["A"; "C"];
-                                                   fields = DQ.of_list [{ident = nl "x";subscripts=[]}]}))))  ;
+       (has_binding (ComponentReference (knownref [cclass "A"; cclass "C"; cconstfld "x"]))))  ;
 
   test_norm
     "Lookup a modified constant in a simple Modelica class using extensions" 
@@ -239,9 +245,7 @@ let test_cases = [
     (has_binding (Real 21.))) ;   
 
   (
-  let expected_ref = KnownRef { class_name=DQ.of_list ["A"];
-                                fields = DQ.of_list [{ident=nl "x"; subscripts=[]}] }
-  in 
+  let expected_ref = knownref [cclass "A"; cfld "x"] in 
   test_norm
     "Lookup an unknown in an equation"
     "model A Real x; equation x = 0.0; end A"
