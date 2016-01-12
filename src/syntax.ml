@@ -299,7 +299,6 @@ type loc_t = Location.t = {
            | TCon of connectivity flagged_type
            | TCau of causality flagged_type
                  
-
   and 'a flagged_type = { flag : 'a ; flagged : texp } 
 
   and type_redeclaration = { redecl_each : bool ; redecl_type : texp typedef_struct commented ; } 

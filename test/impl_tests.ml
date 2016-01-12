@@ -129,8 +129,13 @@ let has_equation eq = function
 let has_binding exp {field_binding} =
     assert_equal ~printer:(show_option show_exp) ~cmp:(equal_option Syntax.equal_exp) (Some exp) (Option.map Parser_tests.prep_expr field_binding)
 
+let is_modification_kind k m =
+  assert_equal ~printer:show_component_kind k m.mod_kind
+
 let is_modified_to exp m =
   assert_equal ~printer:show_field_modification_desc (Modify exp) m.mod_desc
+
+let (&&&) p1 p2 e = (p1 e) ; (p2 e)
 
 let assert_modification name pred mods =
   if StrMap.mem name mods then
@@ -143,6 +148,11 @@ let has_modification fld pred {field_mod} =
     
 let has_class_modification fld pred {class_mod} =
   assert_modification fld pred class_mod
+
+let is_nested p m = match m.mod_desc with Nested m -> p m
+                                        | Modify e -> assert_failure ("Expected a nested modification, got binding = %s" ^ (show_exp e))
+
+let modified_element = assert_modification 
 
 let test_ctxt descr input path =
   descr >:: (Parser_tests.parse_test Parser.td_parser input (assert_ctxt_names (DQ.of_list path)))
@@ -214,12 +224,35 @@ let test_cases = [
   
   test_norm "Normalize Simple Protected Modification"
     "class A protected constant Real x(start = 42.); end A"
-    [`ClassMember "A"] (field protected "x" (has_modification "start" (is_modified_to (Real 42.)))) ;
+    [`ClassMember "A"] (field protected "x" (has_modification "start" (
+        (is_modified_to (Real 42.)) &&& (is_modification_kind CK_BuiltinAttr)
+      )));
 
   test_norm "Normalize Class Modification"
-    "class A type T = Real(start = 42.); end A"
-    [`ClassMember "A"] (class_member public "T" (has_class_modification "start" (is_modified_to (Real 42.)))) ;
+    "class A class B constant Real x = 42.; end B; class C = B(x = 21.); end A"
+    [`ClassMember "A"] (class_member public "C" (has_class_modification "x" (
+        (is_modification_kind CK_Constant)
+        &&& 
+        (is_modified_to (Real 21.)) ))) ;
 
+  test_norm "Normalize Nested Class Modification"
+    "class A class B constant Real x = 42.; end B; class C class B = .A.B(x = 21.); end C; class D = C(B(x=42.)); end A"
+    [`ClassMember "A"] (class_member public "D" (has_class_modification "B" (
+        (is_modification_kind CK_Class)
+        &&&
+        (is_nested (modified_element "x" (            
+             (is_modification_kind CK_Constant) &&& (is_modified_to (Real 42.))))
+          ) ))) ;
+  
+  test_norm "Normalize Nested Class Modification to a field"
+    "class A class B constant Real x = 42.; end B; class C class B = .A.B(x = 21.); end C; class D C c(B(x=42.)); end D; end A"
+    [`ClassMember "A"; `ClassMember "D"] (field public "c" (has_modification "B" (
+        (is_modification_kind CK_Class)
+        &&&
+        (is_nested (modified_element "x" (            
+             (is_modification_kind CK_Constant) &&& (is_modified_to (Real 42.))))
+        ) ))) ;
+  
   test_norm "Self Name Resolution Inside Binding"
     "class A class B constant Real x = x; end B; protected constant Real x = 42.; end A"
     [`ClassMember "A"; `ClassMember "B"] (field public "x" (has_binding (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"]))));
