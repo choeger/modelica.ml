@@ -32,6 +32,7 @@ open Utils
 open Syntax
 open ModlibInter
 open ModlibNormalized
+open ModlibLookup
     
 type environment_entry = EnvClass of class_value
                        | EnvField of class_value
@@ -50,7 +51,7 @@ let env_find x {public_env; protected_env} = try StrMap.find x public_env with N
 
 (** Environment of a class *)
 let env_folder lib = { ModlibNormalized.identity_folder with
-
+                       
                        (* Recursively search for global references, TODO: remove and enforce expansion? *)
                        on_class_value = { ModlibNormalized.identity_folder.on_class_value with
                                           fold_GlobalReference =
@@ -116,7 +117,7 @@ let lexical_env lib path =
   List.map (os_env lib) ctxt.ctxt_classes
 
 (** A stratified value binding *)
-type strat_stmt = { field_name : string DQ.t;
+type strat_stmt = { field_name : known_ref ;
                     exp : Syntax.exp } [@@deriving show]
 
 type strat_stmts = strat_stmt list PathMap.t
@@ -157,6 +158,11 @@ let rec resolve_os lib found os x xs =
 and resolve_in lib found cv (components : component list) = match components with
     [] -> found
   | x :: xs -> begin match cv with
+      | GlobalReference p -> begin match lookup_path lib p with
+            `Found {found_value} -> resolve_in lib found found_value components
+          | _ -> raise (Failure "Lookup error")
+        end
+      | Replaceable arg | Constr {arg} -> resolve_in lib found arg components
       | Class os when x.subscripts=[] -> resolve_os lib found os x xs
       (* Everything else has only builtin attributes *)
       | Class _ 
@@ -210,21 +216,40 @@ let resolve lib src env exp =
 let resolve_behavior lib src env =
   let m = resolution_mapper lib src env in
   m.map_behavior m
-    
-let rec merge_mod exp mod_name nested_name mods =
+
+let stratify_stmt lib scope field exp =
+  let components = List.map (fun x -> {ident=Location.mknoloc x;subscripts=[]}) field in
+  let () = assert (DQ.size scope > 0) in
+  let scope = match DQ.rear scope with
+    | Some(xs, `Protected) -> xs (* If we are in the protected section, make sure the scope is a valid class pointer *)
+    | _ -> scope
+  in
+  match lookup_path lib scope with
+  `Found {found_value} ->
+    let field_name = resolve_in lib DQ.empty found_value components in
+    {field_name; exp}
+  | _ -> raise (Failure "Cannot find context of value binding")
+
+(* 
+   Merge modification [| $mod_name [.$nested_name] = $exp |] with a component into $mods 
+*)
+let rec merge_mod exp mod_component nested_component mods =
+  let mod_name = mod_component.component.ident.txt in
   if StrMap.mem mod_name mods then
     let new_mod =
-    match StrMap.find mod_name mods with
-      Modify _ -> raise (DoubleModification mod_name)
-    | Nested mods -> 
-      begin match DQ.front nested_name with
-        | None when mods = StrMap.empty -> Modify exp
-        | None -> raise (DoubleModification mod_name)
-        | Some (x,xs) -> Nested (merge_mod exp x xs mods)
-      end
-      in StrMap.add mod_name new_mod mods
+      match StrMap.find mod_name mods with
+      (* No need to search for the matching component again, reuse from $mods *)
+        {mod_desc=Modify _} -> raise (DoubleModification mod_name)
+      | {mod_kind; mod_desc=Nested mods} -> 
+        begin match DQ.front nested_component with
+          | None when mods = StrMap.empty -> {mod_kind; mod_desc=Modify exp}
+          | None -> raise (DoubleModification mod_name)
+          | Some (x,xs) -> {mod_kind; mod_desc = Nested (merge_mod exp x xs mods)}
+        end
+    in StrMap.add mod_name new_mod mods
   else
-    merge_mod exp mod_name nested_name (StrMap.add mod_name (Nested StrMap.empty) mods)
+    let empty_mod = {mod_desc = Nested StrMap.empty ; mod_kind = mod_component.kind} in
+    merge_mod exp mod_component nested_component (StrMap.add mod_name empty_mod mods)
 
 let rec find_super_field lib x super =
   (* Get the first inherited class field named x or None *)
@@ -243,24 +268,27 @@ let rec find_super_field lib x super =
   take (IntMap.values super)
 
 (* Normalize all statements in a direct class modification *)
-let rec normalize_classmod_stmts lib src env class_mod =
+let rec normalize_classmod_stmts lib src env {class_; class_mod} =
   function
-  | [] -> class_mod
+  | [] -> {class_; class_mod}
   | {field_name; exp}::stmts ->
+    (* normalize the modified component *)
     let exp = resolve lib src env exp in
+
     (* merge modification and continue *)
     let class_mod =
     begin match DQ.front field_name with
         None -> raise (Failure "empty modification on class")
       | Some(y,ys) -> merge_mod exp y ys class_mod
     end in
-    normalize_classmod_stmts lib src env class_mod stmts
+    normalize_classmod_stmts lib src env {class_; class_mod} stmts
 
-(* Normalize all statements in class_fields *)
-let rec normalize_stmts lib src env super class_fields =
+(* Normalize all statements in the given element structure *)
+let rec normalize_stmts lib src env ({super;fields;class_members} as es)=
   function
-  | [] -> class_fields
-  | {field_name;exp}::stmts ->    
+  | [] -> es
+  | {field_name;exp}::stmts ->
+    (* normalize the modified component *)
     let exp = resolve lib src env exp in
 
     let insert fld xs = match DQ.front xs with
@@ -268,21 +296,27 @@ let rec normalize_stmts lib src env super class_fields =
       | Some(y,ys) -> {fld with field_mod = merge_mod exp y ys fld.field_mod} 
     in
     
-    begin match DQ.front field_name with    
-      | Some (x,xs) when StrMap.mem x class_fields ->
-        let fld = StrMap.find x class_fields in
-        let class_field = insert fld xs 
-        in normalize_stmts lib src env super (StrMap.add x class_field class_fields) stmts
-      | None -> normalize_stmts lib src env super class_fields stmts (* bogus stmt *)                  
+    begin match DQ.front field_name with
+      | None -> normalize_stmts lib src env es stmts (* bogus stmt *)                  
 
-      | Some (x, xs) ->
+      (* TODO: nested modification inside classes *)
+      
+      (* Local field *)
+      | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete; component},xs) when StrMap.mem component.ident.txt fields ->
+        let fld = StrMap.find component.ident.txt fields in
+        let class_field = insert fld xs 
+        in normalize_stmts lib src env {es with fields = StrMap.add component.ident.txt class_field fields} stmts
+
+      (* Inherited field *)
+      | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete; component},xs) ->
         (* Search superclasses *)
-        begin match find_super_field lib x super with
-            None -> BatLog.logf "No field %s in %a\n" x (DQ.print (fun x c -> IO.write_string x (show_known_component c))) src ;
-            raise (NoSuchField ({txt=x;loc=Location.none})) (* Error TODO: move to Report Monad? *)
+        begin match find_super_field lib component.ident.txt super with
+            None -> BatLog.logf "No field %s in %a\n" component.ident.txt (DQ.print (fun x c -> IO.write_string x (show_known_component c))) src ;
+            raise (NoSuchField component.ident) (* Error TODO: move to Report Monad? *)
           | Some fld ->
+            (* TODO: this only works properly when a modification of the inherited field is found *)
             let class_field = insert fld xs 
-            in normalize_stmts lib src env super (StrMap.add x class_field class_fields) stmts
+            in normalize_stmts lib src env {es with fields = (StrMap.add component.ident.txt class_field fields)} stmts
         end
     end
 
@@ -334,16 +368,14 @@ let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
           else
             let current_path = DQ.snoc current_path (`ClassMember name) in
             let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in
-            let class_mod = normalize_classmod_stmts lib (class_name current_path) current_env class_mod stmts in
-            {class_; class_mod}
+            normalize_classmod_stmts lib (class_name current_path) current_env {class_;class_mod} stmts
         in
             
         let class_members = StrMap.mapi map_cm class_members in
           
         (* normalize and attach statements to fields *)
         let current_class = class_name current_path in
-        let fields = normalize_stmts lib current_class current_env super fields stmts in
-        {class_members; super; fields}
+        normalize_stmts lib current_class current_env {super;fields;class_members} stmts
       );
   }
 

@@ -75,8 +75,11 @@ and object_struct = { object_sort : sort ;
                       behavior : behavior [@default {algorithms=[]; equations=[]; initial_algorithms=[]; initial_equations=[]; external_=None}] ;
                     }
 
-and field_modification = Modify of exp
-                       | Nested of field_modification StrMap.t
+and field_modification_desc = Modify of exp
+                            | Nested of field_modification StrMap.t
+
+and field_modification = { mod_kind : component_kind ;
+                           mod_desc : field_modification_desc }
 
 and class_field = { field_class : class_value ;
                     field_binding : exp option [@default None] ;
@@ -208,10 +211,16 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
   | `ClassMember x -> raise (IllegalPath x)
 
 
-let lookup_path global path = match DQ.front path with
+let lookup_path global path =
+  try
+
+  match DQ.front path with
     Some (x,xs) -> follow_path_es global DQ.empty global xs x
   | None -> raise (IllegalPath "")
 
+  with
+    (IllegalPath x) -> raise (IllegalPath (Printf.sprintf "'%s' in %s" x (Path.show path)))
+                         
 exception CannotUpdate of string * string * string
 
 let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) = match DQ.front lhs with

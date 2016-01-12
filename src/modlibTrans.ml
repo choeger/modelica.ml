@@ -131,7 +131,9 @@ let apply_imports env =
 
 let bind_value rhs state =
   let rhs = apply_imports state.env rhs in
-  ((), {state with value_code = {lhs = {scope = state.current_path; field = state.current_field}; rhs} :: state.value_code})
+  let () = assert (DQ.size state.current_path > 0) in
+  let scope = state.current_path in      
+  ((), {state with value_code = {lhs = {scope; field = state.current_field}; rhs} :: state.value_code})
 
 let open_class sort post state = ((), {state with class_code =
                                                     {lhs = state.current_path ;

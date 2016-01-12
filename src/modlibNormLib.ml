@@ -43,7 +43,8 @@ module NormSig = ModlibNormSig
 open Inter
 open NormSig
 open Normalized
-
+open Lookup
+    
 type library = { signature : Normalized.elements_struct ; implementation : Normalized.elements_struct }
 
 let rec collect_impl_pkg impl {FileSystem.package_unit; external_units; sub_packages} =
@@ -59,7 +60,9 @@ open ModlibNormImpl
 let sort_impl map stmt =
   Report.do_ ;
   scope <-- stratify_ptr stmt.lhs.scope ;
-  let strat_stmt = {exp=stmt.rhs;field_name=stmt.lhs.field} in
+  lib <-- output ;
+  let () = assert (DQ.size scope > 0) in
+  let strat_stmt = stratify_stmt lib scope (DQ.to_list stmt.lhs.field) stmt.rhs in
   return (
   PathMap.add scope 
   begin if PathMap.mem scope map then

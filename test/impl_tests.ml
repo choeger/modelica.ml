@@ -129,8 +129,8 @@ let has_equation eq = function
 let has_binding exp {field_binding} =
     assert_equal ~printer:(show_option show_exp) ~cmp:(equal_option Syntax.equal_exp) (Some exp) (Option.map Parser_tests.prep_expr field_binding)
 
-let is_modified_to exp =
-  assert_equal ~printer:show_field_modification (Modify exp)  
+let is_modified_to exp m =
+  assert_equal ~printer:show_field_modification_desc (Modify exp) m.mod_desc
 
 let assert_modification name pred mods =
   if StrMap.mem name mods then
