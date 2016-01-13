@@ -70,7 +70,7 @@ let env_folder lib = { ModlibNormalized.identity_folder with
 
                        fold_elements_struct =
                          (fun self {class_members;fields;super} env ->
-                            let env' = IntMap.fold (fun _ -> self.fold_class_value self) super env in
+                            let env' = IntMap.fold (fun _ -> self.fold_modified_class self) super env in
                             (* Put parts into public environment by default (see above for the part sorting it out) *)
                             {env' with public_env =
                                          StrMap.union (StrMap.union env'.public_env (StrMap.map (fun v -> EnvClass v.class_) class_members))
@@ -153,7 +153,7 @@ and extends_builtin_os lib {object_sort; public; protected} =
    (* TODO: protected.super = IntMap.empty ? *)
     (extends_builtin_el lib public) || (extends_builtin_el lib protected))
   
-and extends_builtin_el lib {super} = IntMap.cardinal super = 1 && extends_builtin lib (IntMap.find 0 super)
+and extends_builtin_el lib {super} = IntMap.cardinal super = 1 && extends_builtin lib (IntMap.find 0 super).class_
 
 let rec resolve_os lib found os x xs =    
   (* Resolve a reference in an object structure *)
@@ -299,13 +299,13 @@ let rec merge_mod exp mod_component nested_component mods =
 let rec find_super_field lib x super =
   (* Get the first inherited class field named x or None *)
   let rec take enum = Enum.get (Enum.filter_map get_fld enum)
-  and get_fld = function
+  and get_fld {class_; class_mod} = match class_ with
       Class os when StrMap.mem x os.public.fields -> Some (StrMap.find x os.public.fields)
     | Class os when StrMap.mem x os.protected.fields -> Some (StrMap.find x os.protected.fields)
     | Class os -> take (Enum.append (IntMap.values os.public.super) (IntMap.values os.protected.super))
     | GlobalReference r ->
       begin match lookup_path lib r with
-          `Found {found_value} -> get_fld found_value
+          `Found {found_value} -> get_fld {class_=found_value; class_mod}
         | _ -> None
       end
     | _ -> None
@@ -345,6 +345,8 @@ let rec normalize_stmts lib src env ({super;fields;class_members} as es)=
       | None -> normalize_stmts lib src env es stmts (* bogus stmt *)                  
 
       (* TODO: nested modification inside classes *)
+
+      (* Builtin attributes *)
       
       (* Local field *)
       | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete; component},xs) when StrMap.mem component.ident.txt fields ->

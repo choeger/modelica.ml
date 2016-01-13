@@ -89,7 +89,7 @@ and modified_class = { class_ : class_value ;
                        class_mod : field_modification StrMap.t [@default StrMap.empty]}
 
 and elements_struct = { class_members : modified_class StrMap.t [@default StrMap.empty];
-                        super : class_value IntMap.t [@default IntMap.empty];
+                        super : modified_class IntMap.t [@default IntMap.empty];
                         fields : class_field StrMap.t [@default StrMap.empty]
                       }
 
@@ -116,7 +116,7 @@ let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () = {identi
                       
   map_elements_struct = (fun self {class_members; super; fields} ->
       let class_members = StrMap.map (self.map_modified_class self) class_members in
-      let super = IntMap.map (self.map_class_value self) super in
+      let super = IntMap.map (self.map_modified_class self) super in
       let fields = StrMap.map (self.map_class_field self) fields in
       {class_members; super; fields}) ;
       
@@ -164,7 +164,7 @@ let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields
 let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=empty_elements; protected=empty_elements; behavior=no_behavior}
 
 let empty_class = Class empty_object_struct
-let empty_class_member = {class_ = empty_class; class_mod = StrMap.empty}
+let empty_modified_class = {class_ = empty_class; class_mod = StrMap.empty}
 
 type prefix_found_struct = { found : class_path ; not_found : Name.t } [@@deriving show,yojson]
 
@@ -223,7 +223,7 @@ and follow_path_os global found_path {protected; public} todo = function
 and follow_path_es global found_path {class_members;super;fields} todo = function
     `SuperClass n when IntMap.mem n super ->
     follow_path global (DQ.snoc found_path (`SuperClass n))
-      (IntMap.find n super) todo
+      (IntMap.find n super).class_ todo
 
   | `SuperClass n -> raise (IllegalPath ("super(" ^ (string_of_int n) ^ ")"))
 
@@ -259,11 +259,11 @@ let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) 
   | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
   | Some (`Protected,_) -> raise (IllegalPath "")
 
-and update_class_member lhs rhs ({class_} as cm) =
+and update_modified_class lhs rhs ({class_} as cm) =
   {cm with class_ = update_class_value lhs rhs class_}
 
 and update_map lhs rhs x m =  
-  StrMap.modify_def empty_class_member x (update_class_member lhs rhs) m
+  StrMap.modify_def empty_modified_class x (update_modified_class lhs rhs) m
 
 and update_field_map lhs rhs x m =  
   StrMap.modify_def {field_class=empty_class;field_binding=None;field_mod=StrMap.empty}
@@ -272,7 +272,7 @@ and update_field_map lhs rhs x m =
 and update_field_class_value lhs rhs f = {f with field_class = update_class_value lhs rhs f.field_class}
 
 and update_intmap lhs rhs i map =  
-  IntMap.modify_def empty_class i (update_class_value lhs rhs) map
+  IntMap.modify_def empty_modified_class i (update_modified_class lhs rhs) map
 
 and update_class_value lhs rhs = function
   | Constr {constr; arg} -> Constr {constr ; arg = (update_class_value lhs rhs arg)}

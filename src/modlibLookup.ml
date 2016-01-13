@@ -65,7 +65,7 @@ and pickfirst_class global current_path name = function
     [] -> `NothingFound
   | (k,v)::vs ->
     let next_path = DQ.snoc current_path (`SuperClass k) in
-    let f = get_class_element global next_path v name in
+    let f = get_class_element global next_path v.class_ name in
     begin match f with
         `NothingFound -> pickfirst_class global current_path name vs
       | r -> r

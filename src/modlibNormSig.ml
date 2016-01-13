@@ -85,7 +85,7 @@ and stratify_elements global ({class_members; super; fields} as es) (done_:class
   | None -> done_
   | Some(`FieldType x, xs) when StrMap.mem x fields -> stratify global (StrMap.find x fields).field_class (DQ.snoc done_ (`FieldType x)) xs 
   | Some(`ClassMember x, xs) when StrMap.mem x class_members -> stratify global (StrMap.find x class_members).class_ (DQ.snoc done_ (`ClassMember x)) xs 
-  | Some(`SuperClass i, xs) when IntMap.mem i super -> stratify global (IntMap.find i super) (DQ.snoc done_ (`SuperClass i)) xs
+  | Some(`SuperClass i, xs) when IntMap.mem i super -> stratify global (IntMap.find i super).class_ (DQ.snoc done_ (`SuperClass i)) xs
 
   | Some (`Protected, xs) -> raise (IllegalPath "protected")
 
