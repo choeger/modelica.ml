@@ -172,9 +172,13 @@ let known_component kind x = {kind;component={ident=nl x; subscripts=[]}}
 
 let cclass = known_component CK_Class
 
+let cattr = known_component CK_BuiltinAttr
+
 let cconstfld = known_component CK_Constant 
 
 let cfld = known_component CK_Continuous
+
+let cr x = ComponentReference x
 
 let knownref cks = KnownRef (DQ.of_list cks)
                   
@@ -218,6 +222,10 @@ let test_cases = [
     "class A protected constant Real x = 42.; end A"
     [`ClassMember "A"] (field protected "x" (has_binding (Real 42.))) ;
 
+  test_norm "Normalize Binding to Builtin Attributes"
+    "class A constant Real x = y.start; Real y; end A"
+    [`ClassMember "A"] (field public "x" (has_binding (cr (knownref [cclass "A"; cfld "y"; cattr "start"])))) ;  
+  
   test_norm "Normalize Simple Modification"
     "class A constant Real x(start = 42.); end A"
     [`ClassMember "A"] (field public "x" (has_modification "start" (is_modified_to (Real 42.)))) ;  

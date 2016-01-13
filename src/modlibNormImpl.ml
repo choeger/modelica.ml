@@ -167,7 +167,7 @@ and resolve_in lib found cv (components : component list) = match components wit
       (* Everything else has only builtin attributes *)
       | Class _ 
       | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ ->
-        DQ.append (DQ.snoc found {kind=CK_BuiltinClass; component=x})
+        DQ.append (DQ.snoc found {kind=CK_BuiltinAttr; component=x})
           (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) xs ))
     end
 
