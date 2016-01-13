@@ -178,6 +178,8 @@ let cconstfld = known_component CK_Constant
 
 let cfld = known_component CK_Continuous
 
+let cbuiltinfun = known_component CK_BuiltinFunction
+
 let cr x = ComponentReference x
 
 let knownref cks = KnownRef (DQ.of_list cks)
@@ -225,6 +227,12 @@ let test_cases = [
   test_norm "Normalize Binding to Builtin Attributes"
     "class A constant Real x = y.start; Real y; end A"
     [`ClassMember "A"] (field public "x" (has_binding (cr (knownref [cclass "A"; cfld "y"; cattr "start"])))) ;  
+
+  test_norm "Normalize Builtin 'size'"
+    "class A constant Integer x = size(y); Real y; end A"
+    [`ClassMember "A"] (field public "x" (has_binding (app {fun_= knownref [cbuiltinfun "size"] ;
+                                                            args=[cr (knownref [cclass "A"; cfld "y"; cattr "start"])];
+                                                            named_args=[]}))) ;
   
   test_norm "Normalize Simple Modification"
     "class A constant Real x(start = 42.); end A"
