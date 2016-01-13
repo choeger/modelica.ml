@@ -170,7 +170,7 @@ let rec resolve_os lib found os x xs =
       | _ -> raise AstInvariant
     end
   | `NothingFound when extends_builtin_os lib os ->
-    DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs))
+    DQ.append found (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs)))
   | _ ->
     raise (NoSuchField x.ident)
 
@@ -344,9 +344,7 @@ let rec normalize_stmts lib src env ({super;fields;class_members} as es)=
     begin match DQ.front field_name with
       | None -> normalize_stmts lib src env es stmts (* bogus stmt *)                  
 
-      (* TODO: nested modification inside classes *)
-
-      (* Builtin attributes *)
+      (* TODO: nested modification inside classes *)                 
       
       (* Local field *)
       | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete; component},xs) when StrMap.mem component.ident.txt fields ->
@@ -365,6 +363,8 @@ let rec normalize_stmts lib src env ({super;fields;class_members} as es)=
             let class_field = insert fld xs 
             in normalize_stmts lib src env {es with fields = (StrMap.add component.ident.txt class_field fields)} stmts
         end
+
+      | Some(x,_) -> raise (Failure ("Don't know how to handle " ^ (show_known_component x)))
     end
 
 let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
