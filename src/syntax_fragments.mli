@@ -29,7 +29,56 @@
 (** Useful fragments of Modelica syntax *)
 
 open Syntax
-       
+
+val nl : 'a -> 'a Location.loc
+
+val int : int -> Syntax.exp
+(** Constructor for integer literals *)
+                   
+val real : float -> Syntax.exp
+val ide : string -> Syntax.exp
+val bool : bool -> Syntax.exp
+val string : string -> Syntax.exp
+val colon : Syntax.exp
+val end_ : Syntax.exp
+val app : Syntax.application -> Syntax.exp
+val pow : Syntax.binary_exp -> Syntax.exp
+val dpow : Syntax.binary_exp -> Syntax.exp
+val mul : Syntax.binary_exp -> Syntax.exp
+val dmul : Syntax.binary_exp -> Syntax.exp
+val div : Syntax.binary_exp -> Syntax.exp
+val ddiv : Syntax.binary_exp -> Syntax.exp
+val plus : Syntax.binary_exp -> Syntax.exp
+val dplus : Syntax.binary_exp -> Syntax.exp
+val minus : Syntax.binary_exp -> Syntax.exp
+val dminus : Syntax.binary_exp -> Syntax.exp
+val uminus : Syntax.exp -> Syntax.exp
+val uplus : Syntax.exp -> Syntax.exp
+val udminus : Syntax.exp -> Syntax.exp
+val udplus : Syntax.exp -> Syntax.exp
+val gt : Syntax.binary_exp -> Syntax.exp
+val lt : Syntax.binary_exp -> Syntax.exp
+val leq : Syntax.binary_exp -> Syntax.exp
+val geq : Syntax.binary_exp -> Syntax.exp
+val neq : Syntax.binary_exp -> Syntax.exp
+val eq_ : Syntax.binary_exp -> Syntax.exp
+val and_ : Syntax.binary_exp -> Syntax.exp
+val or_ : Syntax.binary_exp -> Syntax.exp
+val not_ : Syntax.exp -> Syntax.exp
+val if_ : Syntax.if_expression -> Syntax.exp
+val range : Syntax.range -> Syntax.exp
+val compr : Syntax.comprehension -> Syntax.exp
+val array : Syntax.exp list -> Syntax.exp
+val marray : Syntax.exp list list -> Syntax.exp
+val explicitclosure : Syntax.exp -> Syntax.exp
+val outputexpression : Syntax.exp option list -> Syntax.exp
+val cr : Syntax.component list -> Syntax.component_reference
+val cre : Syntax.component_reference -> Syntax.exp
+val der : Syntax.exp
+val initial : Syntax.exp
+val assert_ : Syntax.exp
+val any : string -> Syntax.component
+
 val empty_app : component_reference -> application
 (** Return an empty application with the given expression as function *)
 

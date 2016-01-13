@@ -29,8 +29,69 @@
 
 (** Useful fragments of Modelica syntax *)
 
+open Batteries
 open Syntax
 open Utils
+
+let nl = Location.mknoloc
+
+exception EmptyName
+
+let rec name_ components = function
+  | [] -> {components = List.rev components; root=false}
+  | txt::r -> name_ ({ident = {txt; loc = Location.none}; subscripts=[]}::components) r
+
+let name = function
+  | [] -> raise EmptyName
+  | n -> ComponentReference (UnknownRef (name_ [] n))
+
+let int x =  (Int x)
+let real x =  (Real x)
+let ide x = name [x]
+let bool x =  (Bool x)
+let string x =  (String x)
+let colon =  Colon
+let end_ =  End
+let app x =  (App x)
+let pow x =  (Pow x)
+let dpow x =  (DPow x)
+let mul x =  (Mul x)
+let dmul x =  (DMul x)
+let div x =  (Div x)
+let ddiv x =  (DDiv x)
+let plus x =  (Plus x)
+let dplus x =  (DPlus x)
+let minus x =  (Minus x)
+let dminus x =  (DMinus x)
+let uminus x =  (UMinus x)
+let uplus x =  (UPlus x)
+let udminus x =  (UDMinus x)
+let udplus x =  (UDPlus x)
+let gt x =  (Gt x)
+let lt x =  (Lt x)
+let leq x =  (Leq x)
+let geq x =  (Geq x)
+let neq x =  (Neq x)
+let eq_ x =  (Eq x)
+let and_ x =  (And x)
+let or_ x =  (Or x)
+let not_ x =  (Not x)
+let if_ x =  (If x)
+let range x =  (Range x)
+let compr x =  (Compr x)
+let array x =  (Array x)
+let marray x =  (MArray x)
+let explicitclosure x =  (ExplicitClosure x)
+let outputexpression x =  (OutputExpression x)
+
+let cr components = UnknownRef {root=false; components}
+let cre cr =  (ComponentReference cr)
+
+let der =  (ComponentReference Der)
+let initial =  (ComponentReference Initial)
+let assert_ =  (ComponentReference Assert)                   
+
+let any x = {ident = nl x;subscripts=[]}                             
 
 let empty_app f = { fun_ = f ; args = [] ; named_args = [] }
 
@@ -60,16 +121,6 @@ let empty_elements = { defs = [] ; extensions = [] ; redeclared_defs = [] ;
 
 
 let empty_composition = { imports = [] ; public = empty_elements ; protected = empty_elements ; cargo = empty_behavior  }
-
-exception EmptyName
-
-let rec name_ components = function
-  | [] -> {components = List.rev components; root=false}
-  | txt::r -> name_ ({ident = {txt; loc = Location.none}; subscripts=[]}::components) r
-
-let name = function
-  | [] -> raise EmptyName
-  | n -> ComponentReference (UnknownRef (name_ [] n))
 
 let type_name xs = TName (List.map Location.mknoloc xs)
 

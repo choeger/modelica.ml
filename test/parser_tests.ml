@@ -49,56 +49,6 @@ let parse_test parser input f =
 let expr_test input f =
   parse_test expr_parser
 
-let nl = mknoloc
-
-let int x =  (Int x)
-let real x =  (Real x)
-let ide x = name [x]
-let bool x =  (Bool x)
-let string x =  (String x)
-let colon =  Colon
-let end_ =  End
-let app x =  (App x)
-let pow x =  (Pow x)
-let dpow x =  (DPow x)
-let mul x =  (Mul x)
-let dmul x =  (DMul x)
-let div x =  (Div x)
-let ddiv x =  (DDiv x)
-let plus x =  (Plus x)
-let dplus x =  (DPlus x)
-let minus x =  (Minus x)
-let dminus x =  (DMinus x)
-let uminus x =  (UMinus x)
-let uplus x =  (UPlus x)
-let udminus x =  (UDMinus x)
-let udplus x =  (UDPlus x)
-let gt x =  (Gt x)
-let lt x =  (Lt x)
-let leq x =  (Leq x)
-let geq x =  (Geq x)
-let neq x =  (Neq x)
-let eq_ x =  (Eq x)
-let and_ x =  (And x)
-let or_ x =  (Or x)
-let not_ x =  (Not x)
-let if_ x =  (If x)
-let range x =  (Range x)
-let compr x =  (Compr x)
-let array x =  (Array x)
-let marray x =  (MArray x)
-let explicitclosure x =  (ExplicitClosure x)
-let outputexpression x =  (OutputExpression x)
-
-let cr components = UnknownRef {root=false; components}
-let cre cr =  (ComponentReference cr)
-
-let der =  (ComponentReference Der)
-let initial =  (ComponentReference Initial)
-let assert_ =  (ComponentReference Assert)                   
-
-let any x = {ident = nl x;subscripts=[]}                             
-
 let parser_test_case parser lprinter sprinter prep input expected =
   (Printf.sprintf "Parse '%s'" input) >::: [
     ("parsing" >::
