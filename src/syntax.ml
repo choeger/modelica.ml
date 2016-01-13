@@ -277,7 +277,12 @@ type loc_t = Location.t = {
 
   and known_ref = known_component DQ.t
 
-  and component_kind = CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete | CK_Class | CK_BuiltinAttr | CK_BuiltinClass
+  and component_kind = CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete (* components of given variability *)
+                     | CK_Class (* class or type *)
+                     | CK_BuiltinClass (* builtin class or type *)
+                     | CK_Function (* function *)
+                     | CK_BuiltinFunction (* builtin function/function like operator/thingy *)
+                     | CK_BuiltinAttr (* attribute of a builtin class *)
                      
   and known_component = { kind : component_kind ; component : component }
 
