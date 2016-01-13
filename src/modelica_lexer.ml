@@ -143,7 +143,7 @@ let white_space = [%sedlex.regexp?
 let state_from_utf8_string src input = {
   buf = Utf8.from_string input ;
   src;
-  m_cursor = { m_line = 0; m_bol = 0 ; m_last = None } ; 
+  m_cursor = { m_line = 1; m_bol = 0 ; m_last = None } ; 
   s_cursor = { str_start = 0 ; str_end = 0; str_bol = 0 ; str_line = 0 } }
 
 let last_token { src; buf; m_cursor ; } = m_cursor.m_last
@@ -159,8 +159,14 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
 
   let lift txt =    
     let loc_start = match txt with      
-        STRING(_) | QIDENT(_) -> { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ; 
-                                   pos_cnum = s_cursor.str_start ; pos_fname = src }
+        STRING(_) | QIDENT(_) ->
+        let pos =
+          { pos_lnum = m_cursor.m_line ; pos_bol = m_cursor.m_bol ;            
+            pos_cnum = s_cursor.str_start ; pos_fname = src } in
+        (* Parsed a string, Reset cursor *)
+        m_cursor.m_line <- s_cursor.str_line;
+        m_cursor.m_bol <- s_cursor.str_bol ;
+        pos
       | _ -> last_loc ()
     in
     let loc_end = match txt with
@@ -170,7 +176,8 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
       | _ -> { loc_start with pos_cnum = lexeme_start buf + lexeme_length buf }
     in
     let tok = { txt ; loc = { loc_start ; loc_end ; loc_ghost = false } } 
-    in m_cursor.m_last <- Some tok ; tok
+    in
+    m_cursor.m_last <- Some tok ; tok
   in
 
   let current _ = Utf8.lexeme buf in
