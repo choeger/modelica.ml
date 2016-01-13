@@ -180,6 +180,8 @@ let cfld = known_component CK_Continuous
 
 let cbuiltinfun = known_component CK_BuiltinFunction
 
+let cbuiltinclass = known_component CK_BuiltinClass
+
 let cr x = ComponentReference x
 
 let knownref cks = KnownRef (DQ.of_list cks)
@@ -232,6 +234,16 @@ let test_cases = [
     "class A constant Integer x = size(y); Real y; end A"
     [`ClassMember "A"] (field public "x" (has_binding (app {fun_= knownref [cbuiltinfun "size"] ;
                                                             args=[cr (knownref [cclass "A"; cfld "y"])];
+                                                            named_args=[]}))) ;
+
+  test_norm "Normalize Builtin 'stateSelect'"
+    "class A Real y(stateSelect=StateSelect.never); end A"
+    [`ClassMember "A"] (field public "y" (has_binding (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] )))) ;
+
+  test_norm "Normalize Builtin 'String'"
+    "class A constant Integer x = String(1); end A"
+    [`ClassMember "A"] (field public "x" (has_binding (app {fun_= knownref [cbuiltinclass "String"] ;
+                                                            args=[int 1];
                                                             named_args=[]}))) ;
   
   test_norm "Normalize Simple Modification"
