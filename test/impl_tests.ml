@@ -39,6 +39,10 @@ open Class_tests
 
 let nl = Location.mknoloc
 
+let erase_location = ModlibNormalized.cv_mapper ~map_expr:Parser_tests.prep_expr ()
+                                                           
+let prep_cv = erase_location.map_class_value erase_location
+
 let assert_path lib path =
   match lookup_path lib path with
     `Found f -> f.found_value
@@ -109,7 +113,7 @@ let assert_norm path pred td =
 
   let impl = (assert_result final_result).implementation in
   let cv = assert_path impl path in
-  pred cv
+  pred (prep_cv cv)
 
 let show_option f = function None -> "None" | Some x -> "(Some " ^ (f x) ^ ")"
 
@@ -133,7 +137,7 @@ let is_modification_kind k m =
   assert_equal ~printer:show_component_kind k m.mod_kind
 
 let is_modified_to exp m =
-  assert_equal ~printer:show_field_modification_desc (Modify exp) m.mod_desc
+  assert_equal ~printer:show_field_modification_desc (Modify (Parser_tests.prep_expr exp)) m.mod_desc
 
 let (&&&) p1 p2 e = (p1 e) ; (p2 e)
 
@@ -238,8 +242,12 @@ let test_cases = [
 
   test_norm "Normalize Builtin 'stateSelect'"
     "class A Real y(stateSelect=StateSelect.never); end A"
-    [`ClassMember "A"] (field public "y" (has_binding (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] )))) ;
+    [`ClassMember "A"] (field public "y" (has_modification "stateSelect" (is_modified_to (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
 
+  test_norm "Normalize Builtin 'stateSelect' in an array"
+    "class A Real[3] y(stateSelect=StateSelect.never); end A"
+    [`ClassMember "A"] (field public "y" (has_modification "stateSelect" (is_modified_to (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
+  
   test_norm "Normalize Builtin 'String'"
     "class A constant Integer x = String(1); end A"
     [`ClassMember "A"] (field public "x" (has_binding (app {fun_= knownref [cbuiltinclass "String"] ;

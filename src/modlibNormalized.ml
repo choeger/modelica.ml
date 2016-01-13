@@ -52,7 +52,7 @@ let norm_constr = function
   | CCau c -> Cau c
   | CCon c -> Con c
   | CDer d -> Der d
-  | CRepl -> raise (Invalid_argument "'replaceable' is not a normlized constructor")
+  | CRepl -> raise (Invalid_argument "'replaceable' is not a normalized constructor")
 
 type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                  | Enumeration of StrSet.t
@@ -92,6 +92,35 @@ and elements_struct = { class_members : class_member StrMap.t [@default StrMap.e
                         super : class_value IntMap.t [@default IntMap.empty];
                         fields : class_field StrMap.t [@default StrMap.empty]
                       }
+
+(** Enhance the automatically derived mapper with map-routines for all these Map.t elements *)
+let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () = {identity_mapper with 
+  on_field_modification_desc = {identity_mapper.on_field_modification_desc with
+                                map_Modify = (fun self e -> Modify (map_expr e)) ;
+                                map_Nested = (fun self m -> Nested (StrMap.map (self.map_field_modification self) m)) ;};
+
+  map_object_struct = (fun self os -> {os with public = self.map_elements_struct self os.public ;
+                                               protected = self.map_elements_struct self os.protected ;
+                                               behavior = map_behavior os.behavior}) ;
+  
+  map_class_member = (fun self {class_; class_mod} ->
+                       let class_ = self.map_class_value self class_ in
+                       let class_mod = StrMap.map (self.map_field_modification self) class_mod in
+                       {class_; class_mod});
+
+  map_class_field = (fun self {field_class; field_binding; field_mod} ->
+      let field_class = self.map_class_value self field_class in
+      let field_binding = Option.map map_expr field_binding in
+      let field_mod = StrMap.map (self.map_field_modification self) field_mod in
+      {field_class; field_binding; field_mod});
+                      
+  map_elements_struct = (fun self {class_members; super; fields} ->
+      let class_members = StrMap.map (self.map_class_member self) class_members in
+      let super = IntMap.map (self.map_class_value self) super in
+      let fields = StrMap.map (self.map_class_field self) fields in
+      {class_members; super; fields}) ;
+      
+}
 
 type flat_attributes = {
   fa_sort : sort option [@default None] ;
