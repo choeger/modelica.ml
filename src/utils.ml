@@ -41,6 +41,8 @@ type location = Location.t = {
 
 type 'a loc = 'a Location.loc = { txt : 'a; loc : location; } [@@deriving yojson]
 
+let print_loc l = Location.print Format.str_formatter l ; Format.flush_str_formatter ()
+
 type token =
     GT | LT | NEQ | GEQ | LEQ | EQ | EQEQ | LPAREN | RPAREN | LBRACKET | RBRACKET | LBRACE | RBRACE | SEMICOLON | COMMA | DOT | COLON | COLONEQ
   | INT of int

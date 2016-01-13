@@ -115,27 +115,30 @@ let run_compile global root =
   match FileSystem.parse_root root with
     Some root -> begin 
       let tr = Trans.translate_pkg_root root in
-      let o = Report.run (NormLib.norm_pkg_root tr)
-          {messages=[]; output=global} in
-      List.iteri print_message o.final_messages ;
-      match o.final_result with
-        Ok {signature;implementation} -> BatLog.logf "Normalization Ok.\n%!" ;                
-        let c = Compress.compress_elements signature in
-        BatLog.logf "Compression Ok.\n%!" ;
-        let c' = clean global c in
+      try 
+        let o = Report.run (NormLib.norm_pkg_root tr)
+            {messages=[]; output=global} in
+        List.iteri print_message o.final_messages ;
+        match o.final_result with
+          Ok {signature;implementation} -> BatLog.logf "Normalization Ok.\n%!" ;                
+          let c = Compress.compress_elements signature in
+          BatLog.logf "Compression Ok.\n%!" ;
+          let c' = clean global c in
         
-        let js = Normalized.elements_struct_to_yojson c' in
-        let sig_dump = Yojson.Safe.pretty_to_string js in
-        write_out sig_dump (sig_file ()) ;
-        BatLog.logf "Signature Dump (%d) Ok.\n" (String.length sig_dump);
+          let js = Normalized.elements_struct_to_yojson c' in
+          let sig_dump = Yojson.Safe.pretty_to_string js in
+          write_out sig_dump (sig_file ()) ;
+          BatLog.logf "Signature Dump (%d) Ok.\n" (String.length sig_dump);
 
-        let js = Normalized.elements_struct_to_yojson implementation in
-        let impl_dump = Yojson.Safe.pretty_to_string js in
-        write_out impl_dump (impl_file ()) ;
-        BatLog.logf "Implementation Dump (%d) Ok.\n" (String.length impl_dump);
+          let js = Normalized.elements_struct_to_yojson implementation in
+          let impl_dump = Yojson.Safe.pretty_to_string js in
+          write_out impl_dump (impl_file ()) ;
+          BatLog.logf "Implementation Dump (%d) Ok.\n" (String.length impl_dump);
 
-        0
-      | Failed -> BatLog.logf "Normalization Error\n" ; 1 
+          0        
+        | Failed -> BatLog.logf "Normalization Error\n" ; 1
+      with
+        NormImpl.NoSuchField fld -> BatLog.logf "   at: %s\n" (print_loc fld.loc) ; BatLog.logf "Error: No such field '%s'\n" fld.txt ; 1
     end 
   | None -> BatLog.logf "Syntax Error\n" ; 1
 
