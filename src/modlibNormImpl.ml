@@ -192,6 +192,7 @@ let resolve_builtin lib first rest =
 
   (* Builtin Classes *)
   | "String" -> builtin CK_BuiltinClass
+  | "StateSelect" -> builtin CK_BuiltinClass
 
   (* TODO: this is actually wrong, the toplevel should come _before_ the builtins *)
   | _ -> resolve_os lib DQ.empty {empty_object_struct with public=lib} first rest 
@@ -250,8 +251,8 @@ let stratify_stmt lib scope field exp =
     | _ -> scope
   in
   match lookup_path lib scope with
-  `Found {found_value} ->
-    let field_name = resolve_in lib DQ.empty found_value components in
+    `Found {found_value} ->
+    let field_name = resolve_in lib DQ.empty found_value components in    
     {field_name; exp}
   | _ -> raise (Failure "Cannot find context of value binding")
 
@@ -377,7 +378,7 @@ let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
 
     map_elements_struct = (fun self {class_members; super; fields} ->
         let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in        
-
+        
         (* deal with modified short-defined classes *)
         let map_cm name {class_; class_mod} =
           (* filter out classes with own scope *)
