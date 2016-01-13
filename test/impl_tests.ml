@@ -231,7 +231,7 @@ let test_cases = [
   test_norm "Normalize Builtin 'size'"
     "class A constant Integer x = size(y); Real y; end A"
     [`ClassMember "A"] (field public "x" (has_binding (app {fun_= knownref [cbuiltinfun "size"] ;
-                                                            args=[cr (knownref [cclass "A"; cfld "y"; cattr "start"])];
+                                                            args=[cr (knownref [cclass "A"; cfld "y"])];
                                                             named_args=[]}))) ;
   
   test_norm "Normalize Simple Modification"

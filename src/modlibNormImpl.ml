@@ -171,8 +171,12 @@ and resolve_in lib found cv (components : component list) = match components wit
           (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) xs ))
     end
 
+let resolve_builtin lib first rest = match first.ident.txt with
+    "size" -> DQ.cons {kind=CK_BuiltinFunction; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) rest))
+  | _ -> resolve_os lib DQ.empty {empty_object_struct with public=lib} first rest 
+
 let rec resolve_env lib found first rest = function
-    [] -> resolve_os lib DQ.empty {empty_object_struct with public=lib} first rest
+    [] -> resolve_builtin lib first rest
   | env :: envs when env_mem first.ident.txt env ->
     begin
     match env_find first.ident.txt env with
