@@ -85,10 +85,10 @@ and class_field = { field_class : class_value ;
                     field_binding : exp option [@default None] ;
                     field_mod : field_modification StrMap.t [@default StrMap.empty]}
 
-and class_member = { class_ : class_value ;
-                     class_mod : field_modification StrMap.t [@default StrMap.empty]}
+and modified_class = { class_ : class_value ;
+                       class_mod : field_modification StrMap.t [@default StrMap.empty]}
 
-and elements_struct = { class_members : class_member StrMap.t [@default StrMap.empty];
+and elements_struct = { class_members : modified_class StrMap.t [@default StrMap.empty];
                         super : class_value IntMap.t [@default IntMap.empty];
                         fields : class_field StrMap.t [@default StrMap.empty]
                       }
@@ -103,10 +103,10 @@ let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () = {identi
                                                protected = self.map_elements_struct self os.protected ;
                                                behavior = map_behavior os.behavior}) ;
   
-  map_class_member = (fun self {class_; class_mod} ->
-                       let class_ = self.map_class_value self class_ in
-                       let class_mod = StrMap.map (self.map_field_modification self) class_mod in
-                       {class_; class_mod});
+  map_modified_class = (fun self {class_; class_mod} ->
+      let class_ = self.map_class_value self class_ in
+      let class_mod = StrMap.map (self.map_field_modification self) class_mod in
+      {class_; class_mod});
 
   map_class_field = (fun self {field_class; field_binding; field_mod} ->
       let field_class = self.map_class_value self field_class in
@@ -115,7 +115,7 @@ let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () = {identi
       {field_class; field_binding; field_mod});
                       
   map_elements_struct = (fun self {class_members; super; fields} ->
-      let class_members = StrMap.map (self.map_class_member self) class_members in
+      let class_members = StrMap.map (self.map_modified_class self) class_members in
       let super = IntMap.map (self.map_class_value self) super in
       let fields = StrMap.map (self.map_class_field self) fields in
       {class_members; super; fields}) ;

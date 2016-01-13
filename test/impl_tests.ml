@@ -242,11 +242,21 @@ let test_cases = [
 
   test_norm "Normalize Builtin 'stateSelect'"
     "class A Real y(stateSelect=StateSelect.never); end A"
-    [`ClassMember "A"] (field public "y" (has_modification "stateSelect" (is_modified_to (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
+    [`ClassMember "A"] (field public "y" (has_modification "stateSelect" (
+        is_modification_kind CK_BuiltinAttr &&&
+        is_modified_to (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
 
   test_norm "Normalize Builtin 'stateSelect' in an array"
     "class A Real[3] y(stateSelect=StateSelect.never); end A"
-    [`ClassMember "A"] (field public "y" (has_modification "stateSelect" (is_modified_to (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
+    [`ClassMember "A"] (field public "y" (has_modification "stateSelect" (
+        is_modification_kind CK_BuiltinAttr &&&
+        is_modified_to (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
+
+  test_norm "Normalize Builtin 'stateSelect' in an extended array"
+    "class A T y(stateSelect=StateSelect.never); type T extends Real[3]; end T; end A"
+    [`ClassMember "A"] (field public "y" (has_modification "stateSelect" (
+        is_modification_kind CK_BuiltinAttr &&&
+        is_modified_to (cr (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
   
   test_norm "Normalize Builtin 'String'"
     "class A constant Integer x = String(1); end A"

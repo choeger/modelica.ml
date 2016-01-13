@@ -138,7 +138,24 @@ let ck_of_var =
   let open Flags in
   function None -> CK_Continuous | Some Constant -> CK_Constant | Some Parameter -> CK_Parameter | Some Discrete -> CK_Discrete
 
-let rec resolve_os lib found os x xs =
+let rec extends_builtin lib = function
+  | Class os -> extends_builtin_os lib os
+  | GlobalReference p -> begin match lookup_path lib p with
+            `Found {found_value} -> extends_builtin lib found_value
+          | _ -> raise (Failure "Lookup error")
+    end
+  | Replaceable arg | Constr {arg} -> extends_builtin lib arg
+  | Int | Real | String | Bool | Unit -> true
+  | _ -> false
+    
+and extends_builtin_os lib {object_sort; public; protected} =
+  object_sort = Type && (
+   (* TODO: protected.super = IntMap.empty ? *)
+    (extends_builtin_el lib public) || (extends_builtin_el lib protected))
+  
+and extends_builtin_el lib {super} = IntMap.cardinal super = 1 && extends_builtin lib (IntMap.find 0 super)
+
+let rec resolve_os lib found os x xs =    
   (* Resolve a reference in an object structure *)
   match ModlibLookup.get_class_element_os lib DQ.empty os x.ident.txt DQ.empty with
     `Found {found_value; found_path} ->
@@ -152,6 +169,8 @@ let rec resolve_os lib found os x xs =
         resolve_in lib (DQ.snoc found {kind ; component=x}) found_value xs
       | _ -> raise AstInvariant
     end
+  | `NothingFound when extends_builtin_os lib os ->
+    DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs))
   | _ ->
     raise (NoSuchField x.ident)
 
