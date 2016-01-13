@@ -171,8 +171,29 @@ and resolve_in lib found cv (components : component list) = match components wit
           (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) xs ))
     end
 
-let resolve_builtin lib first rest = match first.ident.txt with
-    "size" -> DQ.cons {kind=CK_BuiltinFunction; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) rest))
+(** Attempt to resolve $first.$rest as a builtin *)
+let resolve_builtin lib first rest =
+  let builtin kind = DQ.cons {kind; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) rest)) in
+  match first.ident.txt with
+  (* Numeric Functions and Conversion Functions, see 3.7.1 *)
+  | "abs" | "sign" | "sqrt" | "div" 
+  | "mod" | "rem" | "ceil" | "floor" 
+  | "integer"
+  (* 3.7.1.2 *)
+  | "sin" | "cos" | "tan"
+  | "asin" | "acos" | "atan"
+  | "atan2" 
+  | "sinh" | "cosh" | "tanh"
+  | "exp" | "log" | "log10"
+    -> builtin CK_BuiltinFunction
+
+  (* Array functions, see 10.3 *)
+  | "size" -> builtin CK_BuiltinFunction
+
+  (* Builtin Classes *)
+  | "String" -> builtin CK_BuiltinClass
+
+  (* TODO: this is actually wrong, the toplevel should come _before_ the builtins *)
   | _ -> resolve_os lib DQ.empty {empty_object_struct with public=lib} first rest 
 
 let rec resolve_env lib found first rest = function
@@ -222,7 +243,7 @@ let resolve_behavior lib src env =
   m.map_behavior m
 
 let stratify_stmt lib scope field exp =
-  let components = List.map (fun x -> {ident=Location.mknoloc x;subscripts=[]}) field in
+  let components = List.map (fun ident -> {ident;subscripts=[]}) field in
   let () = assert (DQ.size scope > 0) in
   let scope = match DQ.rear scope with
     | Some(xs, `Protected) -> xs (* If we are in the protected section, make sure the scope is a valid class pointer *)

@@ -30,6 +30,7 @@
 (** Translation of Modelica units to intermediate representation *)
 
 open Syntax
+open Syntax_fragments
 open Flags
 open Utils
 open Location
@@ -68,10 +69,10 @@ let final opts arg = match opts with {type_final=false} -> Constr {arg; constr=C
 
 type translation_state = {
   env : import_env ;
-  current_path : class_ptr ;
+  current_path : class_ptr_elem Location.loc DQ.t ;
   anons : int ;
   class_code : class_stmt list ;
-  current_field : string DQ.t ;
+  current_field : Syntax.str DQ.t ;
   value_code : value_stmt list ;
   payload_code : payload_stmt list;
 }
@@ -92,18 +93,20 @@ let down pe state = ((), {state with current_path = DQ.snoc state.current_path p
 
 let within_path = function 
     None -> return ()
-  | Some (ps) -> fun state -> ((), {state with current_path = DQ.of_list (List.map (fun str -> `ClassMember str.txt) ps)})
+  | Some (ps) -> fun state -> ((), {state with current_path = DQ.of_list (List.map (fun {loc;txt} -> {loc; txt=`ClassMember txt}) ps)})
 
 let up state = ((), {state with current_path = match DQ.rear state.current_path with None -> DQ.empty | Some (xs,_) -> xs})
 
-let define rhs state = ((), {state with class_code = {lhs=state.current_path; rhs} :: state.class_code})
+let txt_only = DQ.map (fun {txt} -> txt)
+
+let define rhs state = ((), {state with class_code = {lhs=txt_only state.current_path; rhs} :: state.class_code})
 
 let payload rhs state =
   (* Small optimization: Only cover actual payload *)
   if rhs = Syntax_fragments.empty_behavior then
     ((), state)
   else
-    let state' = {state with payload_code = {lhs=state.current_path; rhs} :: state.payload_code} in
+    let state' = {state with payload_code = {lhs=txt_only state.current_path; rhs} :: state.payload_code} in
     ((), state')
 
 let down_field x state = ((), {state with current_field = DQ.snoc state.current_field x})
@@ -132,14 +135,14 @@ let apply_imports env =
 let bind_value rhs state =
   let rhs = apply_imports state.env rhs in
   let () = assert (DQ.size state.current_path > 0) in
-  let scope = state.current_path in      
+  let scope = txt_only state.current_path in      
   ((), {state with value_code = {lhs = {scope; field = state.current_field}; rhs} :: state.value_code})
 
 let open_class sort post state = ((), {state with class_code =
-                                                    {lhs = state.current_path ;
+                                                    {lhs = txt_only state.current_path ;
                                                      rhs = Close } ::
-                                                    {lhs = state.current_path;
-                                                     rhs = (post (Empty {class_sort = sort; class_name = (Name.of_ptr state.current_path)}))} :: state.class_code})
+                                                    {lhs = txt_only state.current_path;
+                                                     rhs = (post (Empty {class_sort = sort; class_name = (Name.of_ptr (txt_only state.current_path))}))} :: state.class_code})
 
 let in_context m state =
   let (x, s') = m {state with anons = (Hashtbl.hash state.current_path)} in
@@ -152,7 +155,7 @@ let inside name m state =
 let current_path state = (state.current_path, state)
 
 let in_superclass state = match DQ.rear state.current_path with
-    Some(xs, `SuperClass _) -> (true, state)
+    Some(xs, {txt=`SuperClass _}) -> (true, state)
   | _ -> (false, state)
 
 let rec mseqi_ i fm list state = match list with
@@ -182,12 +185,14 @@ let set state s = ((), state)
 
 let set_env env state = ((), {state with env})
 
-let next_anon state = `ClassMember ("anon" ^ (string_of_int state.anons)), {state with anons = state.anons + 1}
+let next_anon state = (nl (`ClassMember ("anon" ^ (string_of_int state.anons))), {state with anons = state.anons + 1})
+
+let down_class {loc;txt} = down {loc; txt=`ClassMember txt}
 
 let rec mtranslate_tds = function
   | Short tds -> do_ ;
     (* new path is the definition *)
-    down (`ClassMember tds.td_name.txt) ;
+    down_class tds.td_name ;
     (* Translate the rhs of the type-definition *)
     te <-- mtranslate_texp ((sort tds.sort) %> (repl tds.type_options)) tds.type_exp ;
     (* restore path *)
@@ -200,7 +205,7 @@ let rec mtranslate_tds = function
       do_ ;
       add_imports tds.type_exp.imports ;
       (* Class name *)
-      down (`ClassMember tds.td_name.txt) ;
+      down_class tds.td_name ;
       (* Class skeleton *)
       open_class tds.sort (repl tds.type_options) ;
       (* Payload *)
@@ -208,25 +213,25 @@ let rec mtranslate_tds = function
       (* Public elements *)
       mtranslate_elements tds.type_exp.public ;	 
       (* Protected elements *)
-      down `Protected ;
+      down (nl `Protected) ;
       mtranslate_elements tds.type_exp.protected 
     )     
 
   | Enumeration tds ->
     do_ ;
-    down (`ClassMember tds.td_name.txt) ;
+    down_class tds.td_name ;
     define (repl tds.type_options (sort tds.sort (PEnumeration (StrSet.of_list (List.map (fun {commented} -> commented) tds.type_exp))))) ;
     up
 
   | OpenEnumeration tds ->
     do_ ;
-    down (`ClassMember tds.td_name.txt) ;
+    down_class tds.td_name ;
     define (repl tds.type_options (sort tds.sort (PEnumeration StrSet.empty))) ;
     up
 
   | DerSpec tds ->
     do_ ;
-    down (`ClassMember tds.td_name.txt) ;
+    down_class tds.td_name ;
     define (repl tds.type_options (sort tds.sort (Constr {arg = Reference tds.type_exp.der_name ; constr = CDer (lunloc tds.type_exp.idents)}))) ;
     up 
 
@@ -235,12 +240,12 @@ let rec mtranslate_tds = function
     in_context (
       do_ ;
       add_imports cmp.imports ;
-      down (`ClassMember tds.td_name.txt) ;
+      down_class tds.td_name ;
       open_class tds.sort (repl tds.type_options) ;
       mtranslate_elements cmp.public ;
-      down (`SuperClass (List.length cmp.public.extensions)) ;
+      down (nl (`SuperClass (List.length cmp.public.extensions))) ;
       define RedeclareExtends ; up ;
-      down `Protected ;
+      down (nl `Protected) ;
       mtranslate_elements cmp.protected
     )
 
@@ -271,7 +276,7 @@ and mtranslate_texp post =
     let s = state.current_path in
     let (src,ctxt) = match DQ.rear s with None -> raise InconsistentHierarchy | Some(xs,x) -> (xs,x) in
     redec <--
-    begin match ctxt with
+    begin match ctxt.txt with
         `SuperClass _ -> mtranslate_mod_superclass src ctxt {mod_type; modification}
       | `FieldType _ -> mtranslate_mod_field src {mod_type; modification}
       | `ClassMember _ -> mtranslate_mod_class src ctxt {mod_type; modification}
@@ -289,9 +294,9 @@ and mtranslate_texp post =
     end ;
     
     (* value modifications go into different places, depending on context *)
-    begin match ctxt with
+    begin match ctxt.txt with
         `SuperClass _ -> do_ ; up; mtranslate_modification_values modification; down ctxt 
-      | `FieldType x -> do_ ; up; down_field x; mtranslate_modification_values modification; up_field; down ctxt
+      | `FieldType txt -> do_ ; up; down_field {loc=ctxt.loc; txt}; mtranslate_modification_values modification; up_field; down ctxt
       | `ClassMember _ -> mtranslate_modification_values modification
       | `Protected -> raise InconsistentHierarchy
     end
@@ -303,7 +308,7 @@ and mtranslate_mod_class src name {mod_type; modification} =
   do_ ;
   (* context is [..; 'model Pipe'] *)
   open_class Class (fun x -> x) ;
-  down (`SuperClass 0) ;
+  down (nl (`SuperClass 0)) ;
   mtranslate_texp (fun x -> x) mod_type ;
   up ;     
   mtranslate_modification src modification 
@@ -319,11 +324,11 @@ and mtranslate_mod_field src {mod_type; modification} =
   a <-- next_anon ;  
   let pullout = DQ.snoc src a in     
   (* context is [..; 'field pipe'] *)
-  define (KnownPtr pullout) ;
+  define (KnownPtr (txt_only pullout)) ;
   up ;
   down a ;
   open_class Class (fun x -> x) ;
-  down (`SuperClass 0) ;
+  down (nl (`SuperClass 0)) ;
   mtranslate_texp (fun x -> x) mod_type ;
   up ;     
   mtranslate_modification src modification 
@@ -344,7 +349,7 @@ and mtranslate_mod_superclass src name {mod_type; modification} =
   
 and mtranslate_extends i {ext_type} =
   do_ ;
-  down (`SuperClass i) ;
+  down (nl (`SuperClass i)) ;
   mtranslate_texp identity ext_type ;
   up
   
@@ -360,10 +365,10 @@ and mtranslate_typedef td = mtranslate_tds td.commented
 
 and mtranslate_def def =
   do_ ;
-  down (`FieldType def.commented.def_name) ;
+  down (nl (`FieldType def.commented.def_name)) ;
   mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type ;  
   up ;
-  down_field def.commented.def_name ;
+  down_field (nl def.commented.def_name) ;
   begin match def.commented.def_rhs with
       Some e -> bind_value e
     | None -> return () end ;
@@ -376,8 +381,8 @@ and mtranslate_type_redeclaration src {redecl_type} =
   a <-- next_anon ;
   let pullout = DQ.snoc src a in
   inside pullout (mtranslate_texp (final tds.type_options %> sort tds.sort) tds.type_exp ) ;
-  down (`ClassMember tds.td_name.txt) ;  
-  define (KnownPtr pullout) ;  
+  down_class tds.td_name ;
+  define (KnownPtr (txt_only pullout)) ;  
   up 
 
 and mtranslate_modification src {types; components; modifications} =
@@ -398,9 +403,9 @@ and mtranslate_nested_modification src = function
   | {commented = {mod_name = x::xs}} as nm ->
     do_ ;
     state <-- get ;
-    down (`Any x.txt) ;
+    down {loc=x.loc; txt=(`Any x.txt)} ;
     open_class Class (fun x -> x) ;
-    down (`SuperClass 0) ;
+    down (nl (`SuperClass 0)) ;
     define RedeclareExtends ;
     up;    
     change <-- mtranslate_nested_modification src
@@ -418,8 +423,8 @@ and mtranslate_def_redeclaration src {def} = do_ ;
   f <-- next_anon ;
   let pullout = DQ.snoc src f in
   inside pullout (mtranslate_texp (repl {Syntax_fragments.no_type_options with type_replaceable = def.commented.def_options.replaceable}) def.commented.def_type) ;
-  down (`FieldType def.commented.def_name) ;
-  define (KnownPtr pullout) ;  
+  down (nl (`FieldType def.commented.def_name)) ;
+  define (KnownPtr (txt_only pullout)) ;  
   up
 
 and mtranslate_nested_modification_values = function
@@ -434,7 +439,7 @@ and mtranslate_nested_modification_values = function
     bind_value v
   | {commented = {mod_name = x::xs}} as nm ->
     do_ ;
-    down_field x.txt;
+    down_field x;
     mtranslate_nested_modification_values {nm with commented = {nm.commented with mod_name = xs}} ;
     up_field 
            
@@ -464,7 +469,7 @@ let mtranslate_unit env {within; toplevel_defs=td::_} =
   within_path within ;
   mtranslate_typedef td ;
   s <-- get ;
-  return {class_code=s.class_code; class_name=Name.of_ptr s.current_path; impl_code=s.value_code; payload=s.payload_code}
+  return {class_code=s.class_code; class_name=Name.of_ptr (txt_only s.current_path); impl_code=s.value_code; payload=s.payload_code}
 
 let translate_unit env {scanned; parsed} =
   run (mtranslate_unit env parsed)
