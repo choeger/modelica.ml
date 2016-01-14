@@ -37,3 +37,4 @@ module NormSig = ModlibNormSig
 module NormImpl = ModlibNormImpl
 module NormLib = ModlibNormLib
 module Utils = Utils
+module Report = Report

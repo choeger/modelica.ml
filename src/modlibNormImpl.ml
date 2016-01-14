@@ -171,13 +171,14 @@ let rec resolve_os lib found os x xs =
     end
   | `NothingFound when extends_builtin_os lib os ->
     DQ.append found (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs)))
-  | _ ->
-    raise (NoSuchField x.ident)
+  | _ -> BatLog.logf "In:\n %s\n" (show_object_struct os) ; raise (NoSuchField x.ident)
 
 and resolve_in lib found cv (components : component list) = match components with
     [] -> found
   | x :: xs -> begin match cv with
-      | GlobalReference p -> begin match lookup_path lib p with
+      | Recursive _ -> raise (Failure "Cannot normalize recursive type")
+      | DynamicReference p | GlobalReference p ->
+        begin match lookup_path lib p with
             `Found {found_value} -> resolve_in lib found found_value components
           | _ -> raise (Failure "Lookup error")
         end

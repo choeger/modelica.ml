@@ -126,3 +126,18 @@ let type_name xs = TName (List.map Location.mknoloc xs)
 
 let root_type xs = TRootName (List.map Location.mknoloc xs)
 
+let known_component kind x = {kind;component={ident=nl x; subscripts=[]}}
+
+let cclass = known_component CK_Class
+      
+let cattr = known_component CK_BuiltinAttr
+
+let cconstfld = known_component CK_Constant 
+
+let cfld = known_component CK_Continuous
+
+let cbuiltinfun = known_component CK_BuiltinFunction
+
+let cbuiltinclass = known_component CK_BuiltinClass
+    
+let knownref cks = KnownRef (DQ.of_list cks)

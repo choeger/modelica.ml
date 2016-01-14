@@ -79,6 +79,17 @@ val initial : Syntax.exp
 val assert_ : Syntax.exp
 val any : string -> Syntax.component
 
+val known_component :
+  Syntax.component_kind -> string -> Syntax.known_component
+val cclass : string -> Syntax.known_component
+val cattr : string -> Syntax.known_component
+val cconstfld : string -> Syntax.known_component
+val cfld : string -> Syntax.known_component
+val cbuiltinfun : string -> Syntax.known_component
+val cbuiltinclass : string -> Syntax.known_component
+val knownref : Syntax.known_component list -> Syntax.component_reference
+
+
 val empty_app : component_reference -> application
 (** Return an empty application with the given expression as function *)
 
