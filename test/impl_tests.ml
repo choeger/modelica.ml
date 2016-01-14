@@ -39,6 +39,8 @@ open TestUtils
 open ClassValueFragments
 open P
 
+module S = Syntax_fragments
+
 let public = true
 let protected = false
 
@@ -113,7 +115,7 @@ let test_cases = [
   test_norm "Normalize Builtin 'String'"
     "class A constant Integer x = String(1); end A"
     [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app {fun_= knownref [cbuiltinclass "String"] ;
-                                                                args=[int 1];
+                                                                args=[S.int 1];
                                                                 named_args=[]}))) ;
   
   test_norm "Normalize Simple Modification"
@@ -128,17 +130,17 @@ let test_cases = [
 
   test_norm "Normalize Class Modification"
     "class A class B constant Real x = 42.; end B; class C = B(x = 21.); end A"
-    [`ClassMember "A"] (class_member public "C" (has_class_modification "x" (
+    [`ClassMember "A"] (Has.class_member public "C" (Has.class_modification "x" (
         (Has.modification_kind CK_Constant)
         &&& 
         (Is.modified_to (Real 21.)) ))) ;
 
   test_norm "Normalize Nested Class Modification"
     "class A class B constant Real x = 42.; end B; class C class B = .A.B(x = 21.); end C; class D = C(B(x=42.)); end A"
-    [`ClassMember "A"] (class_member public "D" (has_class_modification "B" (
+    [`ClassMember "A"] (Has.class_member public "D" (Has.class_modification "B" (
         (Has.modification_kind CK_Class)
         &&&
-        (is_nested (modified_element "x" (            
+        (Is.nested (Has.element "x" (            
              (Has.modification_kind CK_Constant) &&& (Is.modified_to (Real 42.))))
           ) ))) ;
   
@@ -147,7 +149,7 @@ let test_cases = [
     [`ClassMember "A"; `ClassMember "D"] (Has.field public "c" (Has.modification "B" (
         (Has.modification_kind CK_Class)
         &&&
-        (is_nested (modified_element "x" (            
+        (Is.nested (Has.element "x" (            
              (Has.modification_kind CK_Constant) &&& (Is.modified_to (Real 42.))))
         ) ))) ;
   
@@ -180,7 +182,7 @@ let test_cases = [
   test_norm
     "Lookup an unknown in an equation"
     "model A Real x; equation x = 0.0; end A"
-    [`ClassMember "A"] (has_equation {comment = no_comment; commented = SimpleEquation {left=ComponentReference expected_ref; right=Real 0.0}}) );
+    [`ClassMember "A"] (Has.behavior **> Has.equations **> The.first **> Is.equation {comment = no_comment; commented = SimpleEquation {left=ComponentReference expected_ref; right=Real 0.0}}) );
 ]
 
 let suite = "Implementation Normalization" >::: test_cases

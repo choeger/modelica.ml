@@ -137,6 +137,11 @@ module P = struct
   end
 
   module Has = struct
+    let class_member vis cm k = function
+      | Class {public} when vis && StrMap.mem cm public.class_members -> k (StrMap.find cm public.class_members)
+      | Class {protected} when (not vis) && StrMap.mem cm protected.class_members -> k (StrMap.find cm protected.class_members)
+      | cv -> assert_failure ("No class: '"^cm^"' in: " ^ (show_class_value cv)) 
+
     let field vis fld k = function
       | Class {public} when vis && StrMap.mem fld public.fields -> k (StrMap.find fld public.fields)
       | Class {protected} when (not vis) && StrMap.mem fld protected.fields -> k (StrMap.find fld protected.fields)
@@ -146,6 +151,12 @@ module P = struct
         {field_binding=Some b} -> k b
       | _ -> assert_failure "Expected a binding"
 
+    let class_modification fld k {class_mod} =
+      if StrMap.mem fld class_mod then
+        k (StrMap.find fld class_mod)
+      else
+        assert_failure ("No modification to '" ^ fld ^ "'")  
+    
     let modification fld k {field_mod} =
       if StrMap.mem fld field_mod then
         k (StrMap.find fld field_mod)
@@ -155,6 +166,22 @@ module P = struct
     let modification_kind kind m =
       assert_equal ~printer:show_component_kind kind m.mod_kind
 
+    let element x k m =
+      if StrMap.mem x m then
+        k (StrMap.find x m)
+      else        
+        assert_failure ("No element '" ^ x ^ "'")
+
+    let equations k {equations} = k equations
+    
+    let behavior k = function
+      Class {behavior} -> k behavior
+    | cv -> assert_failure ("Expected a class. Got: " ^ (show_class_value cv))
+      
+  end
+
+  module The = struct
+    let first k = function [] -> assert_failure "Expected non-empty list" | x :: _ -> k x
   end
   
   module Is = struct
@@ -199,9 +226,16 @@ module P = struct
     let bound_to e =
       Has.binding (exp e)
 
+    let nested k = function
+        {mod_desc=Nested m} -> k m
+      | _ -> assert_failure "Expected a nested modification."
+
     let modified_to expected = function
         {mod_desc=Modify e} -> exp expected e
       | _ -> assert_failure "Expected a binding modification."
+
+    let equation expected eq =
+      assert_equal ~printer:show_equation expected eq
     
   end
 
@@ -268,24 +302,9 @@ let t = test_env "Empty class" "class A end A" [`ClassMember "A"] NormImpl.empty
 
 let field = assert_fld
 
-let assert_cm vis cm pred = function
-  | Class {public} when vis && StrMap.mem cm public.class_members -> pred (StrMap.find cm public.class_members)
-  | Class {protected} when (not vis) && StrMap.mem cm protected.class_members -> pred (StrMap.find cm protected.class_members)
-  | cv -> assert_failure ("No class: '"^cm^"' in: " ^ (show_class_value cv)) 
-  
 let class_member = assert_cm
 
-let has_equation eq = function
-    Class {behavior} -> assert_equal ~printer:(show_list show_equation) ~cmp:(equal_list Syntax.equal_equation) [eq] (List.map Parser_tests.prep_eq behavior.equations)
-  | cv -> assert_failure ("Expected a class. Got: " ^ (show_class_value cv))
     
-let has_class_modification fld pred {class_mod} =
-  assert_modification fld pred class_mod
-
-let is_nested p m = match m.mod_desc with Nested m -> p m
-                                        | Modify e -> assert_failure ("Expected a nested modification, got binding = %s" ^ (show_exp e))
-
 let modified_element = assert_modification 
-
 
 *)
