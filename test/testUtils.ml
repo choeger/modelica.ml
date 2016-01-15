@@ -137,6 +137,7 @@ module P = struct
   end
 
   module Has = struct
+
     let class_member vis cm k = function
       | Class {public} when vis && StrMap.mem cm public.class_members -> k (StrMap.find cm public.class_members)
       | Class {protected} when (not vis) && StrMap.mem cm protected.class_members -> k (StrMap.find cm protected.class_members)
@@ -185,6 +186,9 @@ module P = struct
   end
   
   module Is = struct
+    let struct_val expected p =
+      assert_equal ~printer:show_struct_val expected p
+
     let path expected p =
       assert_equal ~cmp:Path.equal ~printer:Path.show expected p
 
@@ -240,6 +244,9 @@ module P = struct
   end
 
   module Compute = struct
+    let structural_type_of p k public =
+      k (Normalized.eval_struct (DQ.snoc DQ.empty {up=None; tip={empty_object_struct with public}}) (GlobalReference p))
+
     let signature (k : elements_struct -> unit) td = 
       let parsed = {within = Some []; toplevel_defs = [td] } in
       let report =

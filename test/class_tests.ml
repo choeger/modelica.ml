@@ -218,8 +218,9 @@ let test_cases = [
        model C extends B(redeclare type T = Real); end C;
        C c;
      end A10"
-    (Find.def_of (pol [cm "A10" ; fld "c"; sup 0; fld "x"]) **> Is.class_value Normalized.Real) ;
-
+    (Compute.structural_type_of (pol [cm "A10" ; fld "c"; sup 0; fld "x"]) **> Is.struct_val **>
+     {sv_desc=Normalized.SReal; sv_attr={Normalized.empty_attr with fa_sort = Some Type}} ) ;
+  
   signature
     "Nested Redeclaration inside Component"
     "class A11
@@ -244,12 +245,18 @@ let test_cases = [
   signature
     "Forwarding a Redeclaration into a Component (Media Library Pattern)"
     "package MiniMedium
-       package DefaultMedium end DefaultMedium ;
+       package DefaultMedium type T = Integer; end DefaultMedium ;
+       package NonDefaultMedium type T = Real; end NonDefaultMedium;
        class Interface replaceable package Medium = DefaultMedium; end Interface;
-       class SomeComponent extends Interface; constant Real s = 42.; end SomeComponent;
-       class SomeModel extends Interface; SomeComponent component(redeclare package Medium = Medium); end SomeModel;
+       
+       class SomeComponent extends Interface; constant Medium.T s = 42; end SomeComponent;
+       
+       class SomeModel extends Interface(redeclare package Medium = NonDefaultMedium); 
+                       SomeComponent component(redeclare package Medium = Medium); 
+       end SomeModel;
      end MiniMedium"
-    (Find.def_of (pol [cm "MiniMedium"; cm "SomeModel"; fld "component"; cm "Medium"]) **> Points.to_ (Is.path (pol [cm "MiniMedium"; cm "SomeModel"; cm "Medium"]))) ;
+    (Compute.structural_type_of (pol [cm "MiniMedium"; cm "SomeModel"; fld "component"; cm "Medium"; cm "T"]) **>
+     Is.struct_val **> {sv_desc=Normalized.SReal; sv_attr={Normalized.empty_attr with fa_sort = Some Type}}) ;
   
 ]
 

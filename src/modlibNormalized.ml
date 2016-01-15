@@ -289,3 +289,150 @@ and update_class_value lhs rhs = function
     end
 
 let update lhs rhs es = update_ lhs rhs es
+
+(** Evaluation to structural types *)
+
+type struct_desc =
+    SInt | SReal | SString | SBool | SUnit | SProtoExternalObject
+  | SEnumeration of StrSet.t
+  | SArray of struct_desc * int
+  | SClass of class_t
+  | SDer of struct_desc * (string list)
+
+and struct_val = {sv_attr : flat_attributes ;
+                  sv_desc : struct_desc }
+
+and class_t = {up : class_t option; tip : object_struct}
+  [@@deriving show]
+  
+let empty_attr = {fa_sort=None;fa_var=None;fa_con=None;fa_cau=None}
+
+type ctxt_bracket = class_t DQ.t 
+
+let last bracket = match DQ.rear bracket with
+    None -> raise (Failure "Bracket is empty")
+  | Some(_, c) -> c
+
+let first bracket = match DQ.front bracket with
+    None -> raise (Failure "Bracket is empty")
+  | Some(c, _) -> c
+    
+let rec del_common_prefix p1 p2 = match DQ.front p1 with
+    Some (x,xs) ->
+    begin match DQ.front p2 with
+        Some (y,ys) when y = x ->
+        del_common_prefix xs ys
+      | _ -> (p1, p2)
+    end
+  | _ -> (p1, p2)
+
+let find_field protected x bracket =
+  let rec find_field_ done_ bracket = match DQ.front bracket with
+      None -> raise (Failure ("No such Field: '" ^ x ^ "'"))
+    | Some(cl, _) when protected && StrMap.mem x cl.tip.protected.fields ->
+      let fld = StrMap.find x cl.tip.protected.fields in
+      (DQ.snoc done_ cl, fld)
+    | Some(cl, _) when not protected && StrMap.mem x cl.tip.public.fields ->
+      let fld = StrMap.find x cl.tip.public.fields in
+      (DQ.snoc done_ cl, fld)
+    | Some(cl, xs) -> find_field_ (DQ.snoc done_ cl) xs
+  in find_field_ DQ.empty bracket    
+
+let find_class protected x bracket =
+  let rec find_class_ done_ bracket = match DQ.front bracket with
+      None -> raise (Failure ("No such class: '" ^ x ^ "'"))
+    | Some(cl, _) when protected && StrMap.mem x cl.tip.protected.class_members ->
+      let cls = StrMap.find x cl.tip.protected.class_members in
+      (DQ.snoc done_ cl, cls)
+    | Some(cl, _) when not protected && StrMap.mem x cl.tip.public.class_members ->
+      let cls = StrMap.find x cl.tip.public.class_members in
+      (DQ.snoc done_ cl, cls)
+    | Some(cl, xs) -> find_class_ (DQ.snoc done_ cl) xs
+  in find_class_ DQ.empty bracket    
+
+let rec walk_up up bracket = match DQ.rear up with
+    None -> bracket
+  | Some(xs,_) ->
+    begin match (last bracket).up with
+        None -> raise (Failure "Upwards out of scope")
+      | Some cl -> (DQ.cons cl DQ.empty)
+    end
+
+let rec eval_struct bracket = function
+    Int -> {sv_attr=empty_attr; sv_desc=SInt}
+  | Real -> {sv_attr=empty_attr; sv_desc=SReal}
+  | String -> {sv_attr=empty_attr; sv_desc=SString}
+  | Bool -> {sv_attr=empty_attr; sv_desc=SBool}
+  | Unit -> {sv_attr=empty_attr; sv_desc=SUnit}
+  | ProtoExternalObject -> {sv_attr=empty_attr; sv_desc=SProtoExternalObject}
+  | Enumeration keys -> {sv_attr=empty_attr; sv_desc=SEnumeration keys}
+  | Constr {arg; constr} ->
+    let {sv_desc;sv_attr} = eval_struct bracket arg in
+    begin match constr with
+        Var v -> {sv_desc; sv_attr = {sv_attr with fa_var = Some (Option.default v sv_attr.fa_var)}}
+      | Con c -> {sv_desc; sv_attr = {sv_attr with fa_con = Some (Option.default c sv_attr.fa_con)}}
+      | Cau c -> {sv_desc; sv_attr = {sv_attr with fa_cau = Some (Option.default c sv_attr.fa_cau)}}
+      | Sort s -> {sv_desc; sv_attr = {sv_attr with fa_sort = Some (Option.default s sv_attr.fa_sort)}}
+      | Der ls -> {sv_desc = SDer (sv_desc, ls); sv_attr}
+      | Array i -> {sv_desc = SArray (sv_desc, i); sv_attr}
+    end
+  | Replaceable cv -> eval_struct bracket cv
+
+  | GlobalReference cp | DynamicReference cp ->
+    (* The common prefix between the right-bracket's source name and the given path
+       determines the up- and down- steps we need to take to get from here to there *)
+    let (up, down) = del_common_prefix (last bracket).tip.source_path cp in
+    let bracket = walk_up up bracket in
+    project false bracket down
+      
+  | Recursive _ -> raise (Failure "recursion")
+  | Class tip ->
+    (* Discover local classes and set their "up" value accordingly *)
+    let (up, down) = del_common_prefix (last bracket).tip.source_path tip.source_path in
+    if (DQ.size up = 0) && (DQ.size down = 1) then
+      {sv_desc = SClass {up = Some (first bracket); tip}; sv_attr=empty_attr}
+    else
+      (* Inlined class, need to evaluate for the lexical context *)
+      let bracket = walk_up up bracket in
+      project false bracket down
+  
+and project protected bracket cp =
+  let continue bracket sv xs = match DQ.rear xs with
+      None -> sv
+    | Some (_,_) ->
+      begin match sv.sv_desc with
+          SClass cl -> project false (DQ.snoc bracket cl) xs
+        | _ -> raise (Failure "Projection from non-class")
+      end
+  in
+  
+  match DQ.front cp with
+    None -> {sv_desc=SClass (first bracket); sv_attr=empty_attr}
+
+  | Some (`FieldType x, xs) ->
+    (*BatLog.logf "Projecting field %s\nBracket:\n" x;
+      DQ.iter (fun cl -> BatLog.logf "%s\n" (Path.show cl.tip.source_path)) bracket ;*)
+    let (bracket, ct) = find_field protected x bracket in
+    let sv = eval_struct bracket ct.field_class in
+    continue DQ.empty sv xs
+      
+  | Some (`ClassMember x, xs) ->
+(*    BatLog.logf "Projecting field %s\nBracket:\n" x;
+      DQ.iter (fun cl -> BatLog.logf "%s\n" (Path.show cl.tip.source_path)) bracket ;*)
+    let (bracket, ct) = find_class protected x bracket in
+    let sv = eval_struct bracket ct.class_ in
+    continue DQ.empty sv xs
+      
+  | Some (`Protected, xs) ->
+    project true bracket xs
+
+  | Some (`SuperClass n, xs) ->
+    let sc =
+      if protected then
+        IntMap.find n (last bracket).tip.protected.super
+      else
+        IntMap.find n (last bracket).tip.public.super
+    in    
+    let sv = eval_struct bracket sc.class_ in
+    continue bracket sv xs
+  
