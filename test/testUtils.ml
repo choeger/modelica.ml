@@ -221,7 +221,7 @@ module P = struct
       assert_equal ~cmp:equal_class_value ~msg:(Printf.sprintf "equality of normalization result = %b" (expected = got)) ~printer:show_class_value (norm_cv expected) (norm_cv got)
 
     let exp expected got =
-      assert_equal ~printer:show_exp ~cmp:Syntax.equal_exp expected got
+      assert_equal ~printer:show_exp ~cmp:Syntax.equal_exp expected (Parser_tests.prep_expr got)
 
     let bound_to e =
       Has.binding (exp e)
@@ -235,7 +235,7 @@ module P = struct
       | _ -> assert_failure "Expected a binding modification."
 
     let equation expected eq =
-      assert_equal ~printer:show_equation expected eq
+      assert_equal ~cmp:equal_equation ~printer:show_equation expected (Parser_tests.prep_eq eq)
     
   end
 
