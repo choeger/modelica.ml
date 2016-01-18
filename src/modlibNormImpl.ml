@@ -217,9 +217,23 @@ let resolve_builtin lib first rest =
   | "min" | "max" | "sum" | "product"
     -> builtin CK_BuiltinFunction
 
-  (* Event related *)
-  | "noEvent" -> builtin CK_BuiltinFunction
-  | "smooth" -> builtin CK_BuiltinFunction
+  (* 10.3.5 Matrix and Vector Algebra Functions *)
+  | "transpose" | "outerProduct" | "symmetric" | "cross" | "skew"
+    -> builtin CK_BuiltinFunction
+
+  (* Special, see 3.7.2 *)
+  | "delay" | "cardinality" | "homotopy" | "semiLinear" 
+  | "inStream" | "actualStream" | "spatialDistribution"
+  | "getInstanceName"
+    -> builtin CK_BuiltinFunction
+
+  (* Event related, see 3.7.3 *)
+  | "noEvent" | "smooth" | "terminal"
+  | "sample" | "pre" | "edge" | "change" | "reinit"
+    -> builtin CK_BuiltinFunction
+
+  (* 8.3.8 *)
+  | "terminate" -> builtin CK_BuiltinFunction
 
   (* Array functions, see 10.3 *)
   | "size" | "ndims" -> builtin CK_BuiltinFunction
@@ -270,6 +284,11 @@ let rec resolution_mapper lib src env = { Syntax.identity_mapper with
                                             map_UnknownRef = (fun _ ur -> KnownRef (resolve_ur lib src env ur));
                                           } ;
 
+                                          (* Do not attempt resolution inside annotations, this is futile 
+                                             TODO: handle standardized annotations
+                                          *)
+                                          map_annotated = (fun f _ a -> {a with annotated_elem = f a.annotated_elem}) ;
+                                          
                                           map_for_statement = 
                                             (fun self {idx; body} ->
                                                let idx = List.map (self.map_idx self) idx in
