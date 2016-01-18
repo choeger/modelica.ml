@@ -181,6 +181,11 @@ let test_cases = [
     "Lookup a modified constant in a component using extensions" 
     "package A C c(x = 21.); model C extends B; end C; model B constant Real x = 42.; end B; end A" 
     [`ClassMember "A"] (Has.field public "c" **> Has.modification "x" **> (Has.modification_kind CK_Constant &&& Is.modified_to (Real 21.)));
+
+  test_norm
+    "Lookup imported names"
+    "package A package B constant Real x = 42.; end B; package C import A.B.x; constant Real y = x; end C; end A"
+    [cm "A"; cm "B"] (Has.field public "y" **> Is.bound_to (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"])));
   
   (
   let expected_ref = knownref [cclass "A"; cfld "x"] in 
