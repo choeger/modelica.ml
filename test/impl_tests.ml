@@ -185,7 +185,7 @@ let test_cases = [
   test_norm
     "Lookup imported names"
     "package A package B constant Real x = 42.; end B; package C import A.B.x; constant Real y = x; end C; end A"
-    [cm "A"; cm "B"] (Has.field public "y" **> Is.bound_to (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"])));
+    [cm "A"; cm "C"] (Has.field public "y" **> Is.bound_to (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"])));
   
   (
   let expected_ref = knownref [cclass "A"; cfld "x"] in 
