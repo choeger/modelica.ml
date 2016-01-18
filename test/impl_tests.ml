@@ -187,6 +187,7 @@ let test_cases = [
     "package A package B constant Real x = 42.; end B; package C import A.B.x; constant Real y = x; end C; end A"
     [cm "A"; cm "C"] (Has.field public "y" **> Is.bound_to (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"])));
 
+
   (let then_ = ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]) in
    let yref = ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"]) in
    let else_if = [{ guard = Bool true ; elsethen = yref }] in
@@ -199,8 +200,32 @@ let test_cases = [
           constant S s = if true then S.X elseif true then S.Y else S.X; 
         end C; 
      end A"
-     [cm "A"; cm "C"] (Has.field public "s" **> Is.bound_to (If {condition=Bool true;then_;else_;else_if})));
-  
+     [cm "A"; cm "C"] (Has.field public "s" **> Is.bound_to (If {condition=Bool true;then_;else_;else_if})));  
+
+
+  (* Test for imported names in behavior section *)
+  (let condition = Eq{
+       left=ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]);
+       right=ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"])};
+   in 
+   let eq = {left=ComponentReference (knownref [cclass "A"; cclass "B"; cfld "x"]); right=ComponentReference (knownref [time])} in   
+   let else_ = [uncommented (SimpleEquation {left=eq.right; right=eq.left})] in
+   let then_ = [uncommented (SimpleEquation eq)] in
+   let else_if = [] in
+   test_norm
+     "Lookup an imported enumeration in a nested if-equation"
+     "package A package B type S = enumeration(X,Y); end B; 
+        package C 
+          import A.B.S; 
+          Real x;
+          equation          
+          if S.X == S.Y then x = time; else time = x; end if; 
+        end C; 
+     end A"
+     [cm "A"; cm "C"] (Has.behavior **> Has.equations **> The.first **> Is.equation (uncommented (IfEquation {condition;then_;else_;else_if}))));  
+
+
+
   (
   let expected_ref = knownref [cclass "A"; cfld "x"] in 
   test_norm

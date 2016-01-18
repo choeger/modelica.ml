@@ -285,7 +285,8 @@ type loc_t = Location.t = {
                      | CK_Function (* function *)
                      | CK_BuiltinFunction (* builtin function/function like operator/thingy *)
                      | CK_BuiltinAttr (* attribute of a builtin class *)
-                     
+                     | CK_Time (* The free variable *)
+                       
   and known_component = { kind : component_kind ; component : component }
 
   and component = { ident : str ; subscripts : exp list }

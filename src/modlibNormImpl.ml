@@ -171,7 +171,9 @@ let rec resolve_os lib found os x xs =
     end
   | `NothingFound when extends_builtin_os lib os ->
     DQ.append found (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs)))
-  | _ -> BatLog.logf "In:\n %s\n" (show_object_struct os) ; raise (NoSuchField x.ident)
+  | _ -> BatLog.logf "In:\n %s\n" (Path.show os.source_path) ;
+    BatLog.logf "NoSuchField: %s\n" (show_component x) ;
+    raise (NoSuchField x.ident)
 
 and resolve_in lib found cv (components : component list) = match components with
     [] -> found
@@ -357,7 +359,7 @@ let rec normalize_stmts lib src env ({super;fields;class_members} as es)=
       | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete; component},xs) ->
         (* Search superclasses *)
         begin match find_super_field lib component.ident.txt super with
-            None -> BatLog.logf "No field %s in %a\n" component.ident.txt (DQ.print (fun x c -> IO.write_string x (show_known_component c))) src ;
+            None -> BatLog.logf "No field %s in %a\n" (show_component component) (DQ.print (fun x c -> IO.write_string x (show_known_component c))) src ;
             raise (NoSuchField component.ident) (* Error TODO: move to Report Monad? *)
           | Some fld ->
             (* TODO: this only works properly when a modification of the inherited field is found *)

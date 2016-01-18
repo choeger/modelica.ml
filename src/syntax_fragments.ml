@@ -134,6 +134,8 @@ let cattr = known_component CK_BuiltinAttr
 
 let cconstfld = known_component CK_Constant 
 
+let time = known_component CK_Time "time"
+
 let cfld = known_component CK_Continuous
 
 let cbuiltinfun = known_component CK_BuiltinFunction
