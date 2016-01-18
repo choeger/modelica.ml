@@ -36,16 +36,18 @@ open Utils
     @author Christoph Höger
 *)
 
+open Sexplib.Conv (* string_of_sexp *)
+       
 module Flags = struct
-  type scope = Inner | Outer | InnerOuter | Local [@@deriving eq,show,yojson]
+  type scope = Inner | Outer | InnerOuter | Local [@@deriving eq,show,yojson,sexp]
   type sort = Package | Class | Model | Block | Connector | ExpandableConnector | Record
-            | Function | Type | Operator | OperatorRecord | OperatorFunction [@@deriving eq,show,yojson]
+            | Function | Type | Operator | OperatorRecord | OperatorFunction [@@deriving eq,show,yojson,sexp]
 
-  type connectivity = Flow | Stream [@@deriving eq,show,yojson]
+  type connectivity = Flow | Stream [@@deriving eq,show,yojson,sexp]
 
-  type variability = Constant | Parameter | Discrete [@@deriving eq,show,yojson]
+  type variability = Constant | Parameter | Discrete [@@deriving eq,show,yojson,sexp]
 
-  type causality = Input | Output [@@deriving eq,show,yojson]
+  type causality = Input | Output [@@deriving eq,show,yojson,sexp]
 end
 
   let (%>) f g x = g (f x)
@@ -59,15 +61,15 @@ type lexing_position = Lexing.position = {
   pos_lnum : int;
   pos_bol : int;
   pos_cnum : int;
-} [@@deriving show,eq,yojson]
+} [@@deriving show,eq,yojson,sexp]
 
 type loc_t = Location.t = {
     loc_start: lexing_position;
     loc_end: lexing_position;
     loc_ghost: bool;
-  } [@@deriving show,eq,yojson,mapper,folder]
+  } [@@deriving show,eq,yojson,mapper,folder,sexp]
 
-  and 'a located = 'a Location.loc = {txt : 'a; loc : loc_t }
+  and 'a located = 'a Location.loc = {txt : 'a; loc : loc_t [@default Location.none] [@sexp_drop_default]}
 
   and str = string located
 

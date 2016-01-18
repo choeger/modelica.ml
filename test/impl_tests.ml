@@ -186,6 +186,20 @@ let test_cases = [
     "Lookup imported names"
     "package A package B constant Real x = 42.; end B; package C import A.B.x; constant Real y = x; end C; end A"
     [cm "A"; cm "C"] (Has.field public "y" **> Is.bound_to (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"])));
+
+  (let then_ = ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]) in
+   let yref = ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"]) in
+   let else_if = [{ guard = Bool true ; elsethen = yref }] in
+   let else_ = then_ in   
+   test_norm
+     "Lookup an imported enumeration in a nested if-else-if-clause"
+     "package A package B type S = enumeration(X,Y); end B; 
+        package C 
+          import A.B.S; 
+          constant S s = if true then S.X elseif true then S.Y else S.X; 
+        end C; 
+     end A"
+     [cm "A"; cm "C"] (Has.field public "s" **> Is.bound_to (If {condition=Bool true;then_;else_;else_if})));
   
   (
   let expected_ref = knownref [cclass "A"; cfld "x"] in 

@@ -29,6 +29,124 @@
 
 open OUnit2
 open Batteries
+open Sexplib
+       
+module Diff :
+sig
+  type t
+  val print : ?oc:out_channel -> t -> unit
+  val to_buffer : t -> Buffer.t
+  val to_string : t -> string
+  val of_sexps : original:Sexp.t -> updated:Sexp.t -> t option
+end
+=
+struct
+  type t =
+      | Different of ([`Original of Sexp.t] * [`Updated of Sexp.t])
+      | List of t list
+      | Record of record_field list
+
+  and record_field =
+      | New_in_updated of Sexp.t
+      | Not_in_updated of Sexp.t
+      | Bad_match of string * t
+
+  let rec rev_map_append f l1 l2 =
+    match l1 with
+    | [] -> l2
+    | h :: t -> rev_map_append f t (f h :: l2)
+
+  let make_tail make tail acc =
+    Some (Record (List.rev (rev_map_append make tail acc)))
+
+  let recf (k, v) = Sexp.List [Sexp.Atom k; v]
+
+  let maybe_record sexps =
+    let is_list_of_atom_pairs = function
+      | Sexp.List [Sexp.Atom _; _] -> true
+      | _ -> false
+    in
+    sexps <> [] &&
+      (List.for_all is_list_of_atom_pairs sexps)
+
+  let sort_record_fields sexp_list =
+    let to_pair = function
+      | Sexp.List [Sexp.Atom k; v] -> k, v
+      | _ -> assert false  (* impossible *)
+    in
+    let pairs = List.map to_pair sexp_list in
+    List.sort (fun (k1, _) (k2, _) -> compare k1 k2) pairs
+
+  let rec of_record_fields acc pairs_orig pairs_upd =
+    match pairs_orig, pairs_upd with
+    | [], [] when acc = [] -> None
+    | [], [] -> Some (Record (List.rev acc))
+    | [], tail -> make_tail (fun kv -> New_in_updated (recf kv)) tail acc
+    | tail, [] -> make_tail (fun kv -> Not_in_updated (recf kv)) tail acc
+    | (((k_o, v_o) as h_o) :: t_o as l_o), (((k_u, v_u) as h_u) :: t_u as l_u) ->
+        let c = String.compare k_o k_u in
+        if c = 0 then
+          match of_sexps ~original:v_o ~updated:v_u with
+          | None -> of_record_fields acc t_o t_u
+          | Some diff -> of_record_fields (Bad_match (k_u, diff) :: acc) t_o t_u
+        else if c > 0 then of_record_fields (New_in_updated (recf h_u) :: acc) l_o t_u
+        else of_record_fields (Not_in_updated (recf h_o) :: acc) t_o l_u
+
+  and of_lists acc original updated =
+    match original, updated with
+    | [], [] when acc = [] -> None
+    | [], [] -> Some (List (List.rev acc))
+    | [], _ | _, [] -> assert false  (* impossible *)
+    | h_orig :: t_orig, h_upd :: t_upd ->
+        match of_sexps ~original:h_orig ~updated:h_upd with
+        | None -> of_lists acc t_orig t_upd
+        | Some res -> of_lists (res :: acc) t_orig t_upd
+
+  and of_sexps ~original ~updated =
+    match original, updated with
+    | Sexp.List [], Sexp.List [] -> None
+    | Sexp.Atom a1, Sexp.Atom a2 when a1 = a2 -> None
+    | Sexp.List orig, Sexp.List upd ->
+        if maybe_record orig && maybe_record upd then
+          of_record_fields [] (sort_record_fields orig) (sort_record_fields upd)
+        else if List.length orig = List.length upd then of_lists [] orig upd
+        else Some (Different (`Original original, `Updated updated))
+    | _ -> Some (Different (`Original original, `Updated updated))
+
+  let to_buffer diff =
+    let buf = Buffer.create 80 in
+    let print_string ~tag ~indent str =
+      Buffer.add_string buf (Printf.sprintf "%-*s %s\n%!" indent tag str)
+    in
+    let print_sexp ~tag ~indent sexp =
+      print_string ~tag ~indent (Sexp.to_string sexp)
+    in
+    let rec loop indent = function
+      | Different (`Original sexp1, `Updated sexp2) ->
+        print_sexp ~tag:"-" ~indent sexp1;
+        print_sexp ~tag:"+" ~indent sexp2
+      | List lst ->
+        print_string ~tag:"" ~indent "(";
+        List.iter (loop (indent + 1)) lst;
+        print_string ~tag:"" ~indent ")"
+      | Record record_fields ->
+        let print_record_field = function
+          | New_in_updated sexp -> print_sexp ~tag:"+" ~indent sexp
+          | Not_in_updated sexp -> print_sexp ~tag:"-" ~indent sexp
+          | Bad_match (key, diff) ->
+            print_string ~tag:"" ~indent key;
+            loop (indent + 1) diff
+        in
+        List.iter print_record_field record_fields;
+    in
+    loop 0 diff;
+    buf
+
+  let to_string diff = Buffer.contents (to_buffer diff)
+
+  let print ?(oc = Pervasives.stdout) diff = Buffer.print (IO.output_channel oc) (to_buffer diff)
+end
+
 open Modelica_parser
 open Syntax_fragments
 open Modelica_lexer
@@ -42,6 +160,9 @@ open Modlib.NormImpl
 open Modlib.Normalized
 open Modlib.Report
 open Modlib.Utils
+
+let diff_exp fmt (e1, e2) =
+  match Diff.of_sexps ~original:(sexp_of_exp e1) ~updated:(sexp_of_exp e2) with Some d -> Format.fprintf fmt "%s\n" (Diff.to_string d) | None -> ()
 
 let cm = Modlib.Inter.Path.cm
 
@@ -225,7 +346,7 @@ module P = struct
       assert_equal ~cmp:equal_class_value ~msg:(Printf.sprintf "equality of normalization result = %b" (expected = got)) ~printer:show_class_value (norm_cv expected) (norm_cv got)
 
     let exp expected got =
-      assert_equal ~printer:show_exp ~cmp:Syntax.equal_exp expected (Parser_tests.prep_expr got)
+      assert_equal ~printer:show_exp ~pp_diff:diff_exp ~cmp:Syntax.equal_exp expected (Parser_tests.prep_expr got)
 
     let bound_to e =
       Has.binding (exp e)

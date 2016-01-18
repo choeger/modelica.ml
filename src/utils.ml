@@ -152,7 +152,8 @@ end
 module IntSet = struct include Set.Make(Int) end
 
 module List = List
-
+  
+open Sexplib.Conv (* string_of_sexp *)       
 module DQ = struct include BatDeque
 
   let compare f a b = Enum.compare f (enum a) (enum b)
@@ -162,8 +163,14 @@ module DQ = struct include BatDeque
   let singleton x = cons x empty
 
   open StdFormat
+
+  let t_of_sexp f s = of_list (list_of_sexp f s)
+
+  let sexp_of_t f dq = sexp_of_list f (to_list dq) 
+  
   let pp pp_v fmt dq = let pp_comma fmt () = fprintf fmt "," in
     fprintf fmt "@[%a@]" (pp_print_list ~pp_sep:pp_comma pp_v) (to_list dq)
+
   let to_yojson a dq = `List (List.map a (to_list dq))
 
   let of_yojson f js =

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 4fb34de4bad74bd592c08cdab47e0767)
+# DO NOT EDIT (digest: 0d91d71b9804a430f0072be3274a9c7d)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -27,7 +27,9 @@ true: annot, bin_annot
 <src/*.ml{,i,y}>: package(ppx_deriving_yojson)
 <src/*.ml{,i,y}>: package(ppx_import)
 <src/*.ml{,i,y}>: package(ppx_monadic)
+<src/*.ml{,i,y}>: package(ppx_sexp_conv)
 <src/*.ml{,i,y}>: package(sedlex)
+<src/*.ml{,i,y}>: package(sexplib)
 <src/*.ml{,i,y}>: package(yojson)
 # Executable modelica_frontend_tests
 <test/modelica_frontend_tests.{native,byte}>: package(batteries)
@@ -42,7 +44,9 @@ true: annot, bin_annot
 <test/modelica_frontend_tests.{native,byte}>: package(ppx_deriving_yojson)
 <test/modelica_frontend_tests.{native,byte}>: package(ppx_import)
 <test/modelica_frontend_tests.{native,byte}>: package(ppx_monadic)
+<test/modelica_frontend_tests.{native,byte}>: package(ppx_sexp_conv)
 <test/modelica_frontend_tests.{native,byte}>: package(sedlex)
+<test/modelica_frontend_tests.{native,byte}>: package(sexplib)
 <test/modelica_frontend_tests.{native,byte}>: package(yojson)
 <test/modelica_frontend_tests.{native,byte}>: use_modelica_ml
 <test/*.ml{,i,y}>: package(batteries)
@@ -57,7 +61,9 @@ true: annot, bin_annot
 <test/*.ml{,i,y}>: package(ppx_deriving_yojson)
 <test/*.ml{,i,y}>: package(ppx_import)
 <test/*.ml{,i,y}>: package(ppx_monadic)
+<test/*.ml{,i,y}>: package(ppx_sexp_conv)
 <test/*.ml{,i,y}>: package(sedlex)
+<test/*.ml{,i,y}>: package(sexplib)
 <test/*.ml{,i,y}>: package(yojson)
 <test/*.ml{,i,y}>: use_modelica_ml
 # Executable modml_clc
@@ -72,7 +78,9 @@ true: annot, bin_annot
 <examples/modml_clc.{native,byte}>: package(ppx_deriving_yojson)
 <examples/modml_clc.{native,byte}>: package(ppx_import)
 <examples/modml_clc.{native,byte}>: package(ppx_monadic)
+<examples/modml_clc.{native,byte}>: package(ppx_sexp_conv)
 <examples/modml_clc.{native,byte}>: package(sedlex)
+<examples/modml_clc.{native,byte}>: package(sexplib)
 <examples/modml_clc.{native,byte}>: package(yojson)
 <examples/modml_clc.{native,byte}>: use_modelica_ml
 # Executable modlibc
@@ -87,7 +95,9 @@ true: annot, bin_annot
 <tools.src/modlibc.{native,byte}>: package(ppx_deriving_yojson)
 <tools.src/modlibc.{native,byte}>: package(ppx_import)
 <tools.src/modlibc.{native,byte}>: package(ppx_monadic)
+<tools.src/modlibc.{native,byte}>: package(ppx_sexp_conv)
 <tools.src/modlibc.{native,byte}>: package(sedlex)
+<tools.src/modlibc.{native,byte}>: package(sexplib)
 <tools.src/modlibc.{native,byte}>: package(yojson)
 <tools.src/modlibc.{native,byte}>: use_modelica_ml
 <tools.src/*.ml{,i,y}>: package(batteries)
@@ -101,7 +111,9 @@ true: annot, bin_annot
 <tools.src/*.ml{,i,y}>: package(ppx_deriving_yojson)
 <tools.src/*.ml{,i,y}>: package(ppx_import)
 <tools.src/*.ml{,i,y}>: package(ppx_monadic)
+<tools.src/*.ml{,i,y}>: package(ppx_sexp_conv)
 <tools.src/*.ml{,i,y}>: package(sedlex)
+<tools.src/*.ml{,i,y}>: package(sexplib)
 <tools.src/*.ml{,i,y}>: package(yojson)
 <tools.src/*.ml{,i,y}>: use_modelica_ml
 # Executable modml_parseall
@@ -117,7 +129,9 @@ true: annot, bin_annot
 <examples/parse_all.{native,byte}>: package(ppx_deriving_yojson)
 <examples/parse_all.{native,byte}>: package(ppx_import)
 <examples/parse_all.{native,byte}>: package(ppx_monadic)
+<examples/parse_all.{native,byte}>: package(ppx_sexp_conv)
 <examples/parse_all.{native,byte}>: package(sedlex)
+<examples/parse_all.{native,byte}>: package(sexplib)
 <examples/parse_all.{native,byte}>: package(yojson)
 <examples/parse_all.{native,byte}>: use_modelica_ml
 <examples/*.ml{,i,y}>: package(ANSITerminal)
@@ -133,7 +147,9 @@ true: annot, bin_annot
 <examples/dump_cl.{native,byte}>: package(ppx_deriving_yojson)
 <examples/dump_cl.{native,byte}>: package(ppx_import)
 <examples/dump_cl.{native,byte}>: package(ppx_monadic)
+<examples/dump_cl.{native,byte}>: package(ppx_sexp_conv)
 <examples/dump_cl.{native,byte}>: package(sedlex)
+<examples/dump_cl.{native,byte}>: package(sexplib)
 <examples/dump_cl.{native,byte}>: package(yojson)
 <examples/dump_cl.{native,byte}>: use_modelica_ml
 # Executable modml_cl
@@ -148,7 +164,9 @@ true: annot, bin_annot
 <examples/modml_cl.{native,byte}>: package(ppx_deriving_yojson)
 <examples/modml_cl.{native,byte}>: package(ppx_import)
 <examples/modml_cl.{native,byte}>: package(ppx_monadic)
+<examples/modml_cl.{native,byte}>: package(ppx_sexp_conv)
 <examples/modml_cl.{native,byte}>: package(sedlex)
+<examples/modml_cl.{native,byte}>: package(sexplib)
 <examples/modml_cl.{native,byte}>: package(yojson)
 <examples/modml_cl.{native,byte}>: use_modelica_ml
 # Executable modml_clread
@@ -163,7 +181,9 @@ true: annot, bin_annot
 <examples/modml_clread.{native,byte}>: package(ppx_deriving_yojson)
 <examples/modml_clread.{native,byte}>: package(ppx_import)
 <examples/modml_clread.{native,byte}>: package(ppx_monadic)
+<examples/modml_clread.{native,byte}>: package(ppx_sexp_conv)
 <examples/modml_clread.{native,byte}>: package(sedlex)
+<examples/modml_clread.{native,byte}>: package(sexplib)
 <examples/modml_clread.{native,byte}>: package(yojson)
 <examples/modml_clread.{native,byte}>: use_modelica_ml
 <examples/*.ml{,i,y}>: package(batteries)
@@ -177,7 +197,9 @@ true: annot, bin_annot
 <examples/*.ml{,i,y}>: package(ppx_deriving_yojson)
 <examples/*.ml{,i,y}>: package(ppx_import)
 <examples/*.ml{,i,y}>: package(ppx_monadic)
+<examples/*.ml{,i,y}>: package(ppx_sexp_conv)
 <examples/*.ml{,i,y}>: package(sedlex)
+<examples/*.ml{,i,y}>: package(sexplib)
 <examples/*.ml{,i,y}>: package(yojson)
 <examples/*.ml{,i,y}>: use_modelica_ml
 # OASIS_STOP
