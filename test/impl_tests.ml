@@ -177,6 +177,11 @@ let test_cases = [
     [`ClassMember "A"; `ClassMember "C"] (Has.field public "x"  
     (Is.bound_to (Real 21.))) ;   
 
+  test_norm
+    "Lookup a modified constant in a component using extensions" 
+    "package A C c(x = 21.); model C extends B; end C; model B constant Real x = 42.; end B; end A" 
+    [`ClassMember "A"] (Has.field public "c" **> Has.modification "x" **> (Has.modification_kind CK_Constant &&& Is.modified_to (Real 21.)));
+  
   (
   let expected_ref = knownref [cclass "A"; cfld "x"] in 
   test_norm
@@ -192,16 +197,16 @@ let test_cases = [
        package NonDefaultMedium constant Real foo = 42.; end NonDefaultMedium;
        class Interface replaceable package Medium = DefaultMedium; end Interface;
        
-       class SomeComponent extends Interface; end SomeComponent;
+       class SomeComponent extends Interface; Medium medium; end SomeComponent;
        
        class SomeModel extends Interface(redeclare package Medium = NonDefaultMedium); 
-                       SomeComponent component(redeclare package Medium = Medium, foo = 23.); 
+             SomeComponent component(redeclare package Medium = Medium, medium(foo = 23.)); 
        end SomeModel;
      end MiniMedium"
-    [`ClassMember "MiniMedium"; `ClassMember "SomeModel"] (Has.field public "component" (Has.modification "foo" (
-        (Has.modification_kind CK_Constant)
-        &&&
-        (Is.modified_to (Real 21.))))) ;
+    [`ClassMember "MiniMedium"; `ClassMember "SomeModel"]
+    (Has.field public "component" **> Has.modification "medium" **> Is.nested **> Has.element "foo"
+       (Has.modification_kind CK_Constant     &&&
+        (Is.modified_to (Real 21.)))) ;
 
 ]
 
