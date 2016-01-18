@@ -93,7 +93,7 @@ and get_class_element global found_path e p =
       | Recursive rec_term -> `Recursion {rec_term; search_state={found = found_path; not_found = p}}
 
       (* follow global references through self to implement redeclarations *)
-      | GlobalReference g ->
+      | DynamicReference g | GlobalReference g ->
         begin match DQ.front g with
             Some(x,xs) ->
             begin match follow_path_es global DQ.empty global xs x with
