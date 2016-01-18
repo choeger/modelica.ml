@@ -82,6 +82,7 @@ val any : string -> Syntax.component
 val known_component :
   Syntax.component_kind -> string -> Syntax.known_component
 val cclass : string -> Syntax.known_component
+val cvar : string -> Syntax.known_component
 val cattr : string -> Syntax.known_component
 val cconstfld : string -> Syntax.known_component
 val cfld : string -> Syntax.known_component

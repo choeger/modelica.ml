@@ -128,7 +128,6 @@ and pp_cr fmt = function
   | UnknownRef {root=true ; components} -> fprintf fmt "@[.%a@]" (pp_list ~sep:"." pp_component) components
   | UnknownRef {root=false ; components} -> fprintf fmt "@[%a@]" (pp_list ~sep:"." pp_component) components
   | KnownRef kcs -> fprintf fmt "@[.%a@]" (pp_dq ~sep:"." pp_known_component) kcs
-  | Var x -> pp_str fmt x
   | Assert -> fprintf fmt "assert"
   | Der -> fprintf fmt "der"
   | Initial -> fprintf fmt "initial"         

@@ -167,7 +167,9 @@ let diff_sexp f fmt (e1, e2) =
 let diff_exp = diff_sexp sexp_of_exp
 
 let diff_eq = diff_sexp sexp_of_equation
-    
+
+let diff_st = diff_sexp sexp_of_statement
+
 let cm = Modlib.Inter.Path.cm
 
 module ClassValueFragments = struct
@@ -299,6 +301,8 @@ module P = struct
         assert_failure ("No element '" ^ x ^ "'")
 
     let equations k {equations} = k equations
+
+    let algorithms k {algorithms} = k algorithms
     
     let behavior k = function
       Class {behavior} -> k behavior
@@ -365,6 +369,9 @@ module P = struct
 
     let equation expected eq =
       assert_equal ~cmp:equal_equation ~pp_diff:diff_eq ~printer:show_equation expected (Parser_tests.prep_eq eq)
+
+    let statement expected st =
+      assert_equal ~cmp:equal_statement ~pp_diff:diff_st ~printer:show_statement expected (Parser_tests.prep_stmt st)
     
   end
 

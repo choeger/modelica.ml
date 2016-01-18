@@ -215,6 +215,7 @@ let resolve_builtin lib first rest =
 
   (* Array functions, see 10.3 *)
   | "size" -> builtin CK_BuiltinFunction
+  | "zeros" -> builtin CK_BuiltinFunction
 
   (* Builtin Classes *)
   | "String" -> builtin CK_BuiltinClass
@@ -234,7 +235,8 @@ let rec resolve_env lib found first rest = function
       let {flat_attr={fa_var}} = flat cv in
       let kind = ck_of_var fa_var in      
       resolve_in lib (DQ.snoc found {kind; component=first}) cv rest                                                     
-    | EnvVar -> raise (Failure "Variable found in component lookup") (* searching for a known_ref, variables need to be figured out earlier *)
+    | EnvVar -> (* found a local variable, its elements can only be checked by type-inference *)
+      DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest))
     end
   | env :: envs -> begin
       (* try next scope 
@@ -253,13 +255,23 @@ let resolve_ur lib src env {root;components} =
         resolve_env lib src cmp components env
   | [] -> raise AstInvariant
 
-let resolution_mapper lib src env = { Syntax.identity_mapper with
-                                      on_component_reference = {
-                                        Syntax.identity_mapper.on_component_reference with
-                                        map_UnknownRef =
-                                          (fun _ ur -> KnownRef (resolve_ur lib src env ur));
-                                      }
-                                    }
+let rec resolution_mapper lib src env = { Syntax.identity_mapper with
+                                          on_component_reference = {
+                                            Syntax.identity_mapper.on_component_reference with
+                                            map_UnknownRef = (fun _ ur -> KnownRef (resolve_ur lib src env ur));
+                                          } ;
+
+                                          map_for_statement = 
+                                            (fun self {idx; body} ->
+                                               let idx = List.map (self.map_idx self) idx in
+                                               let mk_env = fun {variable={txt}} m -> StrMap.add txt EnvVar m in
+                                               let env = match env with [] -> env (* cannot happen, one env per class *)
+                                                                      | e::es -> {e with public_env = List.fold_right mk_env idx e.public_env}::env
+                                               in
+                                               let self' = resolution_mapper lib src env  in
+                                               let body = self'.map_statements self' body in
+                                               {idx; body}) ;
+                                        }
 
 let resolve lib src env exp =
   let m = resolution_mapper lib src env in

@@ -273,7 +273,7 @@ type loc_t = Location.t = {
                  | ComponentReference of component_reference
                  | OutputExpression of exp option list
                      
-  and component_reference = Der | Assert | Initial | UnknownRef of unknown_ref | KnownRef of known_ref | Var of str
+  and component_reference = Der | Assert | Initial | UnknownRef of unknown_ref | KnownRef of known_ref 
 
   and unknown_ref = { root : bool ; components : component list }
 
@@ -286,6 +286,8 @@ type loc_t = Location.t = {
                      | CK_BuiltinFunction (* builtin function/function like operator/thingy *)
                      | CK_BuiltinAttr (* attribute of a builtin class *)
                      | CK_Time (* The free variable *)
+                     | CK_LocalVar (* Variable bound by a loop *)
+                     | CK_VarAttr (* Attribute of a local variable *)
                        
   and known_component = { kind : component_kind ; component : component }
 

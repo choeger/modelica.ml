@@ -222,10 +222,20 @@ let test_cases = [
           if S.X == S.Y then x = time; else time = x; end if; 
         end C; 
      end A"
-     [cm "A"; cm "C"] (Has.behavior **> Has.equations **> The.first **> Is.equation (uncommented (IfEquation {condition;then_;else_;else_if}))));  
+     [cm "A"; cm "C"] (Has.behavior **> Has.equations **> The.first **> Is.equation (uncommented (IfEquation {condition;then_;else_;else_if}))));
 
 
-
+  (* Test for iteration variables *)
+  (
+    let range = (Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1})) in
+    let assign = Assignment {target = Single (knownref [cclass "A"; cclass "B"; cfld "x"]) ; source = ComponentReference (knownref [cvar "i"])} in
+    let stmt = ForStmt {idx = [{variable=nl "i";range}]; body = [uncommented assign]} in
+  test_norm
+    "Lookup an iteration variable"
+    "package A class B Real x; algorithm for i in 1:1:1 loop x := i; end for; end B; end A"
+    [cm "A"; cm "B"] (Has.behavior **> Has.algorithms **> The.first **> The.first **> Is.statement (uncommented stmt))
+  ) ;
+  
   (
   let expected_ref = knownref [cclass "A"; cfld "x"] in 
   test_norm
