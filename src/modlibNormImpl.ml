@@ -129,7 +129,7 @@ type impl_state = { notify : Path.t -> unit ;
                     current_env : lexical_env ; current_path : Path.t }
 
 exception NoSuchField of str
-exception DoubleModification of string
+exception DoubleModification of str
 exception AstInvariant
 exception SubscriptsOnClass of str
 exception NoSuchClass of str
@@ -343,16 +343,18 @@ let rec merge_mod exp mod_component nested_component mods =
     let new_mod =
       match StrMap.find mod_name mods with
       (* No need to search for the matching component again, reuse from $mods *)
-        {mod_desc=Modify _} -> raise (DoubleModification mod_name)
-      | {mod_kind; mod_desc=Nested mods} -> 
+      | {mod_kind; mod_nested; mod_default} -> 
         begin match DQ.front nested_component with
-          | None when mods = StrMap.empty -> {mod_kind; mod_desc=Modify exp}
-          | None -> raise (DoubleModification mod_name)
-          | Some (x,xs) -> {mod_kind; mod_desc = Nested (merge_mod exp x xs mods)}
+          | None -> begin match mod_default with
+                None -> {mod_kind; mod_nested; mod_default=Some exp}
+              | _ ->
+                raise (DoubleModification mod_component.component.ident)
+            end
+          | Some (x,xs) -> {mod_kind; mod_default; mod_nested = merge_mod exp x xs mod_nested}
         end
     in StrMap.add mod_name new_mod mods
   else
-    let empty_mod = {mod_desc = Nested StrMap.empty ; mod_kind = mod_component.kind} in
+    let empty_mod = {mod_default=None; mod_nested=StrMap.empty ; mod_kind = mod_component.kind} in
     merge_mod exp mod_component nested_component (StrMap.add mod_name empty_mod mods)
 
 let rec find_super_field lib x super =
@@ -395,9 +397,9 @@ let rec normalize_stmts lib src env ({super;fields;class_members} as es)=
     (* normalize the modified component *)
     let exp = resolve lib src env exp in
 
-    let insert fld xs = match DQ.front xs with
-        None -> {fld with field_binding = Some exp}
-      | Some(y,ys) -> {fld with field_mod = merge_mod exp y ys fld.field_mod} 
+    let insert mod_kind fld xs = match DQ.front xs with
+        None -> {fld with field_mod = {mod_kind; mod_default=Some exp; mod_nested=fld.field_mod.mod_nested}}
+      | Some(y,ys) -> {fld with field_mod = {fld.field_mod with mod_kind; mod_nested = merge_mod exp y ys fld.field_mod.mod_nested}} 
     in
     
     begin match DQ.front field_name with
@@ -406,20 +408,20 @@ let rec normalize_stmts lib src env ({super;fields;class_members} as es)=
       (* TODO: nested modification inside classes *)                 
       
       (* Local field *)
-      | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete; component},xs) when StrMap.mem component.ident.txt fields ->
+      | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete as kind; component},xs) when StrMap.mem component.ident.txt fields ->
         let fld = StrMap.find component.ident.txt fields in
-        let class_field = insert fld xs 
+        let class_field = insert kind fld xs 
         in normalize_stmts lib src env {es with fields = StrMap.add component.ident.txt class_field fields} stmts
 
       (* Inherited field *)
-      | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete; component},xs) ->
+      | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete as kind; component},xs) ->
         (* Search superclasses *)
         begin match find_super_field lib component.ident.txt super with
             None -> BatLog.logf "No field %s in %a\n" (show_component component) (DQ.print (fun x c -> IO.write_string x (show_known_component c))) src ;
             raise (NoSuchField component.ident) (* Error TODO: move to Report Monad? *)
           | Some fld ->
             (* TODO: this only works properly when a modification of the inherited field is found *)
-            let class_field = insert fld xs 
+            let class_field = insert kind fld xs 
             in normalize_stmts lib src env {es with fields = (StrMap.add component.ident.txt class_field fields)} stmts
         end
 

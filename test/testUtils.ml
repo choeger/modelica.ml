@@ -276,7 +276,7 @@ module P = struct
       | cv -> assert_failure ("No field: '"^fld^"' in: " ^ (show_class_value cv)) 
 
     let binding k = function
-        {field_binding=Some b} -> k b
+        {field_mod={mod_default=Some b}} -> k b
       | _ -> assert_failure "Expected a binding"
 
     let class_modification fld k {class_mod} =
@@ -286,8 +286,8 @@ module P = struct
         assert_failure ("No modification to '" ^ fld ^ "'")  
     
     let modification fld k {field_mod} =
-      if StrMap.mem fld field_mod then
-        k (StrMap.find fld field_mod)
+      if StrMap.mem fld field_mod.mod_nested then
+        k (StrMap.find fld field_mod.mod_nested)
       else
         assert_failure ("No modification to '" ^ fld ^ "'")  
 
@@ -360,11 +360,11 @@ module P = struct
       Has.binding (exp e)
 
     let nested k = function
-        {mod_desc=Nested m} -> k m
+        {mod_nested} -> k mod_nested
       | _ -> assert_failure "Expected a nested modification."
 
     let modified_to expected = function
-        {mod_desc=Modify e} -> exp expected e
+        {mod_default=Some e} -> exp expected e
       | _ -> assert_failure "Expected a binding modification."
 
     let equation expected eq =

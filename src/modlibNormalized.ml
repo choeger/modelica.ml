@@ -75,15 +75,12 @@ and object_struct = { object_sort : sort ;
                       behavior : behavior [@default {algorithms=[]; equations=[]; initial_algorithms=[]; initial_equations=[]; external_=None}] ;
                     }
 
-and field_modification_desc = Modify of exp
-                            | Nested of field_modification StrMap.t
-
 and field_modification = { mod_kind : component_kind ;
-                           mod_desc : field_modification_desc }
+                           mod_nested : field_modification StrMap.t [@default StrMap.empty] ;
+                           mod_default : exp option [@default None]}
 
 and class_field = { field_class : class_value ;
-                    field_binding : exp option [@default None] ;
-                    field_mod : field_modification StrMap.t [@default StrMap.empty]}
+                    field_mod : field_modification [@default {mod_kind=CK_Class; mod_nested = StrMap.empty; mod_default=None}]}
 
 and modified_class = { class_ : class_value ;
                        class_mod : field_modification StrMap.t [@default StrMap.empty]}
@@ -94,32 +91,34 @@ and elements_struct = { class_members : modified_class StrMap.t [@default StrMap
                       }
 
 (** Enhance the automatically derived mapper with map-routines for all these Map.t elements *)
-let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () = {identity_mapper with 
-  on_field_modification_desc = {identity_mapper.on_field_modification_desc with
-                                map_Modify = (fun self e -> Modify (map_expr e)) ;
-                                map_Nested = (fun self m -> Nested (StrMap.map (self.map_field_modification self) m)) ;};
-
-  map_object_struct = (fun self os -> {os with public = self.map_elements_struct self os.public ;
-                                               protected = self.map_elements_struct self os.protected ;
-                                               behavior = map_behavior os.behavior}) ;
+let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () =
+  {identity_mapper with 
+   
+   map_field_modification = (fun self {mod_kind; mod_nested; mod_default} ->
+       let mod_nested = StrMap.map (self.map_field_modification self) mod_nested in
+       let mod_default = Option.map map_expr mod_default in
+       {mod_kind; mod_nested; mod_default}
+     );
   
-  map_modified_class = (fun self {class_; class_mod} ->
-      let class_ = self.map_class_value self class_ in
-      let class_mod = StrMap.map (self.map_field_modification self) class_mod in
-      {class_; class_mod});
+   map_object_struct = (fun self os -> {os with public = self.map_elements_struct self os.public ;
+                                                protected = self.map_elements_struct self os.protected ;
+                                                behavior = map_behavior os.behavior}) ;
+  
+   map_modified_class = (fun self {class_; class_mod} ->
+       let class_ = self.map_class_value self class_ in
+       let class_mod = StrMap.map (self.map_field_modification self) class_mod in
+       {class_; class_mod});
 
-  map_class_field = (fun self {field_class; field_binding; field_mod} ->
-      let field_class = self.map_class_value self field_class in
-      let field_binding = Option.map map_expr field_binding in
-      let field_mod = StrMap.map (self.map_field_modification self) field_mod in
-      {field_class; field_binding; field_mod});
+   map_class_field = (fun self {field_class; field_mod} ->
+       let field_class = self.map_class_value self field_class in
+       let field_mod = self.map_field_modification self field_mod in
+       {field_class; field_mod});
                       
-  map_elements_struct = (fun self {class_members; super; fields} ->
-      let class_members = StrMap.map (self.map_modified_class self) class_members in
-      let super = IntMap.map (self.map_modified_class self) super in
-      let fields = StrMap.map (self.map_class_field self) fields in
-      {class_members; super; fields}) ;
-      
+   map_elements_struct = (fun self {class_members; super; fields} ->
+       let class_members = StrMap.map (self.map_modified_class self) class_members in
+       let super = IntMap.map (self.map_modified_class self) super in
+       let fields = StrMap.map (self.map_class_field self) fields in
+       {class_members; super; fields}) ;      
 }
 
 type flat_attributes = {
@@ -164,6 +163,7 @@ let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields
 let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=empty_elements; protected=empty_elements; behavior=no_behavior}
 
 let empty_class = Class empty_object_struct
+let no_modification = {mod_kind=CK_Class; mod_nested = StrMap.empty; mod_default=None}
 let empty_modified_class = {class_ = empty_class; class_mod = StrMap.empty}
 
 type prefix_found_struct = { found : class_path ; not_found : Name.t } [@@deriving show,yojson]
@@ -266,7 +266,7 @@ and update_map lhs rhs x m =
   StrMap.modify_def empty_modified_class x (update_modified_class lhs rhs) m
 
 and update_field_map lhs rhs x m =  
-  StrMap.modify_def {field_class=empty_class;field_binding=None;field_mod=StrMap.empty}
+  StrMap.modify_def {field_class=empty_class;field_mod=no_modification}
     x (update_field_class_value lhs rhs) m
 
 and update_field_class_value lhs rhs f = {f with field_class = update_class_value lhs rhs f.field_class}
