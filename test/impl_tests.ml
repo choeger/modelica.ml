@@ -183,6 +183,26 @@ let test_cases = [
     "Lookup an unknown in an equation"
     "model A Real x; equation x = 0.0; end A"
     [`ClassMember "A"] (Has.behavior **> Has.equations **> The.first **> Is.equation {comment = no_comment; commented = SimpleEquation {left=ComponentReference expected_ref; right=Real 0.0}}) );
+
+  (* Attempt to test a typical medium library pattern *)
+  test_norm
+    "Forwarding a Redeclaration into a Component (Media Library Pattern)"
+    "package MiniMedium
+       package DefaultMedium end DefaultMedium ;
+       package NonDefaultMedium constant Real foo = 42.; end NonDefaultMedium;
+       class Interface replaceable package Medium = DefaultMedium; end Interface;
+       
+       class SomeComponent extends Interface; end SomeComponent;
+       
+       class SomeModel extends Interface(redeclare package Medium = NonDefaultMedium); 
+                       SomeComponent component(redeclare package Medium = Medium, foo = 23.); 
+       end SomeModel;
+     end MiniMedium"
+    [`ClassMember "MiniMedium"; `ClassMember "SomeModel"] (Has.field public "component" (Has.modification "foo" (
+        (Has.modification_kind CK_Constant)
+        &&&
+        (Is.modified_to (Real 21.))))) ;
+
 ]
 
 let suite = "Implementation Normalization" >::: test_cases
