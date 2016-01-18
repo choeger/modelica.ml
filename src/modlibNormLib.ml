@@ -77,7 +77,14 @@ let stratify_payload map stmt =
   scope <-- stratify_ptr stmt.lhs ;
   return (PathMap.add scope stmt.rhs map) 
 
-let norm_pkg_root root =
+
+type progress_state = {
+  last : Path.t ;
+  max : int ;
+  done_ : int ;
+}
+
+let norm_pkg_root ?(notify=fun _ -> ()) root =
   Report.do_ ;
   (* normalize signature *)
   signature <-- NormSig.norm_pkg_root root ;
@@ -85,6 +92,12 @@ let norm_pkg_root root =
   (* collect rhs-statements and stratify *)
   stmts <-- Report.fold sort_impl PathMap.empty rhss;
   payloads <-- Report.fold stratify_payload PathMap.empty payloads ;
-  return {signature; implementation = ModlibNormImpl.norm signature payloads stmts}
+
+  let max = PathMap.cardinal payloads in
+  let d = ref 0 in
+  let notify last =
+    incr d; notify {last; max; done_ = !d}
+  in
+  return {signature; implementation = ModlibNormImpl.norm signature notify payloads stmts}
   
       

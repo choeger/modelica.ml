@@ -124,7 +124,8 @@ type strat_stmts = strat_stmt list PathMap.t
 
 type payload_stmts = Syntax.behavior PathMap.t
 
-type impl_state = { strat_stmts : strat_stmts ; payload : payload_stmts ;
+type impl_state = { notify : Path.t -> unit ;
+                    strat_stmts : strat_stmts ; payload : payload_stmts ;
                     current_env : lexical_env ; current_path : Path.t }
 
 exception NoSuchField of str
@@ -373,7 +374,7 @@ let rec normalize_stmts lib src env ({super;fields;class_members} as es)=
       | Some(x,_) -> raise (Failure ("Don't know how to handle " ^ (show_known_component x)))
     end
 
-let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
+let rec impl_mapper lib {notify; strat_stmts; payload; current_env; current_path} =
   let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some {kind=CK_Class;component={ident={txt=x;loc=Location.none};subscripts=[]}} | _ -> None) (DQ.enum path)) in
   
   { ModlibNormalized.identity_mapper with
@@ -384,16 +385,18 @@ let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
         let behavior =
           if PathMap.mem os.source_path payload
           then
+            let () = notify os.source_path in
             resolve_behavior lib (class_name os.source_path) current_env (PathMap.find os.source_path payload)
           else
             os.behavior
         in
 
         let pub_state = {
-            strat_stmts ;
-            payload;
-            current_env ;
-            current_path = os.source_path }
+          notify;
+          strat_stmts ;
+          payload;
+          current_env ;
+          current_path = os.source_path }
         in
         let s = impl_mapper lib pub_state in
 
@@ -432,7 +435,7 @@ let rec impl_mapper lib {strat_stmts; payload; current_env; current_path} =
       );
   }
 
-let norm lib payload strat_stmts =
-  let m = impl_mapper lib {strat_stmts; payload; current_env = []; current_path = DQ.empty} in
+let norm lib notify payload strat_stmts =
+  let m = impl_mapper lib {notify; strat_stmts; payload; current_env = []; current_path = DQ.empty} in
   m.map_elements_struct m lib
                                       

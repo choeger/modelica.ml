@@ -115,9 +115,13 @@ let run_compile global root =
   match FileSystem.parse_root root with
     Some root -> begin 
       let tr = Trans.translate_pkg_root root in
-      try 
-        let o = Report.run (NormLib.norm_pkg_root tr)
+      try
+        let std_notify {NormLib.max;done_} =
+          Printf.printf "\r[%d/%d]%!" done_ max
+        in
+        let o = Report.run (NormLib.norm_pkg_root ~notify:std_notify tr)
             {messages=[]; output=global} in
+        Printf.printf "\n" ;
         List.iteri print_message o.final_messages ;
         match o.final_result with
           Ok {signature;implementation} -> BatLog.logf "Normalization Ok.\n%!" ;                
