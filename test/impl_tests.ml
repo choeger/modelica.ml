@@ -208,7 +208,7 @@ let test_cases = [
        left=ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]);
        right=ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"])};
    in 
-   let eq = {left=ComponentReference (knownref [cclass "A"; cclass "B"; cfld "x"]); right=ComponentReference (knownref [time])} in   
+   let eq = {left=ComponentReference (knownref [cclass "A"; cclass "C"; cfld "x"]); right=ComponentReference (knownref [time])} in   
    let else_ = [uncommented (SimpleEquation {left=eq.right; right=eq.left})] in
    let then_ = [uncommented (SimpleEquation eq)] in
    let else_if = [] in

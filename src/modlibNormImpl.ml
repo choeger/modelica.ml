@@ -197,6 +197,9 @@ and resolve_in lib found cv (components : component list) = match components wit
 let resolve_builtin lib first rest =
   let builtin kind = DQ.cons {kind; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) rest)) in
   match first.ident.txt with
+  (* Free variable *)
+  | "time" -> builtin CK_Time
+                
   (* Numeric Functions and Conversion Functions, see 3.7.1 *)
   | "abs" | "sign" | "sqrt" | "div" 
   | "mod" | "rem" | "ceil" | "floor" 

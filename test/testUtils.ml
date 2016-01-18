@@ -161,9 +161,13 @@ open Modlib.Normalized
 open Modlib.Report
 open Modlib.Utils
 
-let diff_exp fmt (e1, e2) =
-  match Diff.of_sexps ~original:(sexp_of_exp e1) ~updated:(sexp_of_exp e2) with Some d -> Format.fprintf fmt "%s\n" (Diff.to_string d) | None -> ()
+let diff_sexp f fmt (e1, e2) =
+  match Diff.of_sexps ~original:(f e1) ~updated:(f e2) with Some d -> Format.fprintf fmt "%s\n" (Diff.to_string d) | None -> ()
 
+let diff_exp = diff_sexp sexp_of_exp
+
+let diff_eq = diff_sexp sexp_of_equation
+    
 let cm = Modlib.Inter.Path.cm
 
 module ClassValueFragments = struct
@@ -360,7 +364,7 @@ module P = struct
       | _ -> assert_failure "Expected a binding modification."
 
     let equation expected eq =
-      assert_equal ~cmp:equal_equation ~printer:show_equation expected (Parser_tests.prep_eq eq)
+      assert_equal ~cmp:equal_equation ~pp_diff:diff_eq ~printer:show_equation expected (Parser_tests.prep_eq eq)
     
   end
 

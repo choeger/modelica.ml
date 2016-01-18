@@ -80,10 +80,10 @@ type loc_t = Location.t = {
   and der_spec = { der_name : name ; idents : str list }
 
   (** Something that can be commented can wrapped in this record *)
-  and 'a commented = { commented : 'a ; comment : comment }
+  and 'a commented = { commented : 'a ; comment : comment [@default {annotated_elem=None; annotation=None}]}
 
   (** Something that can be annotated can wrapped in this record *)
-  and 'a annotated = { annotated_elem : 'a ; annotation : modification option; } 
+  and 'a annotated = { annotated_elem : 'a ; annotation : modification option [@default None] } 
 
   (** Comments are optionally annotated optional strings *)
   and comment = str option annotated

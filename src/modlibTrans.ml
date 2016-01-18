@@ -101,19 +101,7 @@ let txt_only = DQ.map (fun {txt} -> txt)
 
 let define rhs state = ((), {state with class_code = {lhs=txt_only state.current_path; rhs} :: state.class_code})
 
-let payload rhs state =
-  (* Small optimization: Only cover actual payload *)
-  if rhs = Syntax_fragments.empty_behavior then
-    ((), state)
-  else
-    let state' = {state with payload_code = {lhs=txt_only state.current_path; rhs} :: state.payload_code} in
-    ((), state')
-
-let down_field x state = ((), {state with current_field = DQ.snoc state.current_field x})
-
-let up_field state = ((), {state with current_field = match DQ.rear state.current_field with None -> DQ.empty | Some (xs,_) -> xs})
-
-let apply_imports env =
+let import_mapper env =
   (* resolve imports in expressions *)
   let rec merge x = function
     (* Need to merge all subscripts when replacing an imported name, e.g.,
@@ -129,8 +117,25 @@ let apply_imports env =
     | c -> c
   in
   (* TODO: implement shadowing of imported names by local variables *)
-  let mapper = {Syntax.identity_mapper with map_unknown_ref} in
+  {Syntax.identity_mapper with map_unknown_ref}
+
+let apply_imports env =
+  let mapper = import_mapper env in
   (mapper.map_exp mapper)
+  
+let payload rhs state =
+  (* Small optimization: Only cover actual payload *)
+  if rhs = Syntax_fragments.empty_behavior then
+    ((), state)
+  else
+    let mapper = import_mapper state.env in
+    let rhs = mapper.map_behavior mapper rhs in
+    let state' = {state with payload_code = {lhs=txt_only state.current_path; rhs} :: state.payload_code} in
+    ((), state')
+
+let down_field x state = ((), {state with current_field = DQ.snoc state.current_field x})
+
+let up_field state = ((), {state with current_field = match DQ.rear state.current_field with None -> DQ.empty | Some (xs,_) -> xs})
 
 let bind_value rhs state =
   let rhs = apply_imports state.env rhs in
