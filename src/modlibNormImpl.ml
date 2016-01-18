@@ -213,14 +213,18 @@ let resolve_builtin lib first rest =
   | "exp" | "log" | "log10"
     -> builtin CK_BuiltinFunction
 
+  (* Reductions, see 10.3.4 *)
+  | "min" | "max" | "sum" | "product"
+    -> builtin CK_BuiltinFunction
+
   (* Event related *)
   | "noEvent" -> builtin CK_BuiltinFunction
   | "smooth" -> builtin CK_BuiltinFunction
 
   (* Array functions, see 10.3 *)
-  | "size" -> builtin CK_BuiltinFunction
-  | "zeros" -> builtin CK_BuiltinFunction
-  | "fill" -> builtin CK_BuiltinFunction
+  | "size" | "ndims" -> builtin CK_BuiltinFunction
+  | "scalar" | "vector" | "matrix" -> builtin CK_BuiltinFunction
+  | "zeros" | "fill" | "ones" | "identity" | "diagonal" -> builtin CK_BuiltinFunction
 
   (* Builtin Classes *)
   | "String" -> builtin CK_BuiltinClass
@@ -276,6 +280,18 @@ let rec resolution_mapper lib src env = { Syntax.identity_mapper with
                                                let self' = resolution_mapper lib src env  in
                                                let body = self'.map_statements self' body in
                                                {idx; body}) ;
+
+                                          map_for_equation =
+                                            (fun self {idx; body} ->
+                                               let idx = List.map (self.map_idx self) idx in
+                                               let mk_env = fun {variable={txt}} m -> StrMap.add txt EnvVar m in
+                                               let env = match env with [] -> env (* cannot happen, one env per class *)
+                                                                      | e::es -> {e with public_env = List.fold_right mk_env idx e.public_env}::es
+                                               in
+                                               let self' = resolution_mapper lib src env  in
+                                               let body = self'.map_equations self' body in
+                                               {idx; body}) ;
+                                            
                                         }
 
 let resolve lib src env exp =

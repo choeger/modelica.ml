@@ -235,6 +235,17 @@ let test_cases = [
     "package A class B Real x; algorithm for i in 1:1:1 loop x := i; end for; end B; end A"
     [cm "A"; cm "B"] (Has.behavior **> Has.algorithms **> The.first **> The.first **> Is.statement (uncommented stmt))
   ) ;
+
+  (* Test for iteration variables in equations *)
+  (
+    let range = (Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1})) in
+    let eq = SimpleEquation {left = ComponentReference (knownref [cclass "A"; cclass "B"; cfld "x"]) ; right = ComponentReference (knownref [cvar "i"])} in
+    let loop = ForEquation {idx = [{variable=nl "i";range}]; body = [uncommented eq]} in
+  test_norm
+    "Lookup an iteration variable in an equation"
+    "package A class B Real x; equation for i in 1:1:1 loop x = i; end for; end B; end A"
+    [cm "A"; cm "B"] (Has.behavior **> Has.equations **> The.first **> Is.equation (uncommented loop))
+  ) ;
   
   (
   let expected_ref = knownref [cclass "A"; cfld "x"] in 
