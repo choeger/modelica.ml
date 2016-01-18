@@ -295,6 +295,7 @@ and pp_statement fmt { commented ; comment } =
 and pp_equation_desc fmt = function
     SimpleEquation { left ; right } -> fprintf fmt "@[%a@ =@ %a@]"
                                          pp_expr left pp_expr right
+  | Connect {connlhs; connrhs} -> fprintf fmt "@[connect(%a,%a)@]" pp_cr connlhs pp_cr connrhs 
   | ForEquation loop -> pp_for_loop pp_equations fmt loop
   | IfEquation c -> pp_conditional "if" pp_equations fmt c 
   | WhenEquation c -> pp_conditional "when" ~else_:"" pp_equations fmt c

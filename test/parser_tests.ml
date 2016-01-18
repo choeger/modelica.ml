@@ -623,8 +623,8 @@ let test_cases = [
    in
    let annotation = Some line in
    eq "connect(not1.y, rSFlipFlop.R) annotation (Line(points={{-19,-10},{20,-10}, {20,-6},{38,-6}}, color={255,0,255}));" 
-     { commented = ExpEquation (app {(empty_app (cr [any "connect"])) with args=[name ["not1";"y"]; name ["rSFlipFlop"; "R"] ]}) ; 
-                                                                 comment = { annotated_elem = None ; annotation } } );
+     { commented = Connect {connlhs = unknownref ["not1";"y"]; connrhs = unknownref ["rSFlipFlop"; "R"]} ; 
+       comment = { annotated_elem = None ; annotation } } );
 ]
 
 let suite = "Parser" >::: test_cases

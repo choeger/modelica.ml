@@ -41,9 +41,11 @@ let rec name_ components = function
   | [] -> {components = List.rev components; root=false}
   | txt::r -> name_ ({ident = {txt; loc = Location.none}; subscripts=[]}::components) r
 
-let name = function
+let unknownref = function
   | [] -> raise EmptyName
-  | n -> ComponentReference (UnknownRef (name_ [] n))
+  | n -> UnknownRef (name_ [] n)
+
+let name xs = let ur = unknownref xs in ComponentReference ur
 
 let int x =  (Int x)
 let real x =  (Real x)

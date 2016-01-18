@@ -38,7 +38,7 @@
 %token ALGORITHM DISCRETE FALSE LOOP PURE AND EACH FINAL MODEL RECORD ANNOTATION ELSE
 %token FLOW NOT REDECLARE ASSERT ELSEIF FOR OPERATOR REPLACEABLE BLOCK ELSEWHEN FUNCTION OR RETURN
 %token BREAK ENCAPSULATED IF OUTER STREAM CLASS END IMPORT OUTPUT THEN ENUMERATION IMPURE
-%token PACKAGE TRUE CONNECTOR EQUATION IN PARAMETER TYPE CONSTANT EXPANDABLE INITIAL PARTIAL WHEN
+%token PACKAGE TRUE CONNECT CONNECTOR EQUATION IN PARAMETER TYPE CONSTANT EXPANDABLE INITIAL PARTIAL WHEN
 %token CONSTRAINEDBY EXTENDS INNER PROTECTED WHILE DER EXTERNAL INPUT PUBLIC WITHIN
 %token ENDWHEN ENDIF ENDFOR ENDWHILE INITIAL_EQUATION INITIAL_ALGORITHM
 %token <string> END_IDENT
@@ -299,6 +299,7 @@ equation_body : e = simple_expr { ExpEquation e }
               | WHEN condition=expr THEN then_ = list(equation) else_if = list(elsewhen_equation) ENDWHEN
                    { WhenEquation { condition; then_ ; else_if; else_ = []} }                                                                                                                         
               | FOR idx = list(index) LOOP body=list(equation) ENDFOR { ForEquation { idx; body } }
+              | CONNECT LPAREN connlhs = component_reference COMMA connrhs = component_reference RPAREN { Connect {connlhs; connrhs} }
 
 variability : CONSTANT { Constant }
             | PARAMETER { Parameter } 

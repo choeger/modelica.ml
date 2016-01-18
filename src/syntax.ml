@@ -210,8 +210,11 @@ type loc_t = Location.t = {
                     | ForEquation of for_equation
                     | IfEquation of if_equation
                     | WhenEquation of when_equation
+                    | Connect of connect
                     | ExpEquation of exp
-                          
+
+  and connect = { connlhs : component_reference ; connrhs : component_reference }
+
   and for_equation = equations for_loop_struct  
 
   and if_equation = equations condition_struct 
