@@ -178,6 +178,14 @@ let test_cases = [
     (Is.bound_to (Real 21.))) ;   
 
   test_norm
+    "Allow nested and default modifications at the same time" 
+    "package A model B Real x(start = 0.0) = 42.; end B; end A" 
+    [`ClassMember "A"; `ClassMember "B"] (Has.field public "x"
+                                            (Has.modification "start" **> Is.modified_to (Real 0.0)
+                                             &&&
+                                             Is.bound_to (Real 42.))) ;   
+  
+  test_norm
     "Lookup a modified constant in a component using extensions" 
     "package A C c(x = 21.); model C extends B; end C; model B constant Real x = 42.; end B; end A" 
     [`ClassMember "A"] (Has.field public "c" **> Has.modification "x" **> (Has.modification_kind CK_Constant &&& Is.modified_to (Real 21.)));
@@ -242,10 +250,27 @@ let test_cases = [
     let eq = SimpleEquation {left = ComponentReference (knownref [cclass "A"; cclass "B"; cfld "x"]) ; right = ComponentReference (knownref [cvar "i"])} in
     let loop = ForEquation {idx = [{variable=nl "i";range}]; body = [uncommented eq]} in
   test_norm
+
     "Lookup an iteration variable in an equation"
+
     "package A class B Real x; equation for i in 1:1:1 loop x = i; end for; end B; end A"
+
     [cm "A"; cm "B"] (Has.behavior **> Has.equations **> The.first **> Is.equation (uncommented loop))
   ) ;
+
+  (* Test for iteration variables in comprehensions *)
+  ( let range = Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1}) in
+    let right = Compr {exp=ComponentReference (knownref [cvar "i"]); idxs = [{variable = nl "i"; range}]} in
+    let eq = SimpleEquation {left = ComponentReference (knownref [cclass "A"; cclass "B"; cfld "x"]); right} in
+    test_norm
+
+      "Lookup a variable bound by a comprehension"
+
+      "package A class B Real x; equation x = {i for i in 1:1:1}; end B; end A"
+
+      [cm "A"; cm "B"] (Has.behavior **> Has.equations **> The.first **> Is.equation (uncommented eq))
+  );
+
   
   (
   let expected_ref = knownref [cclass "A"; cfld "x"] in 
