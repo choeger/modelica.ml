@@ -100,6 +100,11 @@ let test_cases = [
     (Find.def_of (pol [cm "A"; cm "C"; cm "E"; cm "F"]) **> Is.class_value (type_ real));
 
   signature
+    "Shadowing of imports"
+    "class A type S = Real; import T = A.S; class B type T = Integer; T x; end B; end A"
+    (Find.def_of (pol [cm "A"; cm "B"; fld "x"]) **> Is.class_value (type_ int));
+  
+  signature
     "Inheritance of forwarded Builtin Types"
     "class A class B1 type T = Real; end B1; extends B1; end A"
     (Find.def_of (pol [cm "A" ; sup 0; cm "T"]) **> Is.class_value real );

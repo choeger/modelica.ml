@@ -238,28 +238,28 @@ let resolve_builtin lib first rest =
   (* Array functions, see 10.3 *)
   | "size" | "ndims" -> builtin CK_BuiltinFunction
   | "scalar" | "vector" | "matrix" -> builtin CK_BuiltinFunction
-  | "zeros" | "fill" | "ones" | "identity" | "diagonal" -> builtin CK_BuiltinFunction
+  | "cat" | "zeros" | "fill" | "ones" | "identity" | "diagonal" -> builtin CK_BuiltinFunction
 
   (* Builtin Classes *)
-  | "String" -> builtin CK_BuiltinClass
-  | "StateSelect" -> builtin CK_BuiltinClass
-
+  | "String" | "StateSelect" | "Connections" -> builtin CK_BuiltinClass
+  
   (* TODO: this is actually wrong, the toplevel should come _before_ the builtins *)
   | _ -> resolve_os lib DQ.empty {empty_object_struct with public=lib} first rest 
 
 let rec resolve_env lib found first rest = function
     [] -> resolve_builtin lib first rest
   | env :: envs when env_mem first.ident.txt env ->
-    begin
-    match env_find first.ident.txt env with
-      EnvClass cv when first.subscripts = [] -> resolve_in lib (DQ.snoc found {kind=CK_Class; component=first}) cv rest
-    | EnvClass cv -> raise (SubscriptsOnClass first.ident)
-    | EnvField cv ->
-      let {flat_attr={fa_var}} = flat cv in
-      let kind = ck_of_var fa_var in      
-      resolve_in lib (DQ.snoc found {kind; component=first}) cv rest                                                     
-    | EnvVar -> (* found a local variable, its elements can only be checked by type-inference *)
-      DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest))
+    begin        
+      match env_find first.ident.txt env with
+        EnvClass cv when first.subscripts = [] ->
+        resolve_in lib (DQ.snoc found {kind=CK_Class; component=first}) cv rest
+      | EnvClass cv -> raise (SubscriptsOnClass first.ident)
+      | EnvField cv ->
+        let {flat_attr={fa_var}} = flat cv in
+        let kind = ck_of_var fa_var in      
+        resolve_in lib (DQ.snoc found {kind; component=first}) cv rest                                                     
+      | EnvVar -> (* found a local variable, its elements can only be checked by type-inference *)
+        DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest))
     end
   | env :: envs -> begin
       (* try next scope 
@@ -272,10 +272,10 @@ let rec resolve_env lib found first rest = function
 let resolve_ur lib src env {root;components} =
   match components with
     cmp :: components ->
-      if root then
-        resolve_os lib DQ.empty {empty_object_struct with public=lib} cmp components
-      else
-        resolve_env lib src cmp components env
+    if root then
+      resolve_os lib DQ.empty {empty_object_struct with public=lib} cmp components
+    else
+      resolve_env lib src cmp components env
   | [] -> raise AstInvariant
 
 let add_idx env idx = 
