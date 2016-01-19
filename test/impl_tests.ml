@@ -260,7 +260,7 @@ let test_cases = [
 
   (* Test for iteration variables in comprehensions *)
   ( let range = Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1}) in
-    let right = Compr {exp=ComponentReference (knownref [cvar "i"]); idxs = [{variable = nl "i"; range}]} in
+    let right = Syntax.Array [Compr {exp=ComponentReference (knownref [cvar "i"]); idxs = [{variable = nl "i"; range}]}] in
     let eq = SimpleEquation {left = ComponentReference (knownref [cclass "A"; cclass "B"; cfld "x"]); right} in
     test_norm
 

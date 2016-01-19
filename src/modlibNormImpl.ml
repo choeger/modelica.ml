@@ -278,6 +278,13 @@ let resolve_ur lib src env {root;components} =
         resolve_env lib src cmp components env
   | [] -> raise AstInvariant
 
+let add_idx env idx = 
+  let mk_env = fun {variable={txt}} m -> StrMap.add txt EnvVar m in
+  let env = match env with [] -> env (* cannot happen, one env per class *)
+                         | e::es -> {e with public_env = List.fold_right mk_env idx e.public_env}::es
+  in
+  env
+
 let rec resolution_mapper lib src env = { Syntax.identity_mapper with
                                           on_component_reference = {
                                             Syntax.identity_mapper.on_component_reference with
@@ -288,26 +295,23 @@ let rec resolution_mapper lib src env = { Syntax.identity_mapper with
                                              TODO: handle standardized annotations
                                           *)
                                           map_annotated = (fun f _ a -> {a with annotated_elem = f a.annotated_elem}) ;
+
+                                          map_comprehension =
+                                            (fun s {exp; idxs} ->
+                                              let self' = resolution_mapper lib src (add_idx env idxs)  in
+                                              {idxs=List.map (self'.map_idx self') idxs; exp=self'.map_exp self' exp});
                                           
                                           map_for_statement = 
                                             (fun self {idx; body} ->
+                                               let self' = resolution_mapper lib src (add_idx env idx)  in
                                                let idx = List.map (self.map_idx self) idx in
-                                               let mk_env = fun {variable={txt}} m -> StrMap.add txt EnvVar m in
-                                               let env = match env with [] -> env (* cannot happen, one env per class *)
-                                                                      | e::es -> {e with public_env = List.fold_right mk_env idx e.public_env}::es
-                                               in
-                                               let self' = resolution_mapper lib src env  in
                                                let body = self'.map_statements self' body in
                                                {idx; body}) ;
 
                                           map_for_equation =
                                             (fun self {idx; body} ->
+                                               let self' = resolution_mapper lib src (add_idx env idx)  in
                                                let idx = List.map (self.map_idx self) idx in
-                                               let mk_env = fun {variable={txt}} m -> StrMap.add txt EnvVar m in
-                                               let env = match env with [] -> env (* cannot happen, one env per class *)
-                                                                      | e::es -> {e with public_env = List.fold_right mk_env idx e.public_env}::es
-                                               in
-                                               let self' = resolution_mapper lib src env  in
                                                let body = self'.map_equations self' body in
                                                {idx; body}) ;
                                             
