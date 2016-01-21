@@ -141,7 +141,7 @@ let ck_of_var =
 
 let rec extends_builtin lib = function
   | Class os -> extends_builtin_os lib os
-  | GlobalReference p -> begin match lookup_path lib p with
+  | GlobalReference p -> begin match follow_path lib DQ.empty global with
             `Found {found_value} -> extends_builtin lib found_value
           | _ -> raise (Failure "Lookup error")
     end

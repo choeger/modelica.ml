@@ -278,7 +278,9 @@ type loc_t = Location.t = {
                      
   and component_reference = Der | Assert | Initial | UnknownRef of unknown_ref | KnownRef of known_ref 
 
-  and unknown_ref = { root : bool ; components : component list }
+  and components = component list
+
+  and unknown_ref = { root : bool ; components : components }
 
   and known_ref = known_component DQ.t
 

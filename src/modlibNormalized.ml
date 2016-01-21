@@ -59,9 +59,9 @@ type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                  | Constr of constr_value
                  | Class of object_struct
                  | Replaceable of class_value
-                 | GlobalReference of class_path
+                 | GlobalReference of Path.t
                  | Recursive of rec_term
-                 | DynamicReference of class_path
+                 | DynamicReference of Path.t
   [@@deriving eq,show,yojson,folder,mapper]
 
 and rec_term = { rec_lhs : class_path; rec_rhs : class_term }
@@ -133,7 +133,11 @@ type flat_repr = {
   flat_attr : flat_attributes [@default {fa_sort=None;fa_var=None;fa_con=None;fa_cau=None}]
 } [@@deriving show,yojson]
 
-let rec flat_ fa = function
+let no_attributes = {fa_con = None; fa_cau = None; fa_sort = None; fa_var = None}
+
+let rec merge_attributes fa =
+  let flat_ = merge_attributes in
+  function
   | Constr {arg; constr = Var v} when fa.fa_var = None -> flat_ {fa with fa_var = Some v} arg
   | Constr {arg; constr = Con c} when fa.fa_con = None -> flat_ {fa with fa_con = Some c} arg
   | Constr {arg; constr = Cau c} when fa.fa_cau = None -> flat_ {fa with fa_cau = Some c} arg
@@ -145,7 +149,7 @@ let rec flat_ fa = function
     end
   | flat_val -> {flat_val; flat_attr = fa}  
 
-let flat = flat_ {fa_con = None; fa_cau = None; fa_sort = None; fa_var = None}
+let flat = merge_attributes no_attributes
 
 let rec unflat = function
   | {flat_val = Replaceable flat_val} as fv -> Replaceable (unflat {fv with flat_val})
@@ -166,11 +170,15 @@ let empty_class = Class empty_object_struct
 let no_modification = {mod_kind=CK_Class; mod_nested = StrMap.empty; mod_default=None}
 let empty_modified_class = {class_ = empty_class; class_mod = StrMap.empty}
 
-type prefix_found_struct = { found : class_path ; not_found : Name.t } [@@deriving show,yojson]
+type prefix_found_struct = { found : class_path ; not_found : component list } [@@deriving show,yojson]
 
-let show_prefix_found {found; not_found} = "No element named " ^ (Name.show not_found) ^ " in " ^ (Name.show (Name.of_ptr found))
+let show_prefix_found {found; not_found} = "No element named " ^ (show_components not_found) ^ " in " ^ (Name.show (Name.of_ptr found))
 
-type found_struct = { found_path : class_path ; found_value : class_value ; found_visible : bool ; found_replaceable : bool } [@@deriving show,yojson]
+type found_struct = { found_ref : known_ref ;
+                      found_path : class_path ;
+                      found_value : class_value ;
+                      found_visible : bool ;
+                      found_replaceable : bool } [@@deriving show,yojson]
 
 type search_error = [ `NothingFound | `PrefixFound of prefix_found_struct ] [@@deriving show,yojson]
 
@@ -178,15 +186,55 @@ type found_recursion = { rec_term : rec_term ; search_state : prefix_found_struc
 
 type search_result = [`Found of found_struct | `Recursion of found_recursion | search_error ] [@@deriving show,yojson]
 
-exception IllegalPath of string
+exception IllegalPath of string                         
+exception CannotUpdate of string * string * string
 
+let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) = match DQ.front lhs with
+    None -> elements
+  | Some (`SuperClass i, r) -> {elements with super = update_intmap r rhs i super} 
+  | Some (`FieldType x, r) -> {elements with fields = update_field_map r rhs x fields}
+  | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
+  | Some (`Protected,_) -> raise (IllegalPath "")
+
+and update_modified_class lhs rhs ({class_} as cm) =
+  {cm with class_ = update_class_value lhs rhs class_}
+
+and update_map lhs rhs x m =  
+  StrMap.modify_def empty_modified_class x (update_modified_class lhs rhs) m
+
+and update_field_map lhs rhs x m =  
+  StrMap.modify_def {field_class=empty_class;field_mod=no_modification}
+    x (update_field_class_value lhs rhs) m
+
+and update_field_class_value lhs rhs f = {f with field_class = update_class_value lhs rhs f.field_class}
+
+and update_intmap lhs rhs i map =  
+  IntMap.modify_def empty_modified_class i (update_modified_class lhs rhs) map
+
+and update_class_value lhs rhs = function
+  | Constr {constr; arg} -> Constr {constr ; arg = (update_class_value lhs rhs arg)}
+  | Class ({public; protected} as os) -> begin match DQ.front lhs with
+        None -> rhs
+      | Some(`Protected, q) -> Class {os with protected = update_ q rhs protected}
+      | Some _ -> Class {os with public = update_ lhs rhs public}
+    end
+  | Replaceable cv -> Replaceable (update_class_value lhs rhs cv)
+  | (Recursive _ | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _ | DynamicReference _) as v ->
+    begin match DQ.front lhs with
+        None -> rhs
+      | Some (x,xs) -> raise (CannotUpdate(Path.show_elem_t x, show_class_path xs, show_class_value v))
+    end
+
+let update lhs rhs es = update_ lhs rhs es
+
+(** Follow Path.t pointers literally in the global class structure. This is useful for compression purposes. *)
 let rec follow_path global found_path found_value path = match DQ.front path with
     None ->
     let found_replaceable = match found_value with
         Replaceable _ -> true
       | _ -> false
     in
-    `Found {found_path; found_value; found_visible=true; found_replaceable}
+    `Found {found_path; found_value; found_ref=DQ.empty; found_visible=true; found_replaceable}
 
   | Some (x,xs) -> begin
       match found_value with
@@ -238,201 +286,3 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
       (StrMap.find x class_members).class_ todo
 
   | `ClassMember x -> raise (IllegalPath x)
-
-
-let lookup_path global path =
-  try
-
-  match DQ.front path with
-    Some (x,xs) -> follow_path_es global DQ.empty global xs x
-  | None -> raise (IllegalPath "")
-
-  with
-    (IllegalPath x) -> raise (IllegalPath (Printf.sprintf "'%s' in %s" x (Path.show path)))
-                         
-exception CannotUpdate of string * string * string
-
-let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) = match DQ.front lhs with
-    None -> elements
-  | Some (`SuperClass i, r) -> {elements with super = update_intmap r rhs i super} 
-  | Some (`FieldType x, r) -> {elements with fields = update_field_map r rhs x fields}
-  | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
-  | Some (`Protected,_) -> raise (IllegalPath "")
-
-and update_modified_class lhs rhs ({class_} as cm) =
-  {cm with class_ = update_class_value lhs rhs class_}
-
-and update_map lhs rhs x m =  
-  StrMap.modify_def empty_modified_class x (update_modified_class lhs rhs) m
-
-and update_field_map lhs rhs x m =  
-  StrMap.modify_def {field_class=empty_class;field_mod=no_modification}
-    x (update_field_class_value lhs rhs) m
-
-and update_field_class_value lhs rhs f = {f with field_class = update_class_value lhs rhs f.field_class}
-
-and update_intmap lhs rhs i map =  
-  IntMap.modify_def empty_modified_class i (update_modified_class lhs rhs) map
-
-and update_class_value lhs rhs = function
-  | Constr {constr; arg} -> Constr {constr ; arg = (update_class_value lhs rhs arg)}
-  | Class ({public; protected} as os) -> begin match DQ.front lhs with
-        None -> rhs
-      | Some(`Protected, q) -> Class {os with protected = update_ q rhs protected}
-      | Some _ -> Class {os with public = update_ lhs rhs public}
-    end
-  | Replaceable cv -> Replaceable (update_class_value lhs rhs cv)
-  | (Recursive _ | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _ | DynamicReference _) as v ->
-    begin match DQ.front lhs with
-        None -> rhs
-      | Some (x,xs) -> raise (CannotUpdate(Path.show_elem_t x, show_class_path xs, show_class_value v))
-    end
-
-let update lhs rhs es = update_ lhs rhs es
-
-(** Evaluation to structural types *)
-
-type struct_desc =
-    SInt | SReal | SString | SBool | SUnit | SProtoExternalObject
-  | SEnumeration of StrSet.t
-  | SArray of struct_desc * int
-  | SClass of class_t
-  | SDer of struct_desc * (string list)
-
-and struct_val = {sv_attr : flat_attributes ;
-                  sv_desc : struct_desc }
-
-and class_t = {up : class_t option; tip : object_struct}
-  [@@deriving show]
-  
-let empty_attr = {fa_sort=None;fa_var=None;fa_con=None;fa_cau=None}
-
-type ctxt_bracket = class_t DQ.t 
-
-let last bracket = match DQ.rear bracket with
-    None -> raise (Failure "Bracket is empty")
-  | Some(_, c) -> c
-
-let first bracket = match DQ.front bracket with
-    None -> raise (Failure "Bracket is empty")
-  | Some(c, _) -> c
-    
-let rec del_common_prefix p1 p2 = match DQ.front p1 with
-    Some (x,xs) ->
-    begin match DQ.front p2 with
-        Some (y,ys) when y = x ->
-        del_common_prefix xs ys
-      | _ -> (p1, p2)
-    end
-  | _ -> (p1, p2)
-
-let find_field protected x bracket =
-  let rec find_field_ done_ bracket = match DQ.front bracket with
-      None -> raise (Failure ("No such Field: '" ^ x ^ "'"))
-    | Some(cl, _) when protected && StrMap.mem x cl.tip.protected.fields ->
-      let fld = StrMap.find x cl.tip.protected.fields in
-      (DQ.snoc done_ cl, fld)
-    | Some(cl, _) when not protected && StrMap.mem x cl.tip.public.fields ->
-      let fld = StrMap.find x cl.tip.public.fields in
-      (DQ.snoc done_ cl, fld)
-    | Some(cl, xs) -> find_field_ (DQ.snoc done_ cl) xs
-  in find_field_ DQ.empty bracket    
-
-let find_class protected x bracket =
-  let rec find_class_ done_ bracket = match DQ.front bracket with
-      None -> raise (Failure ("No such class: '" ^ x ^ "'"))
-    | Some(cl, _) when protected && StrMap.mem x cl.tip.protected.class_members ->
-      let cls = StrMap.find x cl.tip.protected.class_members in
-      (DQ.snoc done_ cl, cls)
-    | Some(cl, _) when not protected && StrMap.mem x cl.tip.public.class_members ->
-      let cls = StrMap.find x cl.tip.public.class_members in
-      (DQ.snoc done_ cl, cls)
-    | Some(cl, xs) -> find_class_ (DQ.snoc done_ cl) xs
-  in find_class_ DQ.empty bracket    
-
-let rec walk_up up bracket = match DQ.rear up with
-    None -> bracket
-  | Some(xs,_) ->
-    begin match (last bracket).up with
-        None -> raise (Failure "Upwards out of scope")
-      | Some cl -> (DQ.cons cl DQ.empty)
-    end
-
-let rec eval_struct bracket = function
-    Int -> {sv_attr=empty_attr; sv_desc=SInt}
-  | Real -> {sv_attr=empty_attr; sv_desc=SReal}
-  | String -> {sv_attr=empty_attr; sv_desc=SString}
-  | Bool -> {sv_attr=empty_attr; sv_desc=SBool}
-  | Unit -> {sv_attr=empty_attr; sv_desc=SUnit}
-  | ProtoExternalObject -> {sv_attr=empty_attr; sv_desc=SProtoExternalObject}
-  | Enumeration keys -> {sv_attr=empty_attr; sv_desc=SEnumeration keys}
-  | Constr {arg; constr} ->
-    let {sv_desc;sv_attr} = eval_struct bracket arg in
-    begin match constr with
-        Var v -> {sv_desc; sv_attr = {sv_attr with fa_var = Some (Option.default v sv_attr.fa_var)}}
-      | Con c -> {sv_desc; sv_attr = {sv_attr with fa_con = Some (Option.default c sv_attr.fa_con)}}
-      | Cau c -> {sv_desc; sv_attr = {sv_attr with fa_cau = Some (Option.default c sv_attr.fa_cau)}}
-      | Sort s -> {sv_desc; sv_attr = {sv_attr with fa_sort = Some (Option.default s sv_attr.fa_sort)}}
-      | Der ls -> {sv_desc = SDer (sv_desc, ls); sv_attr}
-      | Array i -> {sv_desc = SArray (sv_desc, i); sv_attr}
-    end
-  | Replaceable cv -> eval_struct bracket cv
-
-  | GlobalReference cp | DynamicReference cp ->
-    (* The common prefix between the right-bracket's source name and the given path
-       determines the up- and down- steps we need to take to get from here to there *)
-    let (up, down) = del_common_prefix (last bracket).tip.source_path cp in
-    let bracket = walk_up up bracket in
-    project false bracket down
-      
-  | Recursive _ -> raise (Failure "recursion")
-  | Class tip ->
-    (* Discover local classes and set their "up" value accordingly *)
-    let (up, down) = del_common_prefix (last bracket).tip.source_path tip.source_path in
-    if (DQ.size up = 0) && (DQ.size down = 1) then
-      {sv_desc = SClass {up = Some (first bracket); tip}; sv_attr=empty_attr}
-    else
-      (* Inlined class, need to evaluate for the lexical context *)
-      let bracket = walk_up up bracket in
-      project false bracket down
-  
-and project protected bracket cp =
-  let continue bracket sv xs = match DQ.rear xs with
-      None -> sv
-    | Some (_,_) ->
-      begin match sv.sv_desc with
-          SClass cl -> project false (DQ.snoc bracket cl) xs
-        | _ -> raise (Failure "Projection from non-class")
-      end
-  in
-  
-  match DQ.front cp with
-    None -> {sv_desc=SClass (first bracket); sv_attr=empty_attr}
-
-  | Some (`FieldType x, xs) ->
-    (*BatLog.logf "Projecting field %s\nBracket:\n" x;
-      DQ.iter (fun cl -> BatLog.logf "%s\n" (Path.show cl.tip.source_path)) bracket ;*)
-    let (bracket, ct) = find_field protected x bracket in
-    let sv = eval_struct bracket ct.field_class in
-    continue DQ.empty sv xs
-      
-  | Some (`ClassMember x, xs) ->
-(*    BatLog.logf "Projecting field %s\nBracket:\n" x;
-      DQ.iter (fun cl -> BatLog.logf "%s\n" (Path.show cl.tip.source_path)) bracket ;*)
-    let (bracket, ct) = find_class protected x bracket in
-    let sv = eval_struct bracket ct.class_ in
-    continue DQ.empty sv xs
-      
-  | Some (`Protected, xs) ->
-    project true bracket xs
-
-  | Some (`SuperClass n, xs) ->
-    let sc =
-      if protected then
-        IntMap.find n (last bracket).tip.protected.super
-      else
-        IntMap.find n (last bracket).tip.public.super
-    in    
-    let sv = eval_struct bracket sc.class_ in
-    continue bracket sv xs
-  

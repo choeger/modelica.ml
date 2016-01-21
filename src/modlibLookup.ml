@@ -33,86 +33,161 @@ open Report
 module Inter = ModlibInter
 module Normalized = ModlibNormalized
 open Inter
+open Syntax
 open Normalized
-
+    
 exception EmptyName
 
-let rec get_class_element_in global current_path {Normalized.class_members; super; fields} x xs =
-  if StrMap.mem x class_members then begin
-    let found = (DQ.snoc current_path (`ClassMember x)) in
-    let r = (get_class_element global found (StrMap.find x class_members).class_ xs) in
-    match r with
-      `NothingFound -> (`PrefixFound {not_found=xs; found})      
-    | r -> r
-  end
-  else if StrMap.mem x fields then begin
-    let found = (DQ.snoc current_path (`FieldType x)) in
-    let r = (get_class_element global found (StrMap.find x fields).field_class xs) in
-    match r with
-      `NothingFound -> (`PrefixFound {not_found=xs; found})      
-    | r -> r
-  end
-  else (
-    pickfirst_class global current_path (DQ.cons x xs) (IntMap.bindings super) )
+type history_entry_kind = [`ClassMember of string | `SuperClass of int]
 
-and get_class_element_os global found_path {public;protected} x xs =
-  let f = get_class_element_in global found_path public x xs in
+type history_entry_t = { entry_structure : object_struct; entry_kind : history_entry_kind}
+
+type trace_t = Path.t list
+
+type history_t = history_entry_t DQ.t
+
+type lookup_state = {
+  history : history_t; (** The visited classes *)
+  trace : trace_t; (** The found references *)
+  current_path : Path.t ; (** The path to the current class value *)
+  current_attr : flat_attributes ;
+  current_ref : Syntax.known_ref; (** The search request as a resolved component *)
+}
+
+let path_of_history = DQ.map (fun {entry_kind} -> (entry_kind :> Path.elem_t)) 
+
+(** Find the first (from bottom) class which is a prefix of $path in $history and the corresponding suffix 
+    If the last entry is a superclass, the corresponding extending class is returned.
+    This should yield the context of a given path relativ to the current search history.
+*)
+let rec find_prefix (history, path) =
+  let rec ip p1 p2 =
+    match DQ.front p1 with None -> Some p2 | Some(x,xs) -> begin match DQ.front p2 with Some(y,ys) when y = x -> ip xs ys | _ -> None end
+  in
+  let rec drop_superclasses history = match DQ.rear history with
+      Some(history, {entry_kind=`SuperClass _}) -> drop_superclasses history
+    | _ -> history
+  in
+  match DQ.rear history with
+    Some (history, {entry_kind=`SuperClass _; entry_structure=os}) ->
+    begin match ip os.source_path path with
+        None -> find_prefix (history, path)
+      | Some suffix -> (drop_superclasses history, suffix)
+    end
+  | Some (history, {entry_kind=`ClassMember _; entry_structure=os}) ->
+    begin match ip os.source_path path with
+        None -> find_prefix (history, path)
+      | Some suffix -> (history, suffix)
+    end
+  | None -> raise (Failure "Fatal error, no root-scope found")
+  
+let rec get_class_element_in ({current_path; current_ref} as state) {Normalized.class_members; super; fields} x xs =
+  if StrMap.mem x.ident.txt class_members then begin
+    let current_path = (DQ.snoc current_path (`ClassMember x.ident.txt)) in
+    let current_ref = DQ.snoc current_ref {kind = CK_Class; component=x} in
+    let r = get_class_element {state with current_path; current_ref} (StrMap.find x.ident.txt class_members).class_ xs in
+    match r with
+      `NothingFound -> (`PrefixFound {not_found=xs; found=current_path})      
+    | r -> r
+  end
+  else if StrMap.mem x.ident.txt fields then begin
+    let current_path = (DQ.snoc current_path (`FieldType x.ident.txt)) in
+    let current_ref = DQ.snoc current_ref {Syntax.kind = CK_Continuous; component=x} in
+    let r = (get_class_element {state with current_path; current_ref} (StrMap.find x.ident.txt fields).field_class xs) in
+    match r with
+      `NothingFound -> (`PrefixFound {not_found=xs; found=current_path})      
+    | r -> r
+  end
+  else ( pickfirst_class state (x::xs) (IntMap.bindings super) )
+
+and get_class_element_os ({history; trace; current_path} as state) ({public;protected} as os) x xs =  
+  let history = match DQ.rear current_path with
+      Some(_, `SuperClass i) -> DQ.snoc history {entry_structure=os; entry_kind=`SuperClass i}
+    | Some(_, `ClassMember x) -> DQ.snoc history {entry_structure=os; entry_kind=`ClassMember x}
+    | Some(_, x) -> raise (Failure ("Unexpected path element for object_struct: " ^ (Path.show_elem_t x)))
+    | None -> raise EmptyName
+  in  
+  let f = get_class_element_in {state with history} public x xs in
   match f with
-    `NothingFound -> get_class_element_in global (DQ.snoc found_path `Protected) protected x xs
+    `NothingFound ->
+    let current_path = DQ.snoc current_path `Protected in
+    get_class_element_in {state with history; current_path} protected x xs
   | _ as r -> r
 
-and pickfirst_class global current_path name = function
+and pickfirst_class state name = function
     [] -> `NothingFound
   | (k,v)::vs ->
-    let next_path = DQ.snoc current_path (`SuperClass k) in
-    let f = get_class_element global next_path v.class_ name in
+    let current_path = DQ.snoc state.current_path (`SuperClass k) in
+    let f = get_class_element {state with current_path} v.class_ name in
     begin match f with
-        `NothingFound -> pickfirst_class global current_path name vs
+        `NothingFound -> pickfirst_class state name vs
       | r -> r
     end
 
-and get_class_element global found_path e p =
+and get_class_element ({history;trace;current_path} as state) e p =
   let open Normalized in 
 
-  match DQ.front p with
+  let ck_of_var = 
+    let open Flags in
+    function None -> CK_Continuous | Some Constant -> CK_Constant | Some Parameter -> CK_Parameter | Some Discrete -> CK_Discrete
+  in
+  
+  let finish_component state = match DQ.rear state.current_ref with
+    (* update last component reference with collected flat attribute *)
+      None | Some (_,{kind=CK_Class}) -> {state with current_attr = no_attributes}
+    | Some(xs, x) -> {state with current_ref = (DQ.snoc xs {x with kind=ck_of_var state.current_attr.fa_var});
+                                 current_attr = no_attributes}
+  in
+  
+  match e with
+  | Class os ->
+    let state = finish_component state in
+    begin match p with
+        [] -> `Found {found_value=e; found_path=state.current_path; found_ref=state.current_ref; found_visible=true; found_replaceable=false}
+      | x::xs -> get_class_element_os state os x xs 
+    end
 
-  (* Empty name, we are done *)
-    None ->
-    let found_replaceable = match e with
-        Replaceable _ -> true
-      | _ -> false
-    in
-    `Found {found_path ; found_value = e;
-            found_visible=true; found_replaceable}
+  (* we might encounter recursive elements *)
+  | Recursive rec_term -> `Recursion {rec_term; search_state={found = current_path; not_found = p}}
 
-  | Some (x, xs) -> begin
-      match e with
-      | Class os -> get_class_element_os global found_path os x xs
+  (* follow global references through self to implement redeclarations *)
+  | DynamicReference g | GlobalReference g ->
+    let q = DQ.of_enum (Enum.filter (function (`FieldType _| `ClassMember _) -> true | _ -> false) (DQ.enum g)) in
 
-      (* we might encounter recursive elements *)
-      | Recursive rec_term -> `Recursion {rec_term; search_state={found = found_path; not_found = p}}
+    (* Append to trace, TODO: found_visible/found_replaceable *)
+    let trace = g::trace in
+    (* History and suffix of searched path 
+           i.e. path[last[h']] ++ q' == q
+    *)
+    let (history', q') = find_prefix (history, q) in
+        
+    (* Create the new search task *)
+    let new_prefix = Enum.filter_map (function (`ClassMember x | `FieldType x) -> Some {ident={txt=x;loc=none};subscripts=[]} | _ -> None) (DQ.enum q') in    
+    let p' = List.of_enum (Enum.append new_prefix (List.enum p)) in
 
-      (* follow global references through self to implement redeclarations *)
-      | DynamicReference g | GlobalReference g ->
-        begin match DQ.front g with
-            Some(x,xs) ->
-            begin match follow_path_es global DQ.empty global xs x with
-              | `Found {found_value} -> get_class_element global found_path found_value p
-              | `Recursion _ as r -> r
-              | `NothingFound | `PrefixFound _ as result -> BatLog.logf "Could not follow (probably recursive) %s\n" (show_class_path g); result
-            end
-          | None -> raise EmptyName
-        end
+    let current_path = path_of_history history' in
+    begin match DQ.rear history' with
+      Some(history, {entry_structure}) ->
+      get_class_element {state with current_path;history;trace} (Class entry_structure) p
+    | None -> raise (Failure "history not setup properly. First element (root) needs to have empty source path!")
+    end
 
-      (* Replaceable/Constr means to look into it *)
-      | Replaceable v -> get_class_element global found_path v p    
-      | Constr {arg} -> get_class_element global found_path arg p
-      | _ -> `NothingFound
-    end    
+  (* Replaceable/Constr means to look into it *)
+  | Replaceable v -> get_class_element state v p    
+  | Constr {arg} -> get_class_element state arg p
+  | _ -> `NothingFound
+    
 
 let lookup o p =
   let open Normalized in
-  match DQ.front p with
-    None -> (`Found {found_value = Class {empty_object_struct with public = o}; found_path = DQ.empty; found_visible=true; found_replaceable=false}) ;
-  | Some(x,xs) -> get_class_element_in o DQ.empty o x xs
+  match p with
+    [] -> (`Found {found_value = Class {empty_object_struct with public = o}; found_path = DQ.empty; found_ref=DQ.empty; found_visible=true; found_replaceable=false}) ;
+  | x::xs ->
+    let state = {history = DQ.singleton {entry_structure = {empty_object_struct with public = o}; entry_kind = `ClassMember ""};
+                 trace = [] ;
+                 current_ref = DQ.empty;
+                 current_attr = no_attributes;
+                 current_path = DQ.empty}                  
+    in
+    get_class_element_in state o x xs
 
