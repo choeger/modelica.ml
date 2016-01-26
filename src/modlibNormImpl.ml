@@ -135,7 +135,7 @@ let rec resolve_env env history first rest =
                  current_attr = no_attributes;
                  current_path = path_of_history history}
     in
-    match lookup_in state first rest with
+    match lookup_lexical_in state first rest with
       Success {lookup_success_state={current_ref}} -> current_ref
     | Error err -> raise (ResolutionError err) 
     

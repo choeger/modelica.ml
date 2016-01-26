@@ -201,10 +201,20 @@ and get_class_element ({history;trace;current_path} as state) e p =
   | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
     
 exception EmptyScopeHistory
-                
-let lookup_in state = match DQ.rear state.history with
+
+(** Start lookup with the given state, follow lexical scoping rules *)
+let rec lookup_lexical_in state x xs =
+  match DQ.rear state.history with
     None -> raise EmptyScopeHistory
-  | Some(xs,x) -> get_class_element_os state x.entry_structure
+  | Some(ys,y) -> match get_class_element_os state y.entry_structure x xs with
+      Error {lookup_error_state={current_ref}} when current_ref==state.current_ref ->
+      (* Found nothing, climb up scope *)
+      lookup_lexical_in {history = ys;
+                         trace = DQ.empty ;
+                         current_ref = DQ.empty;
+                         current_attr = no_attributes;
+                         current_path = path_of_history ys} x xs
+    | r -> r
 
 (** Create a lookup state from a normalized signature (i.e. root class) *)
 let state_of_lib lib =
@@ -221,5 +231,5 @@ let lookup o p =
     [] -> Success {lookup_success_value = Class {empty_object_struct with public = o};
                    lookup_success_state = state} ;
   | x::xs ->    
-    lookup_in state x xs
+    lookup_lexical_in state x xs
 

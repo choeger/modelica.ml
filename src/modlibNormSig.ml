@@ -235,7 +235,7 @@ and norm lhs =
     let components = List.map (fun ident -> {Syntax.ident;subscripts=[]}) n in
     begin match components with
       x::xs ->
-      begin match lookup_in lhs.lookup_result x xs with
+      begin match lookup_lexical_in lhs.lookup_result x xs with
           Success {lookup_success_state={trace}; lookup_success_value} ->
           begin match DQ.front trace with
             | Some (x,_) -> return (GlobalReference x)
