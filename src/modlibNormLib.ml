@@ -59,10 +59,11 @@ open ModlibNormImpl
 
 let sort_impl map stmt =
   Report.do_ ;
-  scope <-- stratify_ptr stmt.lhs.scope ;
+  lhs <-- stratify_ptr stmt.lhs.scope ;
   lib <-- output ;
+  let scope = target lhs in
   let () = assert (DQ.size scope > 0) in
-  let strat_stmt = stratify_stmt lib scope (DQ.to_list stmt.lhs.field) stmt.rhs in
+  let strat_stmt = {exp=stmt.rhs; field_name=stmt.lhs.field} in
   return (
   PathMap.add scope 
   begin if PathMap.mem scope map then
@@ -74,9 +75,8 @@ let sort_impl map stmt =
 let stratify_payload map stmt =
   (* This should actually never fail, but the typechecker demands it *)
   Report.do_ ;
-  scope <-- stratify_ptr stmt.lhs ;
-  return (PathMap.add scope stmt.rhs map) 
-
+  strat <-- stratify_ptr stmt.lhs ;
+  return (PathMap.add (target strat) stmt.rhs map) 
 
 type progress_state = {
   last : Path.t ;

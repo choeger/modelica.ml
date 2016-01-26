@@ -216,7 +216,7 @@ let test_cases = [
      end A9"
     (Find.def_of (pol [cm "A9" ; fld "b"; fld "x"]) **> Is.class_value Normalized.Real) ;
 
-  signature
+(*  signature
     "Indirect Field Type Redeclaration"
     "class A10
        model B replaceable type T = Integer; T x; end B;
@@ -225,6 +225,7 @@ let test_cases = [
      end A10"
     (Compute.structural_type_of (pol [cm "A10" ; fld "c"; sup 0; fld "x"]) **> Is.struct_val **>
      {sv_desc=Normalized.SReal; sv_attr={Normalized.empty_attr with fa_sort = Some Type}} ) ;
+*)
   
   signature
     "Nested Redeclaration inside Component"
@@ -246,7 +247,7 @@ let test_cases = [
      end A12"
     (Find.def_of (pol [cm "A12"; cl "D"; cl "B"; cl "T"]) **> Is.class_value real);
 
-  (* Attempt to test a typical medium library pattern *)
+(*  (* Attempt to test a typical medium library pattern *)
   signature
     "Forwarding a Redeclaration into a Component (Media Library Pattern)"
     "package MiniMedium
@@ -261,7 +262,7 @@ let test_cases = [
        end SomeModel;
      end MiniMedium"
     (Compute.structural_type_of (pol [cm "MiniMedium"; cm "SomeModel"; fld "component"; cm "Medium"; cm "T"]) **>
-     Is.struct_val **> {sv_desc=Normalized.SReal; sv_attr={Normalized.empty_attr with fa_sort = Some Type}}) ;
+     Is.struct_val **> {sv_desc=Normalized.SReal; sv_attr={Normalized.empty_attr with fa_sort = Some Type}}) ;*)
   
 ]
 

@@ -140,8 +140,9 @@ let up_field state = ((), {state with current_field = match DQ.rear state.curren
 let bind_value rhs state =
   let rhs = apply_imports state.env rhs in
   let () = assert (DQ.size state.current_path > 0) in
-  let scope = txt_only state.current_path in      
-  ((), {state with value_code = {lhs = {scope; field = state.current_field}; rhs} :: state.value_code})
+  let scope = txt_only state.current_path in
+  let field = List.of_enum (Enum.map (fun ident -> {subscripts=[]; ident}) (DQ.enum (state.current_field))) in
+  ((), {state with value_code = {lhs = {scope; field}; rhs} :: state.value_code})
 
 let open_class sort post state = ((), {state with class_code =
                                                     {lhs = txt_only state.current_path ;

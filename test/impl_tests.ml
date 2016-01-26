@@ -45,7 +45,7 @@ let public = true
 let protected = false
 
 let test_cases = [
-  test_env "Empty class" "class A end A" [`ClassMember "A"] NormImpl.empty_env ;
+(*  test_env "Empty class" "class A end A" [`ClassMember "A"] NormImpl.empty_env ;
 
   test_env "Constant" "class A constant Real x = 42. ; end A" [`ClassMember "A"]
     {public_env=StrMap.of_list [("x", EnvField (const Real))]; protected_env=StrMap.empty} ;
@@ -75,7 +75,8 @@ let test_cases = [
     "class A constant Real x = 42.; class B end B; end A"
     [`ClassMember "A"; `ClassMember "B"] 
     [ empty_env; {empty_env with public_env = StrMap.of_list ["B", EnvClass b; "x", EnvField (const Real)]} ] ) ; 
-
+*)
+  
   test_norm "Normalize Simple Binding"
     "class A constant Real x = 42.; end A"
     [`ClassMember "A"] (Has.field public "x" (Is.bound_to (Real 42.))) ;

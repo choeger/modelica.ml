@@ -315,18 +315,9 @@ module P = struct
   end
   
   module Is = struct
-    let struct_val expected p =
-      assert_equal ~printer:show_struct_val expected p
-
     let path expected p =
       assert_equal ~cmp:Path.equal ~printer:Path.show expected p
 
-    let env expected env =
-      assert_equal ~printer:show_environment expected env
-
-    let lexical_env expected env =
-      assert_equal ~cmp:equal_lexical_env ~printer:show_lexical_env expected env
-        
     let rec valid_ctxt_for path = function
       [] -> assert_equal ~printer:Inter.Path.show DQ.empty path
       | ctxt::ctxts -> begin match DQ.rear path with
@@ -376,8 +367,6 @@ module P = struct
   end
 
   module Compute = struct
-    let structural_type_of p k public =
-      k (Normalized.eval_struct (DQ.snoc DQ.empty {up=None; tip={empty_object_struct with public}}) (GlobalReference p))
 
     let signature (k : elements_struct -> unit) td = 
       let parsed = {within = Some []; toplevel_defs = [td] } in
@@ -392,15 +381,6 @@ module P = struct
         (Modlib.Report.run (NormLib.norm_pkg_root (Trans.translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=empty_elements})
       in
       (Ensure.Report.has_no_messages **> Ensure.Report.result **> Is.ok **> (fun {NormLib.implementation} -> k implementation)) report
-
-    let env_of path k lib =
-        Find.def_of path (fun cl -> k (env lib cl)) lib
-
-      let lexical_ctxt_of path k lib =
-        k (lexical_ctxt lib path).ctxt_classes
-        
-      let lexical_env_of path k lib =
-        k (lexical_env lib path)
   end
   
   module Parse = struct
@@ -422,28 +402,8 @@ let nl = Location.mknoloc
 
 open P
 
-let test_env descr input classname expected =
-  descr >:: ( (Parse.as_typedef **> Compute.signature **> Compute.env_of (Path.of_list classname) **> (Is.env expected)) input)
-
-let test_ctxt descr input classname =
-  descr >:: (Parse.as_typedef **> Compute.signature **> Compute.lexical_ctxt_of (Path.of_list classname) **> (Is.valid_ctxt_for (Path.of_list classname))) input
-
-let test_lex_env descr input classname expected =
-  descr >:: (Parse.as_typedef **> Compute.signature **> Compute.lexical_env_of (Path.of_list classname) **> (Is.lexical_env expected)) input
+(*let test_env descr input classname expected =
+  descr >:: ( (Parse.as_typedef **> Compute.signature **> Compute.env_of (Path.of_list classname) **> (Is.env expected)) input)*)
 
 let test_norm descr input classname pred =
   descr >:: (Parse.as_typedef **> Compute.implementation **> Find.def_of (Path.of_list classname) **> pred) input
-
-let t = test_env "Empty class" "class A end A" [`ClassMember "A"] NormImpl.empty_env ;
-
-             (*
-
-
-let field = assert_fld
-
-let class_member = assert_cm
-
-    
-let modified_element = assert_modification 
-
-*)

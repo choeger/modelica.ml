@@ -29,7 +29,9 @@
 open Batteries
 open Utils
 open ModlibNormalized
-
+open ModlibLookup
+open Syntax
+    
 type level = Info | Warning | Error [@@deriving show]
 
 type 'a result = Ok of 'a | Failed
@@ -103,4 +105,12 @@ let fail_unresolved {searching; result} =
       what=Printf.sprintf "Dependency %s not evaluated:\n%s\n"
           (Name.show searching)
           (show_search_error result)} ;
+  fail
+
+let fail_lookup {lookup_error_state=state; lookup_error_todo=todo} =
+  do_ ;
+  log{level=Error;where=Location.none;
+      what=Printf.sprintf "Could not find %s in:\n%s\n"
+          (show_components todo)
+          (dump_lookup_state state)} ;
   fail

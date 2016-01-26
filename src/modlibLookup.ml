@@ -29,7 +29,6 @@
 open Batteries
 open Utils
 open Location
-open Report
 module Inter = ModlibInter
 module Normalized = ModlibNormalized
 open Inter
@@ -38,13 +37,17 @@ open Normalized
     
 exception EmptyName
 
-type history_entry_kind = [`ClassMember of string | `SuperClass of int]
+type history_entry_kind = [`ClassMember of string | `SuperClass of int] [@@deriving yojson]
 
-type history_entry_t = { entry_structure : object_struct; entry_kind : history_entry_kind}
+type history_entry_t = { entry_structure : object_struct; entry_kind : history_entry_kind} [@@deriving yojson]
 
-type trace_t = Path.t list
+let pp_history_entry_t fmt = function
+    { entry_structure ; entry_kind = `ClassMember x} -> Format.fprintf fmt "class %s = %a" x Path.pp entry_structure.source_path
+  | { entry_structure ; entry_kind = `SuperClass i} -> Format.fprintf fmt "super %d = %a" i Path.pp entry_structure.source_path
 
-type history_t = history_entry_t DQ.t
+type trace_t = Path.t DQ.t [@@deriving show,yojson]
+
+type history_t = history_entry_t DQ.t [@@deriving show,yojson]
 
 type lookup_state = {
   history : history_t; (** The visited classes *)
@@ -52,7 +55,26 @@ type lookup_state = {
   current_path : Path.t ; (** The path to the current class value *)
   current_attr : flat_attributes ;
   current_ref : Syntax.known_ref; (** The search request as a resolved component *)
-}
+} [@@deriving show,yojson]
+
+let dump_lookup_state {current_path} = Printf.sprintf "Last class: %s\n" (Path.show current_path)
+
+type lookup_success_struct = { lookup_success_state : lookup_state ;
+                               lookup_success_value : class_value ;
+                             } [@@deriving show,yojson]
+
+type lookup_error_struct = { lookup_error_state : lookup_state ;
+                             lookup_error_todo : component list }
+                           [@@deriving show,yojson]
+
+type lookup_recursion_struct = { lookup_recursion_term : rec_term ;
+                                 lookup_recursion_state : lookup_state ;
+                                 lookup_recursion_todo : component list } [@@deriving show,yojson]
+
+type lookup_result = Success of lookup_success_struct 
+                   | Recursion of lookup_recursion_struct
+                   | Error of lookup_error_struct
+  [@@deriving show,yojson]
 
 let path_of_history = DQ.map (fun {entry_kind} -> (entry_kind :> Path.elem_t)) 
 
@@ -80,47 +102,46 @@ let rec find_prefix (history, path) =
       | Some suffix -> (history, suffix)
     end
   | None -> raise (Failure "Fatal error, no root-scope found")
-  
+
+let append_to_history {history;current_path} os =
+  match DQ.rear current_path with
+    Some(_, `SuperClass i) -> DQ.snoc history {entry_structure=os; entry_kind=`SuperClass i}
+  | Some(_, `ClassMember x) -> DQ.snoc history {entry_structure=os; entry_kind=`ClassMember x}
+  | Some(_, x) -> raise (Failure ("Unexpected path element for object_struct: " ^ (Path.show_elem_t x)))
+  | None -> raise EmptyName
+                
 let rec get_class_element_in ({current_path; current_ref} as state) {Normalized.class_members; super; fields} x xs =
   if StrMap.mem x.ident.txt class_members then begin
     let current_path = (DQ.snoc current_path (`ClassMember x.ident.txt)) in
     let current_ref = DQ.snoc current_ref {kind = CK_Class; component=x} in
-    let r = get_class_element {state with current_path; current_ref} (StrMap.find x.ident.txt class_members).class_ xs in
-    match r with
-      `NothingFound -> (`PrefixFound {not_found=xs; found=current_path})      
-    | r -> r
+    get_class_element {state with current_path; current_ref} (StrMap.find x.ident.txt class_members).class_ xs
   end
   else if StrMap.mem x.ident.txt fields then begin
     let current_path = (DQ.snoc current_path (`FieldType x.ident.txt)) in
     let current_ref = DQ.snoc current_ref {Syntax.kind = CK_Continuous; component=x} in
-    let r = (get_class_element {state with current_path; current_ref} (StrMap.find x.ident.txt fields).field_class xs) in
-    match r with
-      `NothingFound -> (`PrefixFound {not_found=xs; found=current_path})      
-    | r -> r
+    get_class_element {state with current_path; current_ref} (StrMap.find x.ident.txt fields).field_class xs
   end
   else ( pickfirst_class state (x::xs) (IntMap.bindings super) )
 
 and get_class_element_os ({history; trace; current_path} as state) ({public;protected} as os) x xs =  
-  let history = match DQ.rear current_path with
-      Some(_, `SuperClass i) -> DQ.snoc history {entry_structure=os; entry_kind=`SuperClass i}
-    | Some(_, `ClassMember x) -> DQ.snoc history {entry_structure=os; entry_kind=`ClassMember x}
-    | Some(_, x) -> raise (Failure ("Unexpected path element for object_struct: " ^ (Path.show_elem_t x)))
-    | None -> raise EmptyName
-  in  
+  let history = append_to_history state os in  
   let f = get_class_element_in {state with history} public x xs in
   match f with
-    `NothingFound ->
+    Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
+    (* Nothing found, search protected section *)
     let current_path = DQ.snoc current_path `Protected in
     get_class_element_in {state with history; current_path} protected x xs
-  | _ as r -> r
+  | _ as r -> r (* Something found *)
 
 and pickfirst_class state name = function
-    [] -> `NothingFound
+    [] -> Error {lookup_error_state=state; lookup_error_todo=name}
   | (k,v)::vs ->
     let current_path = DQ.snoc state.current_path (`SuperClass k) in
     let f = get_class_element {state with current_path} v.class_ name in
     begin match f with
-        `NothingFound -> pickfirst_class state name vs
+        Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
+        (* Nothing found, search next superclass *)
+        pickfirst_class state name vs
       | r -> r
     end
 
@@ -143,19 +164,21 @@ and get_class_element ({history;trace;current_path} as state) e p =
   | Class os ->
     let state = finish_component state in
     begin match p with
-        [] -> `Found {found_value=e; found_path=state.current_path; found_ref=state.current_ref; found_visible=true; found_replaceable=false}
+        [] -> Success {lookup_success_value=e; lookup_success_state=state}
       | x::xs -> get_class_element_os state os x xs 
     end
 
   (* we might encounter recursive elements *)
-  | Recursive rec_term -> `Recursion {rec_term; search_state={found = current_path; not_found = p}}
+  | Recursive lookup_recursion_term -> Recursion {lookup_recursion_term;
+                                                  lookup_recursion_state=state;
+                                                  lookup_recursion_todo=p}
 
   (* follow global references through self to implement redeclarations *)
   | DynamicReference g | GlobalReference g ->
     let q = DQ.of_enum (Enum.filter (function (`FieldType _| `ClassMember _) -> true | _ -> false) (DQ.enum g)) in
 
     (* Append to trace, TODO: found_visible/found_replaceable *)
-    let trace = g::trace in
+    let trace = DQ.snoc trace g in
     (* History and suffix of searched path 
            i.e. path[last[h']] ++ q' == q
     *)
@@ -175,19 +198,28 @@ and get_class_element ({history;trace;current_path} as state) e p =
   (* Replaceable/Constr means to look into it *)
   | Replaceable v -> get_class_element state v p    
   | Constr {arg} -> get_class_element state arg p
-  | _ -> `NothingFound
+  | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
     
+exception EmptyScopeHistory
+                
+let lookup_in state = match DQ.rear state.history with
+    None -> raise EmptyScopeHistory
+  | Some(xs,x) -> get_class_element_os state x.entry_structure
+
+(** Create a lookup state from a normalized signature (i.e. root class) *)
+let state_of_lib lib =
+  {history = DQ.singleton {entry_structure = {empty_object_struct with public = lib}; entry_kind = `ClassMember ""};
+   trace = DQ.empty ;
+   current_ref = DQ.empty;
+   current_attr = no_attributes;
+   current_path = DQ.empty}  
 
 let lookup o p =
   let open Normalized in
+  let state = state_of_lib o in
   match p with
-    [] -> (`Found {found_value = Class {empty_object_struct with public = o}; found_path = DQ.empty; found_ref=DQ.empty; found_visible=true; found_replaceable=false}) ;
-  | x::xs ->
-    let state = {history = DQ.singleton {entry_structure = {empty_object_struct with public = o}; entry_kind = `ClassMember ""};
-                 trace = [] ;
-                 current_ref = DQ.empty;
-                 current_attr = no_attributes;
-                 current_path = DQ.empty}                  
-    in
-    get_class_element_in state o x xs
+    [] -> Success {lookup_success_value = Class {empty_object_struct with public = o};
+                   lookup_success_state = state} ;
+  | x::xs ->    
+    lookup_in state x xs
 

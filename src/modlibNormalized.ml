@@ -174,8 +174,7 @@ type prefix_found_struct = { found : class_path ; not_found : component list } [
 
 let show_prefix_found {found; not_found} = "No element named " ^ (show_components not_found) ^ " in " ^ (Name.show (Name.of_ptr found))
 
-type found_struct = { found_ref : known_ref ;
-                      found_path : class_path ;
+type found_struct = { found_path : class_path ;
                       found_value : class_value ;
                       found_visible : bool ;
                       found_replaceable : bool } [@@deriving show,yojson]
@@ -234,7 +233,7 @@ let rec follow_path global found_path found_value path = match DQ.front path wit
         Replaceable _ -> true
       | _ -> false
     in
-    `Found {found_path; found_value; found_ref=DQ.empty; found_visible=true; found_replaceable}
+    `Found {found_path; found_value; found_visible=true; found_replaceable}
 
   | Some (x,xs) -> begin
       match found_value with
@@ -286,3 +285,7 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
       (StrMap.find x class_members).class_ todo
 
   | `ClassMember x -> raise (IllegalPath x)
+
+let lookup_path_direct global p = match DQ.front p with
+    Some(x,xs) -> follow_path_es global DQ.empty global xs x
+  | None -> raise (Failure "empty path")

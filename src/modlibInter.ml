@@ -49,6 +49,12 @@ module Path = struct
   (** Path to a element in the global class hierarchy *)
   type t = elem_t DQ.t [@@deriving eq,ord,show,yojson]
 
+  let append = DQ.append
+
+  let snoc = DQ.snoc
+
+  let cons = DQ.cons
+  
   let empty : t = DQ.empty
 
   let of_list = DQ.of_list
@@ -91,7 +97,7 @@ type ('lhs, 'rhs) stmt = {lhs : 'lhs ; rhs : 'rhs} [@@deriving show,yojson]
 type class_stmt = (class_ptr, class_term) stmt [@@deriving show,yojson]
 
 (** Path to a term in the global hierarchy *)
-type value_ptr = { scope : class_ptr ; field : Syntax.str DQ.t } [@@deriving eq,show,yojson]
+type value_ptr = { scope : class_ptr ; field : Syntax.components } [@@deriving eq,show,yojson]
 
 (** Assignment of term in the global hierachy *)
 type value_stmt = (value_ptr, Syntax.exp) stmt [@@deriving show,yojson]
