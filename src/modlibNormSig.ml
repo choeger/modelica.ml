@@ -70,19 +70,22 @@ let rec stratify state next todo = match next with
       | None -> {lookup_result=state; protected=false; new_element = k}
     end
   | `Any x ->
+    BatLog.logf "Strat: %s . %s\n" (Path.show state.current_path) x ;
     match lookup_continue state {subscripts=[]; ident={txt=x;loc=Location.none}} [] with
       Success {lookup_success_state={current_path}} ->
       begin match DQ.rear current_path with
           None -> raise (IllegalPath "Found value with empty path.")
-        | Some(xs,x) ->
+        | Some(cs,c) ->
           begin match DQ.front todo with
               None ->
               (* This is the newly modified value *)
-              {lookup_result=state; protected=false; new_element=x}
+              {lookup_result=state; protected=false; new_element=c}
             | Some (y, ys) ->
               (* This is an intermediate modified value, must exist locally *)
-              assert (Path.equal xs state.current_path) ;
-              next_fwd state (DQ.singleton x) y ys
+              if (not (Path.equal cs state.current_path)) then
+                 BatLog.logf "Strat %s WARN: %s != %s\n" x (Path.show cs) (Path.show state.current_path) ;
+              assert (Path.equal cs state.current_path) ;
+              next_fwd state (DQ.singleton c) y ys
           end
       end
     | Error _ -> raise (Stratification (state.current_path, x))
@@ -206,18 +209,16 @@ and norm lhs =
 
   | KnownPtr p -> Report.do_ ;
     strat <-- stratify_ptr p ;
-    return (GlobalReference (target strat))
+    return (DynamicReference (target strat))
 
   | Reference n ->
     let components = List.map (fun ident -> {Syntax.ident;subscripts=[]}) n in
     begin match components with
         x::xs ->
         begin match lookup_lexical_in lhs.lookup_result x xs with
-          Success {lookup_success_state={trace}; lookup_success_value} ->
-          begin match DQ.front trace with
-            | Some (x,_) -> return (GlobalReference x)
-            | None -> return lookup_success_value
-          end
+          Success {lookup_success_state={current_path}; lookup_success_value} ->
+            let () = BatLog.logf "%s ==> %s\n" (Syntax.show_components components) (Path.show current_path) in
+            return (DynamicReference current_path)
         | Error err ->
           fail_lookup err
         | Recursion r -> norm_recursive r
@@ -263,8 +264,8 @@ let rec norm_prog i p =
     let {lhs=ptr;rhs} = p.(i) in
     Report.do_ ;
     lhs <-- stratify_ptr ptr ;
-    (*let () = BatLog.logf "stratified %s\n=  %s\n" (show_class_ptr ptr) (Path.show (target lhs)) in*)
     norm <-- norm lhs rhs;
+    let () = BatLog.logf "stratified %s\n=  %s\n:=  %s\n==  %s\n" (show_class_ptr ptr) (Path.show (target lhs)) (show_class_term rhs) (show_class_value norm) in
     let o' = update (target lhs) (norm_cv norm) o in
     set_output (o') ;
     norm_prog (i+1) p
@@ -303,7 +304,7 @@ let rec close_terms i p =
   else
     let {open_lhs;open_rhs} = p.(i) in
     Report.do_ ;
-    (*let () = BatLog.logf "Close [%d / %d] %s := %s\n" i (Array.length p) (show_class_path open_lhs) (show_class_term open_rhs.rec_rhs) in *)
+    (* let () = BatLog.logf "Close [%d / %d] %s := %s\n" i (Array.length p) (show_class_path open_lhs) (show_class_term open_rhs.rec_rhs) in *)
     lhs <-- stratify_ptr (open_lhs :> class_ptr) ;
     (* Continue normalization *)
     let r = {lookup_recursion_state = lhs.lookup_result ;

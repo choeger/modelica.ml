@@ -239,7 +239,7 @@ let rec follow_path global found_path found_value path = match DQ.front path wit
       match found_value with
       | Class os -> follow_path_os global found_path os xs x
       (* follow global references *)
-      | GlobalReference g -> begin
+      | DynamicReference g | GlobalReference g -> begin
           match DQ.front g with
             None -> raise (IllegalPath "")
           | Some (y,ys) -> begin 

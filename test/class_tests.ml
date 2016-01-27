@@ -195,7 +195,8 @@ let test_cases = [
          B b;
        end C;
        model D
-         extends C(b(redeclare type T = Real));
+         type S = Real;
+         extends C(b(redeclare type T = S));
        end D;
        D d;
      end A7"

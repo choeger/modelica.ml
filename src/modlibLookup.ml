@@ -36,6 +36,9 @@ open Syntax
 open Normalized
     
 exception EmptyName
+exception ExpansionException of string
+exception ForwardFailure of Path.elem_t
+exception EmptyScopeHistory
 
 type history_entry_kind = [`FieldType of string | `ClassMember of string | `SuperClass of int] [@@deriving yojson,show]
 
@@ -95,14 +98,14 @@ let rec find_prefix (history, path) =
     | _ -> history
   in
   match DQ.rear history with
-    Some (history, {entry_kind=`SuperClass _; entry_structure=os}) ->
+    Some (history', {entry_kind=`SuperClass _; entry_structure=os}) ->
     begin match ip os.source_path path with
-        None -> find_prefix (history, path)
+        None -> find_prefix (history', path)
       | Some suffix -> (drop_superclasses history, suffix)
     end
-  | Some (history, {entry_kind=`ClassMember _; entry_structure=os}) ->
+  | Some (history', {entry_kind=`ClassMember _; entry_structure=os}) ->
     begin match ip os.source_path path with
-        None -> find_prefix (history, path)
+        None -> find_prefix (history', path)
       | Some suffix -> (history, suffix)
     end
   | None -> raise (Failure "Fatal error, no root-scope found")
@@ -167,7 +170,7 @@ and get_class_element state (k:history_entry_kind) e p =
     | Some(xs, x) -> {state with current_ref = (DQ.snoc xs {x with kind=ck_of_var state.current_attr.fa_var})}
   in
   
-  match e with
+  let rec helper = function
   | Class os ->
     (*BatLog.logf "Looking in class: %s\n" (Path.show os.source_path) ;*)
     let state = finish_component state in
@@ -183,8 +186,9 @@ and get_class_element state (k:history_entry_kind) e p =
                                                   lookup_recursion_state=state;
                                                   lookup_recursion_todo=p}
 
-  (* follow global references through self to implement redeclarations *)
+    (* follow global references through self to implement redeclarations *)
   | DynamicReference g | GlobalReference g ->
+    BatLog.logf "Continuing lookup in %s\n" (Path.show g) ;
     let q = DQ.of_enum (Enum.filter (function (`FieldType _| `ClassMember _) -> true | _ -> false) (DQ.enum g)) in
 
     (* Append to trace, TODO: found_visible/found_replaceable *)
@@ -193,33 +197,42 @@ and get_class_element state (k:history_entry_kind) e p =
            i.e. path[last[h']] ++ q' == q
     *)
     let (history, q') = find_prefix (state.history, q) in
+    BatLog.logf "Suffix %s\n" (Path.show q') ;
         
     (* Create the new search task *)
-    let new_prefix = Enum.filter_map (function (`ClassMember x | `FieldType x) -> Some {ident={txt=x;loc=none};subscripts=[]} | _ -> None) (DQ.enum q') in    
-    let p' = List.of_enum (Enum.append new_prefix (List.enum p)) in
+    let new_p = List.of_enum (Enum.filter_map (function (`ClassMember x | `FieldType x) -> Some {ident={txt=x;loc=none};subscripts=[]} | _ -> None) (DQ.enum q')) in    
     let current_path = path_of_history history in
-    let state = finish_component {state with current_path;history;trace} in
-    begin match DQ.rear history with
-        Some(_, {entry_structure}) ->
-            begin match p with
-              x::xs ->
-              get_class_element_os state entry_structure x xs
-            | [] -> Success {lookup_success_state=state; lookup_success_value=Class entry_structure}
-          end
-      | None -> raise (Failure "history not setup properly. First element (root) needs to have empty source path!")
-        end
-
+    let new_state = {state with current_path;history;trace} in
+    begin match lookup_continue_or_yield new_state new_p with
+        Success {lookup_success_value} -> helper lookup_success_value
+      | r -> r
+    end
+    
   (* Replaceable/Constr means to look into it *)
-  | Replaceable v -> get_class_element state k v p    
-  | Constr {arg} -> get_class_element state k arg p
+  | Replaceable v -> helper v    
+  | Constr {arg} -> helper arg
   | v -> begin match p with
         [] -> Success {lookup_success_state=finish_component state; lookup_success_value=v}
       | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
-    end    
+    end
+  in
+  helper e
 
-exception ExpansionException of string
-exception ForwardFailure of Path.elem_t
-exception EmptyScopeHistory
+(** Start lookup with the given state *)
+and lookup_continue state x xs =
+  match DQ.rear state.history with
+    None -> raise EmptyScopeHistory
+  | Some(ys,y) ->
+    get_class_element_os state y.entry_structure x xs
+
+and lookup_continue_or_yield state = function
+    [] ->
+    begin match DQ.rear state.history with
+        None -> raise EmptyScopeHistory
+      | Some(_,y) ->
+        Success {lookup_success_state=state; lookup_success_value=Class y.entry_structure}
+    end
+    | x::xs -> lookup_continue state x xs
 
 let rec forward state k c (todo:Path.t) =
   let current_path = DQ.snoc state.current_path (k :> Path.elem_t) in
@@ -267,13 +280,6 @@ let forward_state state todo =
     None -> raise EmptyScopeHistory
   | Some(_,y) ->
     forward_os state y.entry_structure todo
-
-(** Start lookup with the given state *)
-let rec lookup_continue state x xs =
-  match DQ.rear state.history with
-    None -> raise EmptyScopeHistory
-  | Some(ys,y) ->
-    get_class_element_os state y.entry_structure x xs
 
 (** Start lookup with the given state, follow lexical scoping rules *)
 let rec lookup_lexical_in state x xs =
