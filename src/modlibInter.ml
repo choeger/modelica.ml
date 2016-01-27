@@ -55,6 +55,10 @@ module Path = struct
 
   let cons = DQ.cons
   
+  let rear = DQ.rear
+
+  let front = DQ.front
+  
   let empty : t = DQ.empty
 
   let of_list = DQ.of_list

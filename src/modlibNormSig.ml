@@ -67,11 +67,11 @@ let stratify_non_existing state todo =
   in
   strat_ne {lookup_result=state; non_existing=Path.empty} todo
     
-let rec stratify state c (todo:class_ptr) =
+let rec stratify state k c (todo:class_ptr) =
   match DQ.front todo with
     None -> {lookup_result = state; non_existing=Path.empty}
   | Some(`Any x,xs) ->
-    begin match get_class_element state c [{ident={txt=x;loc=Location.none};subscripts=[]}] with
+    begin match get_class_element state k c [{ident={txt=x;loc=Location.none};subscripts=[]}] with
         Success {lookup_success_state; lookup_success_value} ->
         stratify_continue lookup_success_state lookup_success_value xs
       | _ -> raise (Stratification (state.current_path, x))
@@ -80,7 +80,7 @@ let rec stratify state c (todo:class_ptr) =
   | Some(`Protected, xs) -> 
     begin match c with
         Class ({protected} as os) ->
-        let history = append_to_history state os in
+        let history = append_to_history state k os in
         let current_path = DQ.snoc state.current_path `Protected in
         stratify_elements {state with history; current_path} protected xs
       | _ -> raise (ExpansionException "expected a class")
@@ -88,28 +88,32 @@ let rec stratify state c (todo:class_ptr) =
   | Some(x,xs) ->
     begin match c with
         Class ({public} as os) ->
-        let history = append_to_history state os in
+        let history = append_to_history state k os in
         stratify_elements {state with history} public todo
       | _ -> raise (ExpansionException "expected a class")
     end
 
 and stratify_continue state found_value todo =
-  stratify state found_value todo
+  match Path.rear state.current_path with
+    None -> raise (Failure "Lookup of component yielded empty path")
+  | Some(_,`Protected) -> raise (Failure "Lookup of component yielded path ending with `Protected")
+  | Some(_,(`ClassMember _ | `FieldType _ | `SuperClass _ as k)) ->
+    stratify state k found_value todo
   
 and stratify_elements state ({class_members; super; fields} as es) (todo:class_ptr) =
   match DQ.front todo with
   | None -> {lookup_result = state; non_existing=Path.empty}
   | Some(`FieldType x, xs) when StrMap.mem x fields ->
     let current_path = DQ.snoc state.current_path (`FieldType x) in    
-    stratify {state with current_path} (StrMap.find x fields).field_class xs
+    stratify {state with current_path} (`FieldType x) (StrMap.find x fields).field_class xs
       
   | Some(`ClassMember x, xs) when StrMap.mem x class_members ->
     let current_path = DQ.snoc state.current_path (`ClassMember x) in    
-    stratify {state with current_path} (StrMap.find x class_members).class_ xs
+    stratify {state with current_path} (`ClassMember x) (StrMap.find x class_members).class_ xs
       
   | Some(`SuperClass i, xs) when IntMap.mem i super ->
     let current_path = DQ.snoc state.current_path (`SuperClass i) in    
-    stratify {state with current_path} (IntMap.find i super).class_  xs
+    stratify {state with current_path} (`SuperClass i) (IntMap.find i super).class_  xs
 
   | Some (`Protected, xs) -> raise (IllegalPath "protected")
 
@@ -135,7 +139,7 @@ let rec norm_recursive {lookup_recursion_term = rec_term;
                         lookup_recursion_todo} =  
   (* BatLog.logf "Recursively unfolding %s\n" (show_class_term rec_term.rec_rhs) ; *)
   match DQ.rear rec_term.rec_lhs with
-    Some (xs,x) ->
+    Some (xs, (`ClassMember _ | `FieldType _ | `SuperClass _ as k)) ->
     Report.do_ ;                                                  
     (* Unfold the recursive value one level *)
     parent <-- stratify_ptr (xs :> class_ptr) ;
@@ -144,7 +148,7 @@ let rec norm_recursive {lookup_recursion_term = rec_term;
     set_output (update rec_term.rec_lhs n o) ;
 
     (* Lookup in the result of the unfolding *)
-    begin match get_class_element lookup_recursion_state n lookup_recursion_todo with
+    begin match get_class_element lookup_recursion_state k n lookup_recursion_todo with
         Success {lookup_success_value} -> return lookup_success_value
       | Error result -> fail_lookup result
       | Recursion r -> norm_recursive r
@@ -234,7 +238,8 @@ and norm lhs =
   | Reference n ->
     let components = List.map (fun ident -> {Syntax.ident;subscripts=[]}) n in
     begin match components with
-      x::xs ->
+        x::xs ->
+        BatLog.logf "lexical lookup. Found path is: %s\n" (Path.show lhs.lookup_result.current_path) ;
       begin match lookup_lexical_in lhs.lookup_result x xs with
           Success {lookup_success_state={trace}; lookup_success_value} ->
           begin match DQ.front trace with

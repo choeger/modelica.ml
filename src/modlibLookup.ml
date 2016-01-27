@@ -37,7 +37,7 @@ open Normalized
     
 exception EmptyName
 
-type history_entry_kind = [`ClassMember of string | `SuperClass of int] [@@deriving yojson]
+type history_entry_kind = [`FieldType of string | `ClassMember of string | `SuperClass of int] [@@deriving yojson]
 
 type history_entry_t = { entry_structure : object_struct; entry_kind : history_entry_kind} [@@deriving yojson]
 
@@ -107,41 +107,33 @@ let rec find_prefix (history, path) =
     end
   | None -> raise (Failure "Fatal error, no root-scope found")
 
-let append_to_history {history;current_path} os =
-  match DQ.rear current_path with
-    Some(_, `SuperClass i) -> DQ.snoc history {entry_structure=os; entry_kind=`SuperClass i}
-  | Some(_, `ClassMember x) -> DQ.snoc history {entry_structure=os; entry_kind=`ClassMember x}
-  | Some(_, x) -> raise (Failure ("Unexpected path element for object_struct: " ^ (Path.show_elem_t x)))
-  | None -> raise EmptyName
+let append_to_history {history;current_path} entry_kind os =
+  DQ.snoc history {entry_structure=os; entry_kind}
                 
-let rec get_class_element_in ({current_path; current_ref} as state) {Normalized.class_members; super; fields} x xs =
+let rec get_class_element_in state {Normalized.class_members; super; fields} x xs =  
   if StrMap.mem x.ident.txt class_members then begin
-    let current_path = (DQ.snoc current_path (`ClassMember x.ident.txt)) in
-    let current_ref = DQ.snoc current_ref {kind = CK_Class; component=x} in
-    get_class_element {state with current_path; current_ref} (StrMap.find x.ident.txt class_members).class_ xs
+    let current_ref = DQ.snoc state.current_ref {kind = CK_Class; component=x} in
+    get_class_element {state with current_ref} (`ClassMember x.ident.txt) (StrMap.find x.ident.txt class_members).class_ xs
   end
   else if StrMap.mem x.ident.txt fields then begin
-    let current_path = (DQ.snoc current_path (`FieldType x.ident.txt)) in
-    let current_ref = DQ.snoc current_ref {Syntax.kind = CK_Continuous; component=x} in
-    get_class_element {state with current_path; current_ref} (StrMap.find x.ident.txt fields).field_class xs
+    let current_ref = DQ.snoc state.current_ref {Syntax.kind = CK_Continuous; component=x} in
+    get_class_element {state with current_ref} (`FieldType x.ident.txt) (StrMap.find x.ident.txt fields).field_class xs
   end
-  else ( pickfirst_class state (x::xs) (IntMap.bindings super) )
+  else (pickfirst_class state (x::xs) (IntMap.bindings super) )
 
-and get_class_element_os ({history; trace; current_path} as state) ({public;protected} as os) x xs =  
-  let history = append_to_history state os in  
-  let f = get_class_element_in {state with history} public x xs in
+and get_class_element_os state ({public;protected} as os) x xs =  
+  let f = get_class_element_in state public x xs in
   match f with
     Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
     (* Nothing found, search protected section *)
-    let current_path = DQ.snoc current_path `Protected in
-    get_class_element_in {state with history; current_path} protected x xs
+    let current_path = DQ.snoc state.current_path `Protected in
+    get_class_element_in {state with current_path} protected x xs
   | _ as r -> r (* Something found *)
 
 and pickfirst_class state name = function
     [] -> Error {lookup_error_state=state; lookup_error_todo=name}
   | (k,v)::vs ->
-    let current_path = DQ.snoc state.current_path (`SuperClass k) in
-    let f = get_class_element {state with current_path} v.class_ name in
+    let f = get_class_element state (`SuperClass k) v.class_ name in
     begin match f with
         Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
         (* Nothing found, search next superclass *)
@@ -149,19 +141,25 @@ and pickfirst_class state name = function
       | r -> r
     end
 
-and get_class_element ({history;trace;current_path} as state) e p =
+(**
+  $state : lookup state 
+  $k : kind of this class value
+  $p : components todo
+*)
+and get_class_element state (k:history_entry_kind) e p =
   let open Normalized in 
+  let current_path = Path.snoc state.current_path (k :> Path.elem_t) in
+  let state = {state with current_path} in
 
   let ck_of_var = 
     let open Flags in
     function None -> CK_Continuous | Some Constant -> CK_Constant | Some Parameter -> CK_Parameter | Some Discrete -> CK_Discrete
   in
   
-  let finish_component state = match DQ.rear state.current_ref with
+  let finish_component state = match DQ.rear state.current_ref with    
     (* update last component reference with collected flat attribute *)
       None | Some (_,{kind=CK_Class}) -> {state with current_attr = no_attributes}
-    | Some(xs, x) -> {state with current_ref = (DQ.snoc xs {x with kind=ck_of_var state.current_attr.fa_var});
-                                 current_attr = no_attributes}
+    | Some(xs, x) -> {state with current_ref = (DQ.snoc xs {x with kind=ck_of_var state.current_attr.fa_var})}
   in
   
   match e with
@@ -169,7 +167,9 @@ and get_class_element ({history;trace;current_path} as state) e p =
     let state = finish_component state in
     begin match p with
         [] -> Success {lookup_success_value=e; lookup_success_state=state}
-      | x::xs -> get_class_element_os state os x xs 
+      | x::xs ->
+        let history = append_to_history state k os in
+        get_class_element_os {state with history; current_path} os x xs 
     end
 
   (* we might encounter recursive elements *)
@@ -182,28 +182,32 @@ and get_class_element ({history;trace;current_path} as state) e p =
     let q = DQ.of_enum (Enum.filter (function (`FieldType _| `ClassMember _) -> true | _ -> false) (DQ.enum g)) in
 
     (* Append to trace, TODO: found_visible/found_replaceable *)
-    let trace = DQ.snoc trace g in
+    let trace = DQ.snoc state.trace g in
     (* History and suffix of searched path 
            i.e. path[last[h']] ++ q' == q
     *)
-    let (history', q') = find_prefix (history, q) in
+    let (history, q') = find_prefix (state.history, q) in
         
     (* Create the new search task *)
     let new_prefix = Enum.filter_map (function (`ClassMember x | `FieldType x) -> Some {ident={txt=x;loc=none};subscripts=[]} | _ -> None) (DQ.enum q') in    
     let p' = List.of_enum (Enum.append new_prefix (List.enum p)) in
-
-    let current_path = path_of_history history' in
-    begin match DQ.rear history' with
-      Some(history, {entry_structure}) ->
-      get_class_element {state with current_path;history;trace} (Class entry_structure) p
-    | None -> raise (Failure "history not setup properly. First element (root) needs to have empty source path!")
-    end
+    let current_path = path_of_history history in
+    let state = finish_component {state with current_path;history;trace} in
+    begin match DQ.rear history with
+        Some(_, {entry_structure}) ->
+            begin match p with
+              x::xs ->
+              get_class_element_os state entry_structure x xs
+            | [] -> Success {lookup_success_state=state; lookup_success_value=Class entry_structure}
+          end
+      | None -> raise (Failure "history not setup properly. First element (root) needs to have empty source path!")
+        end
 
   (* Replaceable/Constr means to look into it *)
-  | Replaceable v -> get_class_element state v p    
-  | Constr {arg} -> get_class_element state arg p
+  | Replaceable v -> get_class_element state k v p    
+  | Constr {arg} -> get_class_element state k arg p
   | v -> begin match p with
-        [] -> Success {lookup_success_state=state; lookup_success_value=v}
+        [] -> Success {lookup_success_state=finish_component state; lookup_success_value=v}
       | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
     end    
     
@@ -213,7 +217,9 @@ exception EmptyScopeHistory
 let rec lookup_lexical_in state x xs =
   match DQ.rear state.history with
     None -> raise EmptyScopeHistory
-  | Some(ys,y) -> match get_class_element_os state y.entry_structure x xs with
+  | Some(ys,y) ->
+    BatLog.logf "Trying: %s\n" (Path.show state.current_path) ;
+    match get_class_element_os state y.entry_structure x xs with
       Error {lookup_error_state={current_ref}} when current_ref==state.current_ref ->
       (* Found nothing, climb up scope *)
       lookup_lexical_in {history = ys;
