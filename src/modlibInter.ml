@@ -64,6 +64,8 @@ module Path = struct
   let of_list = DQ.of_list
   
   let singleton : elem_t -> t = DQ.singleton
+
+  let size = DQ.size
   
   let cm x = `ClassMember x
 end

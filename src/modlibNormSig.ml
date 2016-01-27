@@ -45,91 +45,67 @@ open Lookup
 open Compress
 open Deps
 
-exception ExpansionException of string
 exception NonLeafRecursion
-exception Stratification of class_path * string
+exception Stratification of Path.t * string
 
 (** 
    A stratification result holds the last valid context of the existing prefix and the non existing suffix of the stratified path 
 *)
-type stratification_result = { lookup_result : lookup_state; non_existing : Path.t }
+type stratification_result = { lookup_result : lookup_state; protected : bool ; new_element : Path.elem_t }
 
 (** The target of a stratified path *)
-let target { lookup_result; non_existing} = Path.append lookup_result.current_path non_existing
-
-let stratify_non_existing state todo =
-  let rec strat_ne sr todo = match DQ.front todo with
-      None -> sr
-    (** Cannot distinguish an ambigous reference that does not exist yet *)
-    | Some(`Any x, _) -> raise (Stratification (Path.append sr.lookup_result.current_path sr.non_existing, x))
-    | Some((`Protected | `ClassMember _ | `FieldType _ | `SuperClass _ ) as x, xs) ->
-      strat_ne {sr with non_existing = (Path.snoc sr.non_existing x)} xs
+let target { lookup_result; protected; new_element} =
+  let parent =
+  if protected then
+    (Path.snoc lookup_result.current_path `Protected)
+  else
+    lookup_result.current_path
   in
-  strat_ne {lookup_result=state; non_existing=Path.empty} todo
-    
-let rec stratify state k c (todo:class_ptr) =
-  match DQ.front todo with
-    None -> {lookup_result = state; non_existing=Path.empty}
-  | Some(`Any x,xs) ->
-    begin match get_class_element state k c [{ident={txt=x;loc=Location.none};subscripts=[]}] with
-        Success {lookup_success_state; lookup_success_value} ->
-        stratify_continue lookup_success_state lookup_success_value xs
-      | _ -> raise (Stratification (state.current_path, x))
+  Path.snoc parent new_element
+
+let rec stratify state next todo = match next with
+    (`ClassMember _ | `FieldType _ | `SuperClass _ | `Protected) as k ->
+    begin match DQ.front todo with
+        Some (x, xs) -> next_fwd state (DQ.singleton (k :> Path.elem_t)) x xs
+      | None -> {lookup_result=state; protected=false; new_element = k}
     end
+  | `Any x ->
+    match lookup_continue state {subscripts=[]; ident={txt=x;loc=Location.none}} [] with
+      Success {lookup_success_state={current_path}} ->
+      begin match DQ.rear current_path with
+          None -> raise (IllegalPath "Found value with empty path.")
+        | Some(xs,x) ->
+          begin match DQ.front todo with
+              None ->
+              (* This is the newly modified value *)
+              {lookup_result=state; protected=false; new_element=x}
+            | Some (y, ys) ->
+              (* This is an intermediate modified value, must exist locally *)
+              assert (Path.equal xs state.current_path) ;
+              next_fwd state (DQ.singleton x) y ys
+          end
+      end
+    | Error _ -> raise (Stratification (state.current_path, x))
 
-  | Some(`Protected, xs) -> 
-    begin match c with
-        Class ({protected} as os) ->
-        let history = append_to_history state k os in
-        let current_path = DQ.snoc state.current_path `Protected in
-        stratify_elements {state with history; current_path} protected xs
-      | _ -> raise (ExpansionException "expected a class")
-    end
-  | Some(x,xs) ->
-    begin match c with
-        Class ({public} as os) ->
-        let history = append_to_history state k os in
-        stratify_elements {state with history} public todo
-      | _ -> raise (ExpansionException "expected a class")
-    end
-
-and stratify_continue state found_value todo =
-  match Path.rear state.current_path with
-    None -> raise (Failure "Lookup of component yielded empty path")
-  | Some(_,`Protected) -> raise (Failure "Lookup of component yielded path ending with `Protected")
-  | Some(_,(`ClassMember _ | `FieldType _ | `SuperClass _ as k)) ->
-    stratify state k found_value todo
-  
-and stratify_elements state ({class_members; super; fields} as es) (todo:class_ptr) =
-  match DQ.front todo with
-  | None -> {lookup_result = state; non_existing=Path.empty}
-  | Some(`FieldType x, xs) when StrMap.mem x fields ->
-    let current_path = DQ.snoc state.current_path (`FieldType x) in    
-    stratify {state with current_path} (`FieldType x) (StrMap.find x fields).field_class xs
-      
-  | Some(`ClassMember x, xs) when StrMap.mem x class_members ->
-    let current_path = DQ.snoc state.current_path (`ClassMember x) in    
-    stratify {state with current_path} (`ClassMember x) (StrMap.find x class_members).class_ xs
-      
-  | Some(`SuperClass i, xs) when IntMap.mem i super ->
-    let current_path = DQ.snoc state.current_path (`SuperClass i) in    
-    stratify {state with current_path} (`SuperClass i) (IntMap.find i super).class_  xs
-
-  | Some (`Protected, xs) -> raise (IllegalPath "protected")
-
-  | Some (_, _) -> stratify_non_existing state todo
-
-  | Some(`Any x, xs) ->
-    begin match get_class_element_in state es {subscripts=[]; ident={txt=x;loc=Location.none}} [] with
-        Success {lookup_success_state; lookup_success_value} ->
-        stratify_continue lookup_success_state lookup_success_value xs
-      | _ -> raise (Stratification (state.current_path, x))
+and next_fwd state fwd next todo = match next with
+    `Any x -> stratify (forward_state state fwd) (`Any x) todo
+  | (`ClassMember _ | `FieldType _ | `SuperClass _ | `Protected) as k ->
+    begin match DQ.front todo with
+        Some (x, xs) -> next_fwd state (DQ.snoc fwd (k :> Path.elem_t)) x xs
+      | None ->
+        begin match DQ.rear fwd with          
+            Some(fwd, `Protected) -> 
+            {lookup_result=forward_state state fwd; protected=true; new_element = (k :> Path.elem_t)}
+          | _ -> 
+            {lookup_result=forward_state state fwd; protected=false; new_element = (k :> Path.elem_t)}
+        end
     end
 
 let stratify_ptr ptr =
   Report.do_ ;
   o <-- output ;
-  try return (stratify_elements (state_of_lib o) o ptr) with
+  match DQ.front ptr with None -> raise EmptyName | Some(x,xs) ->
+  try return (stratify (state_of_lib o) x xs) with
   | Stratification (found, not_found) ->
     Report.do_ ;
     log{level=Error;where=none;what=Printf.sprintf "Stratification error: No element %s in %s" not_found (show_class_path found)}; fail
@@ -138,13 +114,14 @@ let rec norm_recursive {lookup_recursion_term = rec_term;
                         lookup_recursion_state;
                         lookup_recursion_todo} =  
   (* BatLog.logf "Recursively unfolding %s\n" (show_class_term rec_term.rec_rhs) ; *)
-  match DQ.rear rec_term.rec_lhs with
+  match Path.rear rec_term.rec_lhs with
     Some (xs, (`ClassMember _ | `FieldType _ | `SuperClass _ as k)) ->
     Report.do_ ;                                                  
     (* Unfold the recursive value one level *)
-    parent <-- stratify_ptr (xs :> class_ptr) ;
     o <-- output ;
-    n <-- norm parent rec_term.rec_rhs ;
+    let lookup_result = forward_state (state_of_lib o) xs in
+    let protected = match Path.rear xs with Some(_, `Protected) -> true | _ -> false in
+    n <-- norm {lookup_result; protected; new_element=k} rec_term.rec_rhs ;
     set_output (update rec_term.rec_lhs n o) ;
 
     (* Lookup in the result of the unfolding *)
@@ -167,8 +144,7 @@ and norm lhs =
 
   | Close ->
     Report.do_ ; o <-- output ;
-    let () = assert (lhs.non_existing = Path.empty) in
-    begin match lookup_path_direct o lhs.lookup_result.current_path with
+    begin match lookup_path_direct o (target lhs) with
         `Found {found_value} -> return found_value
       | `Recursion _ ->
         BatLog.logf "Internal error. Trying to close a recursive element.\n";
@@ -179,41 +155,38 @@ and norm lhs =
     end
 
   | RedeclareExtends ->
-    let () = assert (lhs.non_existing = Path.empty) in
     begin match DQ.rear lhs.lookup_result.history with
-        Some (redeclared, {entry_structure; entry_kind=`SuperClass _}) ->
-        begin match DQ.rear redeclared with
-          (* redeclared is the class containing the virtual extends statement *)
-            Some(enclosing, {entry_kind=`ClassMember x}) -> begin match DQ.rear enclosing with
-              (* enclosing is the class containing the replaceable *)
-                Some(history, {entry_structure=os; entry_kind}) ->
-                (* Go back in scope *)
-                let state =
-                  {history;
-                   trace = DQ.empty ; current_ref = DQ.empty; current_attr = no_attributes;
-                   current_path = path_of_history enclosing}  in
-                (* Create a virtual lookup target by removing all elements *)
-                let base_only = {os with public = {empty_elements with super = os.public.super};
-                                         protected = {empty_elements with super = os.protected.super}} in
-                begin
-                match get_class_element_os state base_only {ident={txt=x; loc=Location.none};subscripts=[]} [] with
-                    Success {lookup_success_value} -> return lookup_success_value
+      (* redeclared is the class containing the virtual extends statement *)
+        Some(history, {entry_kind=(`FieldType x | `ClassMember x); entry_structure=redeclared}) ->
+        begin match DQ.rear history with
+          (* tip of history is enclosing class containing the replaceable *)
+            Some(_, {entry_structure=os; entry_kind}) ->
+            (* Go back in scope *)
+            let state =
+              {history;
+               trace = DQ.empty ; current_ref = DQ.empty; current_attr = no_attributes;
+               current_path = path_of_history history}  in
+            (* Create a virtual lookup target by removing all elements *)
+            let base_only = {os with public = {empty_elements with super = os.public.super};
+                                     protected = {empty_elements with super = os.protected.super}} in
+            begin
+              match get_class_element_os state base_only {ident={txt=x; loc=Location.none};subscripts=[]} [] with
+                Success {lookup_success_value} -> return lookup_success_value
+                                                    
+              | Recursion _ -> Report.do_ ;
+                log{where=none;level=Error;what="Trying to extend from recursive element."};
+                fail
 
-                  | Recursion _ -> Report.do_ ;
-                    log{where=none;level=Error;what="Trying to extend from recursive element."};
-                    fail
-
-                  | Error result ->
-                    Report.do_ ;
-                    log{where=none;level=Error;
-                        what=Printf.sprintf "Could not find redeclared base class %s\n" x};
-                    fail_lookup result
-                end
-              | _ -> BatLog.logf "Illegal redeclare extends\n"; fail
+              | Error result ->
+                Report.do_ ;
+                log{where=none;level=Error;
+                    what=Printf.sprintf "Could not find redeclared base class %s\n" x};
+                fail_lookup result
             end
           | _ -> BatLog.logf "Illegal redeclare extends\n"; fail
         end
-      | _ -> BatLog.logf "Illegal redeclare extends\n"; fail
+      | None -> BatLog.logf "Illegal redeclare extends: No enclosing class found."; fail
+      | Some (xs,x) -> BatLog.logf "Illegal redeclare extends: Enclosing is: '%s'\n" (show_history_entry_kind x.entry_kind) ; fail
     end
 
   | RootReference r ->
@@ -239,8 +212,7 @@ and norm lhs =
     let components = List.map (fun ident -> {Syntax.ident;subscripts=[]}) n in
     begin match components with
         x::xs ->
-        BatLog.logf "lexical lookup. Found path is: %s\n" (Path.show lhs.lookup_result.current_path) ;
-      begin match lookup_lexical_in lhs.lookup_result x xs with
+        begin match lookup_lexical_in lhs.lookup_result x xs with
           Success {lookup_success_state={trace}; lookup_success_value} ->
           begin match DQ.front trace with
             | Some (x,_) -> return (GlobalReference x)
@@ -288,9 +260,10 @@ let rec norm_prog i p =
   o <-- output;
   if i >= Array.length p then return o
   else
-    let {lhs;rhs} = p.(i) in
+    let {lhs=ptr;rhs} = p.(i) in
     Report.do_ ;
-    lhs <-- stratify_ptr lhs ;
+    lhs <-- stratify_ptr ptr ;
+    (*let () = BatLog.logf "stratified %s\n=  %s\n" (show_class_ptr ptr) (Path.show (target lhs)) in*)
     norm <-- norm lhs rhs;
     let o' = update (target lhs) (norm_cv norm) o in
     set_output (o') ;

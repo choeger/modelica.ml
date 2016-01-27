@@ -37,7 +37,7 @@ open Normalized
     
 exception EmptyName
 
-type history_entry_kind = [`FieldType of string | `ClassMember of string | `SuperClass of int] [@@deriving yojson]
+type history_entry_kind = [`FieldType of string | `ClassMember of string | `SuperClass of int] [@@deriving yojson,show]
 
 type history_entry_t = { entry_structure : object_struct; entry_kind : history_entry_kind} [@@deriving yojson]
 
@@ -119,9 +119,13 @@ let rec get_class_element_in state {Normalized.class_members; super; fields} x x
     let current_ref = DQ.snoc state.current_ref {Syntax.kind = CK_Continuous; component=x} in
     get_class_element {state with current_ref} (`FieldType x.ident.txt) (StrMap.find x.ident.txt fields).field_class xs
   end
-  else (pickfirst_class state (x::xs) (IntMap.bindings super) )
-
-and get_class_element_os state ({public;protected} as os) x xs =  
+  else begin
+    (*BatLog.logf "Looking in %d superclasses for %s\n" (IntMap.cardinal super) x.ident.txt ;*)
+    (pickfirst_class state (x::xs) (IntMap.bindings super) )
+  end
+  
+and get_class_element_os state ({public;protected} as os) x xs =
+  (*BatLog.logf "Looking in: %s\n" (Path.show os.source_path) ;*)
   let f = get_class_element_in state public x xs in
   match f with
     Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
@@ -133,6 +137,7 @@ and get_class_element_os state ({public;protected} as os) x xs =
 and pickfirst_class state name = function
     [] -> Error {lookup_error_state=state; lookup_error_todo=name}
   | (k,v)::vs ->
+    (*BatLog.logf "Superclass %d = %s\n" k (show_class_value v.class_) ;*)
     let f = get_class_element state (`SuperClass k) v.class_ name in
     begin match f with
         Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
@@ -164,6 +169,7 @@ and get_class_element state (k:history_entry_kind) e p =
   
   match e with
   | Class os ->
+    (*BatLog.logf "Looking in class: %s\n" (Path.show os.source_path) ;*)
     let state = finish_component state in
     begin match p with
         [] -> Success {lookup_success_value=e; lookup_success_state=state}
@@ -210,15 +216,70 @@ and get_class_element state (k:history_entry_kind) e p =
         [] -> Success {lookup_success_state=finish_component state; lookup_success_value=v}
       | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
     end    
-    
+
+exception ExpansionException of string
+exception ForwardFailure of Path.elem_t
 exception EmptyScopeHistory
+
+let rec forward state k c (todo:Path.t) =
+  let current_path = DQ.snoc state.current_path (k :> Path.elem_t) in
+  let state = {state with current_path} in
+  match c with
+  (* always append history, even if todo is empty *)
+    Class (os) ->
+    let history = append_to_history state k os in
+    forward_os {state with history} os todo
+  | _ -> begin
+      match DQ.front todo with
+        None -> state
+      | Some(x,xs) ->
+        raise (ExpansionException "expected a class")
+    end
+
+and forward_os state {public;protected} todo =
+  match DQ.front todo with
+    None -> state
+  | Some(`Protected, xs) -> forward_elements
+                              {state with current_path = Path.snoc state.current_path `Protected} protected xs
+  | _ -> forward_elements state public todo
+
+and forward_elements state ({class_members; super; fields} as es) (todo:Path.t) =
+  match DQ.front todo with
+  | None -> raise (ExpansionException "Unexpected end-of-path")
+  | Some(`FieldType x, xs) when StrMap.mem x fields ->
+    forward state (`FieldType x) (StrMap.find x fields).field_class xs
+      
+  | Some(`ClassMember x, xs) when StrMap.mem x class_members ->
+    forward state (`ClassMember x) (StrMap.find x class_members).class_ xs
+      
+  | Some(`SuperClass i, xs) when IntMap.mem i super ->
+    forward state (`SuperClass i) (IntMap.find i super).class_  xs
+
+  | Some (x, _) ->
+    BatLog.logf "Fowarding failed. No element %s in %s" (Path.show_elem_t x) (Path.show state.current_path) ;
+    raise (ForwardFailure x)
+
+  | Some (`Protected, xs) -> raise (IllegalPath "protected")
+
+(** Forward a lookup state by an (existing) (relative) pointer *)
+let forward_state state todo = 
+  match DQ.rear state.history with
+    None -> raise EmptyScopeHistory
+  | Some(_,y) ->
+    forward_os state y.entry_structure todo
+
+(** Start lookup with the given state *)
+let rec lookup_continue state x xs =
+  match DQ.rear state.history with
+    None -> raise EmptyScopeHistory
+  | Some(ys,y) ->
+    get_class_element_os state y.entry_structure x xs
 
 (** Start lookup with the given state, follow lexical scoping rules *)
 let rec lookup_lexical_in state x xs =
   match DQ.rear state.history with
     None -> raise EmptyScopeHistory
   | Some(ys,y) ->
-    BatLog.logf "Trying: %s\n" (Path.show state.current_path) ;
     match get_class_element_os state y.entry_structure x xs with
       Error {lookup_error_state={current_ref}} when current_ref==state.current_ref ->
       (* Found nothing, climb up scope *)
