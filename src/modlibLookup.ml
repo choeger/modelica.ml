@@ -76,7 +76,11 @@ type lookup_result = Success of lookup_success_struct
                    | Error of lookup_error_struct
   [@@deriving show,yojson]
 
-let path_of_history = DQ.map (fun {entry_kind} -> (entry_kind :> Path.elem_t)) 
+let path_of_history h = match DQ.front h with
+    Some(root,classes) ->
+    (* First entry is the unnamed root class *)
+    DQ.map (fun {entry_kind} -> (entry_kind :> Path.elem_t)) classes
+  | _ -> Path.empty (* Should not happen, but empty path is safe default *)
 
 (** Find the first (from bottom) class which is a prefix of $path in $history and the corresponding suffix 
     If the last entry is a superclass, the corresponding extending class is returned.
@@ -198,7 +202,10 @@ and get_class_element ({history;trace;current_path} as state) e p =
   (* Replaceable/Constr means to look into it *)
   | Replaceable v -> get_class_element state v p    
   | Constr {arg} -> get_class_element state arg p
-  | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
+  | v -> begin match p with
+        [] -> Success {lookup_success_state=state; lookup_success_value=v}
+      | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
+    end    
     
 exception EmptyScopeHistory
 
