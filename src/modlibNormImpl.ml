@@ -121,7 +121,7 @@ let resolve_builtin first rest =
   (* Builtin Classes *)
   | "String" | "StateSelect" | "Connections" -> builtin CK_BuiltinClass
 
-  | _ -> raise (NoSuchClass first.ident)
+  | _ -> BatLog.logf "Error searching for %s\n" first.ident.txt ; raise (NoSuchClass first.ident)
 
 exception ResolutionError of lookup_error_struct
 
@@ -135,9 +135,14 @@ let rec resolve_env env history first rest =
                  current_attr = no_attributes;
                  current_path = path_of_history history}
     in
-    match lookup_lexical_in state first rest with
-      Success {lookup_success_state={current_ref}} -> current_ref
-    | Error err -> raise (ResolutionError err) 
+    try 
+      match lookup_lexical_in state first rest with
+        Success {lookup_success_state={current_ref}} -> current_ref
+      | Error err ->
+        BatLog.logf "Error looking up %s\nLast scope:%s\n" (Syntax.show_components err.lookup_error_todo) (Path.show err.lookup_error_state.current_path);
+        raise (ResolutionError err)
+    with
+      EmptyScopeHistory -> resolve_builtin first rest
     
 let resolve_ur env history {root;components} =
   match components with
@@ -218,15 +223,20 @@ let rec merge_mod exp mod_component nested_component mods =
     let empty_mod = {mod_default=None; mod_nested=StrMap.empty ; mod_kind = mod_component.kind} in
     merge_mod exp mod_component nested_component (StrMap.add mod_name empty_mod mods)
 
+exception ModificationTargetNotFound of components
 
 (* Normalize all statements in a direct class modification *)
-let rec normalize_classmod_stmts history {class_; class_mod} =
+let rec normalize_classmod_stmts history kind {class_; class_mod} =
   function
   | [] -> {class_; class_mod}
   | {field_name=[]}::_ -> raise (Failure "empty modification on class")
-  | {field_name=y::ys; exp}::stmts ->
+  | {field_name; exp}::stmts ->
     (* normalize the modified component *)
-    let field_name = resolve_env StrMap.empty history y ys in
+    let field_name = match get_class_element (state_of_history history) kind class_  field_name with
+        Success {lookup_success_state={current_ref}} -> current_ref
+      | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
+        raise (ModificationTargetNotFound todo)
+    in
     let exp = resolve StrMap.empty history exp in
 
     (* merge modification and continue *)
@@ -235,7 +245,7 @@ let rec normalize_classmod_stmts history {class_; class_mod} =
         None -> raise (Failure "empty modification on class")
       | Some(y,ys) -> merge_mod exp y ys class_mod
     end in
-    normalize_classmod_stmts history {class_; class_mod} stmts
+    normalize_classmod_stmts history kind {class_; class_mod} stmts
 
 (* Normalize all statements in the given element structure *)
 let rec normalize_stmts history ({super;fields;class_members} as es)=
@@ -357,13 +367,14 @@ let rec impl_mapper {notify; strat_stmts; payload; current_classes; current_stmt
             let class_ = self.map_class_value self class_ in
             {class_; class_mod}
           else
-            let current_path = DQ.snoc (path_of_history current_classes) (`ClassMember name) in
+            let current_path = DQ.snoc (path_of_history current_classes) (`ClassMember name) in            
             let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in
-            normalize_classmod_stmts current_classes {class_;class_mod} stmts
+            
+            normalize_classmod_stmts current_classes (`ClassMember name) {class_;class_mod} stmts
         in
             
         let class_members = StrMap.mapi map_cm class_members in
-          
+        
         (* normalize and attach statements to fields *)
         normalize_stmts current_classes {super;fields;class_members} current_stmts
       );

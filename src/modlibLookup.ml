@@ -60,6 +60,8 @@ type lookup_state = {
   current_ref : Syntax.known_ref; (** The search request as a resolved component *)
 } [@@deriving show,yojson]
 
+let empty_lookup_state = {history=DQ.empty; trace=DQ.empty; current_path=Path.empty; current_attr=no_attributes; current_ref = DQ.empty}
+
 let dump_lookup_state {current_path} = Printf.sprintf "Last class: %s\n" (Path.show current_path)
 
 type lookup_success_struct = { lookup_success_state : lookup_state ;
@@ -85,6 +87,13 @@ let path_of_history h = match DQ.front h with
     DQ.map (fun {entry_kind} -> (entry_kind :> Path.elem_t)) classes
   | _ -> Path.empty (* Should not happen, but empty path is safe default *)
 
+(** wrap a history of visited classes into a new lookup state *)
+let state_of_history history = {history;
+                                trace = DQ.empty ;
+                                current_ref = DQ.empty;
+                                current_attr = no_attributes;
+                                current_path = path_of_history history}
+
 (** Find the first (from bottom) class which is a prefix of $path in $history and the corresponding suffix 
     If the last entry is a superclass, the corresponding extending class is returned.
     This should yield the context of a given path relativ to the current search history.
@@ -103,7 +112,7 @@ let rec find_prefix (history, path) =
         None -> find_prefix (history', path)
       | Some suffix -> (drop_superclasses history, suffix)
     end
-  | Some (history', {entry_kind=`ClassMember _; entry_structure=os}) ->
+  | Some (history', {entry_kind=`FieldType _ | `ClassMember _; entry_structure=os}) ->
     begin match ip os.source_path path with
         None -> find_prefix (history', path)
       | Some suffix -> (history, suffix)
@@ -170,7 +179,7 @@ and get_class_element state (k:history_entry_kind) e p =
     | Some(xs, x) -> {state with current_ref = (DQ.snoc xs {x with kind=ck_of_var state.current_attr.fa_var})}
   in
   
-  let rec helper = function
+  let rec helper state = function
   | Class os ->
     (*BatLog.logf "Looking in class: %s\n" (Path.show os.source_path) ;*)
     let state = finish_component state in
@@ -204,19 +213,37 @@ and get_class_element state (k:history_entry_kind) e p =
     let current_path = path_of_history history in
     let new_state = {state with current_path;history;trace} in
     begin match lookup_continue_or_yield new_state new_p with
-        Success {lookup_success_value} -> helper lookup_success_value
+        Success {lookup_success_value} -> helper state lookup_success_value
       | r -> r
     end
     
   (* Replaceable/Constr means to look into it *)
-  | Replaceable v -> helper v    
-  | Constr {arg} -> helper arg
+  | Replaceable v -> helper state v (* TODO: set replaceable flag *)    
+  | Constr {constr=Cau c; arg} -> helper {state with current_attr = {state.current_attr with fa_cau = Some c}} arg
+  | Constr {constr=Con c; arg} -> helper {state with current_attr = {state.current_attr with fa_con = Some c}} arg
+  | Constr {constr=Var v; arg} -> helper {state with current_attr = {state.current_attr with fa_var = Some v}} arg
+  | Constr {arg} -> helper state arg
+  | Enumeration flds ->
+    begin match p with
+        [] -> Success {lookup_success_state=finish_component state; lookup_success_value=Enumeration flds}
+      | [x] when StrSet.mem x.ident.txt flds ->
+        let state = {state with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
+        Success {lookup_success_state=finish_component state;
+                 lookup_success_value=Enumeration flds} 
+      | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
+    end
+  | (Int | Real | String | Bool) as v ->
+    let rest = DQ.of_enum (List.enum (List.map (fun component -> {kind=CK_BuiltinAttr; component}) p)) in    
+    let state = finish_component state in
+    let lookup_success_state = {state with current_ref = DQ.append state.current_ref rest} in
+    Success {lookup_success_state; lookup_success_value=v}
+                
   | v -> begin match p with
         [] -> Success {lookup_success_state=finish_component state; lookup_success_value=v}
       | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
     end
   in
-  helper e
+  helper state e
 
 (** Start lookup with the given state *)
 and lookup_continue state x xs =
@@ -289,11 +316,7 @@ let rec lookup_lexical_in state x xs =
     match get_class_element_os state y.entry_structure x xs with
       Error {lookup_error_state={current_ref}} when current_ref==state.current_ref ->
       (* Found nothing, climb up scope *)
-      lookup_lexical_in {history = ys;
-                         trace = DQ.empty ;
-                         current_ref = DQ.empty;
-                         current_attr = no_attributes;
-                         current_path = path_of_history ys} x xs
+      lookup_lexical_in (state_of_history ys) x xs
     | r -> r
 
 (** Create a lookup state from a normalized signature (i.e. root class) *)
