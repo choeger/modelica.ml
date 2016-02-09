@@ -147,3 +147,5 @@ let cbuiltinfun = known_component CK_BuiltinFunction
 let cbuiltinclass = known_component CK_BuiltinClass
     
 let knownref cks = KnownRef (DQ.of_list cks)
+
+let rootref cks = RootRef (DQ.of_list cks)

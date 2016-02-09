@@ -58,9 +58,10 @@ type lookup_state = {
   current_path : Path.t ; (** The path to the current class value *)
   current_attr : flat_attributes ;
   current_ref : Syntax.known_ref; (** The search request as a resolved component *)
+  current_scope : int; (** Relative current scope *)
 } [@@deriving show,yojson]
 
-let empty_lookup_state = {history=DQ.empty; trace=DQ.empty; current_path=Path.empty; current_attr=no_attributes; current_ref = DQ.empty}
+let empty_lookup_state = {history=DQ.empty; trace=DQ.empty; current_path=Path.empty; current_attr=no_attributes; current_ref=DQ.empty; current_scope=0}
 
 let dump_lookup_state {current_path} = Printf.sprintf "Last class: %s\n" (Path.show current_path)
 
@@ -92,6 +93,7 @@ let state_of_history history = {history;
                                 trace = DQ.empty ;
                                 current_ref = DQ.empty;
                                 current_attr = no_attributes;
+                                current_scope = 0;
                                 current_path = path_of_history history}
 
 (** Find the first (from bottom) class which is a prefix of $path in $history and the corresponding suffix 
@@ -316,7 +318,7 @@ let rec lookup_lexical_in state x xs =
     match get_class_element_os state y.entry_structure x xs with
       Error {lookup_error_state={current_ref}} when current_ref==state.current_ref ->
       (* Found nothing, climb up scope *)
-      lookup_lexical_in (state_of_history ys) x xs
+      lookup_lexical_in {(state_of_history ys) with current_scope=state.current_scope+1} x xs
     | r -> r
 
 (** Create a lookup state from a normalized signature (i.e. root class) *)
@@ -325,6 +327,7 @@ let state_of_lib lib =
    trace = DQ.empty ;
    current_ref = DQ.empty;
    current_attr = no_attributes;
+   current_scope = 0;
    current_path = DQ.empty}  
 
 let lookup o p =

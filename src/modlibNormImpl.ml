@@ -126,23 +126,36 @@ let resolve_builtin first rest =
 exception ResolutionError of lookup_error_struct
 
 let rec resolve_env env history first rest =
-  if StrMap.mem first.ident.txt env then  
-    DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest))
+  if StrMap.mem first.ident.txt env then
+    (false, DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest)))
   else
-    let state = {history ;
-                 trace = DQ.empty ;
-                 current_ref = DQ.empty;
-                 current_attr = no_attributes;
-                 current_path = path_of_history history}
-    in
+    let state = state_of_history history in
     try 
       match lookup_lexical_in state first rest with
-        Success {lookup_success_state={current_ref}} -> current_ref
+        Success {lookup_success_state={current_ref;current_scope=0}} -> (false, current_ref)
+      | Success {lookup_success_state={current_ref;current_scope=up}} ->
+        (* At this point, our lookup history is purely lexical, we can directly drop the surrounding classes *)
+        (* TODO: encode this assertion as an OCaml type *)
+        let rec class_name_of_path name p = match DQ.rear p with
+          | None -> name 
+          | Some(xs, `ClassMember txt) -> class_name_of_path (DQ.cons {kind=CK_Class; component={ident={txt;loc=Location.none}; subscripts=[]}} name) xs
+          | Some(xs, `Protected) -> class_name_of_path name xs
+          | _ -> raise (Failure "History not lexical?")
+        in
+        
+        let rec upwards history up =
+          match DQ.rear history with None -> if up = 0 then DQ.empty else raise (Failure "scope number mismatch")
+                                   | Some(xs,x) ->
+                                       if (up = 0) then class_name_of_path current_ref x.entry_structure.source_path
+                                       else upwards xs (up-1)
+        in
+        
+        (true, upwards history up)
       | Error err ->
         BatLog.logf "Error looking up %s\nLast scope:%s\n" (Syntax.show_components err.lookup_error_todo) (Path.show err.lookup_error_state.current_path);
         raise (ResolutionError err)
     with
-      EmptyScopeHistory -> resolve_builtin first rest
+      EmptyScopeHistory -> (true, resolve_builtin first rest)
     
 let resolve_ur env history {root;components} =
   match components with
@@ -150,10 +163,14 @@ let resolve_ur env history {root;components} =
     if root then
       match DQ.front history with
         Some (e, _) ->
-        resolve_env StrMap.empty (DQ.singleton e) cmp components
+        let (_, cs) = resolve_env StrMap.empty (DQ.singleton e) cmp components in
+        RootRef cs
       | None -> raise (Failure "no root class found")
-    else
-      resolve_env env history cmp components
+    else begin
+      match resolve_env env history cmp components with
+        (false,cs) -> KnownRef cs
+      | (true,cs) -> RootRef cs
+    end
   | [] -> raise AstInvariant
 
 let add_idx env idx = 
@@ -164,7 +181,7 @@ let add_idx env idx =
 let rec resolution_mapper env history = { Syntax.identity_mapper with
                                           on_component_reference = {
                                             Syntax.identity_mapper.on_component_reference with
-                                            map_UnknownRef = (fun _ ur -> KnownRef (resolve_ur env history ur));
+                                            map_UnknownRef = (fun _ ur -> resolve_ur env history ur);
                                           } ;
 
                                           (* Do not attempt resolution inside annotations, this is futile 

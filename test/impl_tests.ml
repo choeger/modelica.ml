@@ -85,6 +85,10 @@ let test_cases = [
     "class A protected constant Real x = 42.; end A"
     [`ClassMember "A"] (Has.field protected "x" (Is.bound_to (Real 42.))) ;
 
+  test_norm "Normalize Simple Outer-Scope Binding"
+    "class A class B constant Real x = c; end B; constant Real c = 42.; end A"
+    [cm "A"; cm "B"] (Has.field public "x" (Is.bound_to (cre (rootref [cclass "A"; cconstfld "c"])))) ;
+
   test_norm "Normalize Binding to Builtin Attributes"
     "class A constant Real x = y.start; Real y; end A"
     [`ClassMember "A"] (Has.field public "x" (Is.bound_to (cre (knownref [cclass "A"; cfld "y"; cattr "start"])))) ;  
@@ -237,7 +241,7 @@ let test_cases = [
   (* Test for iteration variables *)
   (
     let range = (Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1})) in
-    let assign = Assignment {target = Single (knownref [cclass "A"; cclass "B"; cfld "x"]) ; source = ComponentReference (knownref [cvar "i"])} in
+    let assign = Assignment {target = Single (knownref [cfld "x"]) ; source = ComponentReference (knownref [cvar "i"])} in
     let stmt = ForStmt {idx = [{variable=nl "i";range}]; body = [uncommented assign]} in
   test_norm
     "Lookup an iteration variable"
@@ -248,7 +252,7 @@ let test_cases = [
   (* Test for iteration variables in equations *)
   (
     let range = (Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1})) in
-    let eq = SimpleEquation {left = ComponentReference (knownref [cclass "A"; cclass "B"; cfld "x"]) ; right = ComponentReference (knownref [cvar "i"])} in
+    let eq = SimpleEquation {left = ComponentReference (knownref [cfld "x"]) ; right = ComponentReference (knownref [cvar "i"])} in
     let loop = ForEquation {idx = [{variable=nl "i";range}]; body = [uncommented eq]} in
   test_norm
 
@@ -262,7 +266,7 @@ let test_cases = [
   (* Test for iteration variables in comprehensions *)
   ( let range = Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1}) in
     let right = Syntax.Array [Compr {exp=ComponentReference (knownref [cvar "i"]); idxs = [{variable = nl "i"; range}]}] in
-    let eq = SimpleEquation {left = ComponentReference (knownref [cclass "A"; cclass "B"; cfld "x"]); right} in
+    let eq = SimpleEquation {left = ComponentReference (knownref [cfld "x"]); right} in
     test_norm
 
       "Lookup a variable bound by a comprehension"
@@ -271,10 +275,9 @@ let test_cases = [
 
       [cm "A"; cm "B"] (Has.behavior **> Has.equations **> The.first **> Is.equation (uncommented eq))
   );
-
   
   (
-  let expected_ref = knownref [cclass "A"; cfld "x"] in 
+  let expected_ref = knownref [cfld "x"] in 
   test_norm
     "Lookup an unknown in an equation"
     "model A Real x; equation x = 0.0; end A"

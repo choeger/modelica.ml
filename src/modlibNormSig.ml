@@ -165,10 +165,8 @@ and norm lhs =
           (* tip of history is enclosing class containing the replaceable *)
             Some(_, {entry_structure=os; entry_kind}) ->
             (* Go back in scope *)
-            let state =
-              {history;
-               trace = DQ.empty ; current_ref = DQ.empty; current_attr = no_attributes;
-               current_path = path_of_history history}  in
+            let state = state_of_history history in
+
             (* Create a virtual lookup target by removing all elements *)
             let base_only = {os with public = {empty_elements with super = os.public.super};
                                      protected = {empty_elements with super = os.protected.super}} in
