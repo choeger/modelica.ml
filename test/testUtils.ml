@@ -275,6 +275,11 @@ module P = struct
       | Class {protected} when (not vis) && StrMap.mem fld protected.fields -> k (StrMap.find fld protected.fields)
       | cv -> assert_failure ("No field: '"^fld^"' in: " ^ (show_class_value cv)) 
 
+    let super_class vis n k = function
+      | Class {public} when vis && IntMap.mem n public.super -> k (IntMap.find n public.super)
+      | Class {protected} when (not vis) && IntMap.mem n protected.super -> k (IntMap.find n protected.super)
+      | cv -> assert_failure ("No Super Class: '"^(string_of_int n)^"' in: " ^ (show_class_value cv)) 
+    
     let binding k = function
         {field_mod={mod_default=Some b}} -> k b
       | _ -> assert_failure "Expected a binding"

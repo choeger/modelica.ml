@@ -175,8 +175,8 @@ let test_cases = [
   test_norm
     "Lookup a modified constant in a simple Modelica class using extensions" 
     "package A model C extends B(x = 21.); end C; model B constant Real x = 42.; end B; end A" 
-    [`ClassMember "A"; `ClassMember "C"] (Has.field public "x"  
-    (Is.bound_to (Real 21.))) ;   
+    [`ClassMember "A"; `ClassMember "C"] (Has.super_class public 0 **>
+                                          Has.class_modification "x" **> Is.modified_to (Real 21.)) ;   
 
   test_norm
     "Allow nested and default modifications at the same time" 

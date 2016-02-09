@@ -253,64 +253,63 @@ let rec normalize_stmts history ({super;fields;class_members} as es)=
   | [] -> es
   | {field_name=y::ys;exp}::stmts ->
     (* normalize the modified component *)
-    let field_name = resolve_env StrMap.empty history y ys in
     let exp = resolve StrMap.empty history exp in
-    
-    begin match DQ.front field_name with
-      | None -> normalize_stmts history es stmts (* bogus stmt *)                  
+    match get_class_element_in {empty_lookup_state with history} es y ys with
+    | Success {lookup_success_state={current_ref; current_path}} ->
+      let fst = match Path.front current_path with
+          Some(`Protected,ps) -> begin match Path.front ps with
+              Some(`Protected,_) -> raise (Failure "Internal Error: Double protected path")
+            | Some(fst,_) -> fst
+            | None -> raise (Failure "Internal Error: Empty Path")
+          end
+        | None -> raise (Failure "Internal Error: Empty Path")
+        | Some(fst,_) -> fst
+      in
+      begin match fst with
+          `ClassMember x ->
+          begin match Path.front current_ref with
+              Some({kind=CK_Class; component}, cr) ->
+              (* Modified a class *)
+              let {class_;class_mod} = StrMap.find x class_members in
+              (* merge modification and continue *)
+              let class_mod =
+                begin match DQ.front cr with
+                    None -> raise (Failure "empty modification on class")
+                  | Some(y,ys) -> merge_mod exp y ys class_mod
+                end in
+              normalize_stmts history {es with class_members = StrMap.add x {class_;class_mod} class_members} stmts
 
-      (* TODO: nested modification inside classes *)                 
-      
-      (* Local field *)
-      | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete as kind; component},xs) when StrMap.mem component.ident.txt fields ->
-        let insert mod_kind fld xs = match DQ.front xs with
-            None -> {fld with field_mod = {mod_kind; mod_default=Some exp; mod_nested=fld.field_mod.mod_nested}}
-          | Some(y,ys) -> {fld with field_mod = {fld.field_mod with mod_kind; mod_nested = merge_mod exp y ys fld.field_mod.mod_nested}} 
-        in
+            | Some({kind},_) -> raise (Failure "Expected to modify a class")
+            | None -> raise (Failure "Lookup Result inconsistent")
+          end
+        | `FieldType x ->
+          begin match Path.front current_ref with
+            | Some({kind=CK_Class},_) -> raise (Failure "Expected to modify a component")
 
-        let fld = StrMap.find component.ident.txt fields in
-        let class_field = insert kind fld xs 
-        in normalize_stmts history {es with fields = StrMap.add component.ident.txt class_field fields} stmts
-
-      (* Inherited field *)
-      | Some ({kind=CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete as kind; component},xs) ->
-
-        (* Search superclasses *)
-        let rec modify_super_field history x super =
-          (* Get the first inherited class field named x or None *)
-          let rec take enum = Enum.get (Enum.filter_map get_fld enum)
-          and get_fld ((i, {class_; class_mod}) as s) = match class_ with
-              Class os when StrMap.mem x.ident.txt os.public.fields -> Some s
-            | Class os when StrMap.mem x.ident.txt os.protected.fields -> Some s
-            | Class os ->
-              (* Regardless what we found, if we find something yield this superclass *)
-              let n = take (Enum.append (IntMap.enum os.public.super) (IntMap.enum os.protected.super)) in
-              Option.map (fun _ -> s) n              
-            | GlobalReference r ->
-              begin
-                match DQ.front history with
-                  Some (e, _) ->
-                  begin match lookup_path_direct e.entry_structure.public r with
-                      `Found {found_value} -> get_fld (i, {class_=found_value; class_mod})
-                    | _ -> None
-                  end
-                | None -> raise (Failure "no root class found")
-              end
-            | _ -> None
-          in
-
-          match take (IntMap.enum super) with
-            None ->
-            BatLog.logf "Internal Error: No field %s after resolution\n" (show_component x) ;
-            raise (NoSuchField component.ident) (* Should better not happen *)
-          | Some (i, s) -> IntMap.add i {s with class_mod = merge_mod exp {kind;component} xs s.class_mod} super
-        in
+            | Some({kind = mod_kind; component}, cr) ->
+              (* Modified a field *)
+              let insert fld xs = match DQ.front xs with
+                  None -> {fld with field_mod = {mod_kind; mod_default=Some exp; mod_nested=fld.field_mod.mod_nested}}
+                | Some(y,ys) -> {fld with field_mod = {fld.field_mod with mod_kind; mod_nested = merge_mod exp y ys fld.field_mod.mod_nested}} 
+              in
+              let fld = StrMap.find x fields in
+              (* merge modification and continue *)
+              let class_field = insert fld cr in
+              normalize_stmts history {es with fields = StrMap.add x class_field fields} stmts
                 
-        let super = modify_super_field history component super in
-        normalize_stmts history {es with super} stmts
+            | None -> raise (Failure "Lookup Result inconsistent")
+          end
+        | `SuperClass n ->
+          begin match Path.front current_ref with
+              Some(y,ys) ->
+              let {class_;class_mod} = IntMap.find n super in
+              let class_mod = merge_mod exp y ys class_mod in
+              normalize_stmts history {es with super = IntMap.add n {class_;class_mod} super} stmts
+          end
+      end
+    | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
+      raise (ModificationTargetNotFound todo)
 
-      | Some(x,_) -> raise (Failure ("Don't know how to handle " ^ (show_known_component x)))
-    end
 
 let rec impl_mapper {notify; strat_stmts; payload; current_classes; current_stmts} =
   let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some {kind=CK_Class;component={ident={txt=x;loc=Location.none};subscripts=[]}} | _ -> None) (DQ.enum path)) in
