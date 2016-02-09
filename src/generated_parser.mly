@@ -382,11 +382,13 @@ mod_component_clause : scope=scope def_type = type_expression component=declarat
                        def_constraint=option(constraining_clause)
                        { declaration_to_def def_type {no_def_options with scope} def_constraint component }
 
-import : IMPORT name=separated_nonempty_list(DOT, ident) comment = comment { { commented = Unnamed name ; comment } }
-       | IMPORT local=ident EQ global=separated_nonempty_list(DOT, ident) comment = comment 
+import : IMPORT DOT name=separated_nonempty_list(DOT, ident) comment = comment { { commented = Unnamed name ; comment } }
+       | IMPORT name=separated_nonempty_list(DOT, ident) comment = comment { { commented = Unnamed name ; comment } }
+       | IMPORT local=ident EQ option(DOT) global=separated_nonempty_list(DOT, ident) comment = comment 
          { { commented = NamedImport {global;local} ; comment } } 
+       | IMPORT DOT name=separated_nonempty_list(DOT, ident) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
        | IMPORT name=separated_nonempty_list(DOT, ident) DOTTIMES comment = comment { { commented = UnqualifiedImport name ; comment } }
-                                                                                    
+
 extends : EXTENDS ext_type = type_expression ext_annotation=option(annotation) { { ext_type ; ext_annotation } } 
 
 flag (F) : F { true } | { false }
