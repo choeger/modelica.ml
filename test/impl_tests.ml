@@ -297,7 +297,7 @@ let test_cases = [
     [`ClassMember "MiniMedium"; `ClassMember "SomeModel"]
     (Has.field public "component" **> Has.modification "medium" **> Is.nested **> Has.element "foo"
        (Has.modification_kind CK_Constant     &&&
-        (Is.modified_to (Real 21.)))) ;
+        (Is.modified_to (Real 23.)))) ;
 
 ]
 
