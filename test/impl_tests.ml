@@ -91,35 +91,35 @@ let test_cases = [
 
   test_norm "Normalize Binding to Builtin Attributes"
     "class A constant Real x = y.start; Real y; end A"
-    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (cre (knownref [cclass "A"; cfld "y"; cattr "start"])))) ;  
+    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (cre (knownref [cfld "y"; cattr "start"])))) ;  
 
   test_norm "Normalize Builtin 'size'"
     "class A constant Integer x = size(y); Real y; end A"
-    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app {fun_= knownref [cbuiltinfun "size"] ;
-                                                            args=[cre (knownref [cclass "A"; cfld "y"])];
+    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app {fun_= rootref [cbuiltinfun "size"] ;
+                                                            args=[cre (knownref [cfld "y"])];
                                                             named_args=[]}))) ;
 
   test_norm "Normalize Builtin 'stateSelect'"
     "class A Real y(stateSelect=StateSelect.never); end A"
     [`ClassMember "A"] (Has.field public "y" (Has.modification "stateSelect" (
         Has.modification_kind CK_BuiltinAttr &&&
-        Is.modified_to (cre (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
+        Is.modified_to (cre (rootref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
 
   test_norm "Normalize Builtin 'stateSelect' in an array"
     "class A Real[3] y(stateSelect=StateSelect.never); end A"
     [`ClassMember "A"] (Has.field public "y" (Has.modification "stateSelect" (
         Has.modification_kind CK_BuiltinAttr &&&
-        Is.modified_to (cre (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
+        Is.modified_to (cre (rootref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
 
   test_norm "Normalize Builtin 'stateSelect' in an extended array"
     "class A T y(stateSelect=StateSelect.never); type T extends Real[3]; end T; end A"
     [`ClassMember "A"] (Has.field public "y" (Has.modification "stateSelect" (
         Has.modification_kind CK_BuiltinAttr &&&
-        Is.modified_to (cre (knownref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
+        Is.modified_to (cre (rootref [cbuiltinclass "StateSelect" ; cattr "never"] ))))) ;
   
   test_norm "Normalize Builtin 'String'"
     "class A constant Integer x = String(1); end A"
-    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app {fun_= knownref [cbuiltinclass "String"] ;
+    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app {fun_= rootref [cbuiltinclass "String"] ;
                                                                 args=[S.int 1];
                                                                 named_args=[]}))) ;
   
@@ -160,21 +160,21 @@ let test_cases = [
   
   test_norm "Self Name Resolution Inside Binding"
     "class A class B constant Real x = x; end B; protected constant Real x = 42.; end A"
-    [`ClassMember "A"; `ClassMember "B"] (Has.field public "x" (Is.bound_to (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"]))));
+    [`ClassMember "A"; `ClassMember "B"] (Has.field public "x" (Is.bound_to (ComponentReference (knownref [cconstfld "x"]))));
 
   test_norm "Name Resolution Inside Binding"
     "class A constant Real y = x; constant Real x = 42.; end A"
-    [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref [cclass "A"; cconstfld "x"])))) ;
+    [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref [cconstfld "x"])))) ;
 
   test_norm "Protected Name Resolution Inside Binding"
     "class A constant Real y = x; protected constant Real x = 42.; end A"
-    [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref [cclass "A"; cconstfld "x"])))) ;
+    [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref [cconstfld "x"])))) ;
 
   test_norm "Inherited Name Resolution Inside Binding"
     "class A class B constant Real x = 42.; end B; class C extends B; protected constant Real y = x; end C; end A"
     [`ClassMember "A"; `ClassMember "C"]
     (Has.field protected "y"
-       (Is.bound_to (ComponentReference (knownref [cclass "A"; cclass "C"; cconstfld "x"]))))  ;
+       (Is.bound_to (ComponentReference (knownref [cconstfld "x"]))))  ;
 
   test_norm
     "Lookup a modified constant in a simple Modelica class using extensions" 
@@ -198,11 +198,11 @@ let test_cases = [
   test_norm
     "Lookup imported names"
     "package A package B constant Real x = 42.; end B; package C import A.B.x; constant Real y = x; end C; end A"
-    [cm "A"; cm "C"] (Has.field public "y" **> Is.bound_to (ComponentReference (knownref [cclass "A"; cclass "B"; cconstfld "x"])));
+    [cm "A"; cm "C"] (Has.field public "y" **> Is.bound_to (ComponentReference (rootref [cclass "A"; cclass "B"; cconstfld "x"])));
 
 
-  (let then_ = ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]) in
-   let yref = ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"]) in
+  (let then_ = ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]) in
+   let yref = ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"]) in
    let else_if = [{ guard = Bool true ; elsethen = yref }] in
    let else_ = then_ in   
    test_norm
@@ -218,10 +218,10 @@ let test_cases = [
 
   (* Test for imported names in behavior section *)
   (let condition = Eq{
-       left=ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]);
-       right=ComponentReference (knownref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"])};
+       left=ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]);
+       right=ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"])};
    in 
-   let eq = {left=ComponentReference (knownref [cclass "A"; cclass "C"; cfld "x"]); right=ComponentReference (knownref [time])} in   
+   let eq = {left=ComponentReference (knownref [cfld "x"]); right=ComponentReference (rootref [time])} in   
    let else_ = [uncommented (SimpleEquation {left=eq.right; right=eq.left})] in
    let then_ = [uncommented (SimpleEquation eq)] in
    let else_if = [] in
