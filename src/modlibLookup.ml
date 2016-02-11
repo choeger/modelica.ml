@@ -229,8 +229,8 @@ and get_class_element state (k:history_entry_kind) e p =
     begin match p with
         [] -> Success {lookup_success_state=finish_component state; lookup_success_value=Enumeration flds}
       | [x] when StrSet.mem x.ident.txt flds ->
-        let state = {state with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
-        Success {lookup_success_state=finish_component state;
+        let state = {(finish_component state) with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
+        Success {lookup_success_state=state;
                  lookup_success_value=Enumeration flds} 
       | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
     end
