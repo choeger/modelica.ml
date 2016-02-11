@@ -55,13 +55,14 @@ type history_t = history_entry_t DQ.t [@@deriving show,yojson]
 type lookup_state = {
   history : history_t; (** The visited classes *)
   trace : trace_t; (** The found references *)
+  replaceable : bool; (** Visited a replaceable declaration *)
   current_path : Path.t ; (** The path to the current class value *)
   current_attr : flat_attributes ;
   current_ref : Syntax.known_ref; (** The search request as a resolved component *)
   current_scope : int; (** Relative current scope *)
 } [@@deriving show,yojson]
 
-let empty_lookup_state = {history=DQ.empty; trace=DQ.empty; current_path=Path.empty; current_attr=no_attributes; current_ref=DQ.empty; current_scope=0}
+let empty_lookup_state = {history=DQ.empty; trace=DQ.empty; replaceable = false ; current_path=Path.empty; current_attr=no_attributes; current_ref=DQ.empty; current_scope=0}
 
 let dump_lookup_state {current_path} = Printf.sprintf "Last class: %s\n" (Path.show current_path)
 
@@ -90,6 +91,7 @@ let path_of_history h = match DQ.front h with
 
 (** wrap a history of visited classes into a new lookup state *)
 let state_of_history history = {history;
+                                replaceable = false;
                                 trace = DQ.empty ;
                                 current_ref = DQ.empty;
                                 current_attr = no_attributes;
@@ -177,7 +179,7 @@ and get_class_element state (k:history_entry_kind) e p =
   
   let finish_component state = match DQ.rear state.current_ref with    
     (* update last component reference with collected flat attribute *)
-      None | Some (_,{kind=CK_Class}) -> {state with current_attr = no_attributes}
+      None | Some (_,{kind=CK_Class}) -> {state with current_attr = {no_attributes with fa_sort = state.current_attr.fa_sort}}
     | Some(xs, x) -> {state with current_ref = (DQ.snoc xs {x with kind=ck_of_var state.current_attr.fa_var})}
   in
   
@@ -214,17 +216,31 @@ and get_class_element state (k:history_entry_kind) e p =
     let new_p = List.of_enum (Enum.filter_map (function (`ClassMember x | `FieldType x) -> Some {ident={txt=x;loc=none};subscripts=[]} | _ -> None) (DQ.enum q')) in    
     let current_path = path_of_history history in
     let new_state = {state with current_path;history;trace} in
+
+    (* Merge all flat attributes from a pointer *)
+    let merge_state state found_state =
+      let (|||) fst = function Some x -> Some x | None -> fst in
+      
+      (* TODO: merge trace here? *)
+      {state with replaceable = state.replaceable or found_state.replaceable ;
+                  current_attr = {fa_var = state.current_attr.fa_var ||| found_state.current_attr.fa_var ;
+                                  fa_cau = state.current_attr.fa_cau ||| found_state.current_attr.fa_cau ;
+                                  fa_con = state.current_attr.fa_con ||| found_state.current_attr.fa_con ;
+                                  fa_sort = state.current_attr.fa_sort ||| found_state.current_attr.fa_sort ;}
+      }
+    in
+    
     begin match lookup_continue_or_yield new_state new_p with
-        Success {lookup_success_value} -> helper state lookup_success_value
+        Success {lookup_success_value;lookup_success_state=found_state} -> helper (merge_state state found_state) lookup_success_value
       | r -> r
     end
     
   (* Replaceable/Constr means to look into it *)
-  | Replaceable v -> helper state v (* TODO: set replaceable flag *)    
+  | Replaceable v -> helper {state with replaceable = true} v
   | Constr {constr=Cau c; arg} -> helper {state with current_attr = {state.current_attr with fa_cau = Some c}} arg
   | Constr {constr=Con c; arg} -> helper {state with current_attr = {state.current_attr with fa_con = Some c}} arg
   | Constr {constr=Var v; arg} -> helper {state with current_attr = {state.current_attr with fa_var = Some v}} arg
-  | Constr {arg} -> helper state arg
+  | Constr {constr=Sort s; arg} -> helper {state with current_attr = {state.current_attr with fa_sort = Some s}} arg
   | Enumeration flds ->
     begin match p with
         [] -> Success {lookup_success_state=finish_component state; lookup_success_value=Enumeration flds}
@@ -271,11 +287,11 @@ let rec forward state k c (todo:Path.t) =
     Class (os) ->
     let history = append_to_history state k os in
     forward_os {state with history} os todo
-  | _ -> begin
+  | c -> begin
       match DQ.front todo with
         None -> state
       | Some(x,xs) ->
-        raise (ExpansionException "expected a class")
+        raise (ExpansionException ("expected a class. got: " ^ (show_class_value c)))
     end
 
 and forward_os state {public;protected} todo =
@@ -324,6 +340,7 @@ let rec lookup_lexical_in state x xs =
 (** Create a lookup state from a normalized signature (i.e. root class) *)
 let state_of_lib lib =
   {history = DQ.singleton {entry_structure = {empty_object_struct with public = lib}; entry_kind = `ClassMember ""};
+   replaceable=false;
    trace = DQ.empty ;
    current_ref = DQ.empty;
    current_attr = no_attributes;

@@ -204,6 +204,7 @@ module P = struct
   let ( **>) p1 p2 = p1 p2 
   let (&&&) p1 p2 got = (p1 got) ; (p2 got)
 
+  let public = true
   
   module Points = struct
     let to_ k = function
@@ -235,32 +236,28 @@ module P = struct
   end
 
   module Find = struct
-    (* Lookup a name and flatten attributes *)
-    let rec def_of path k got =
-      match DQ.front path with
-        Some (x,xs) -> begin
-          let rec def_of_ x xs k got =          
-            let m = try Normalized.follow_path_es got Name.empty got xs x
-              with IllegalPath i -> assert_failure ("Illegal path: " ^ i)
-            in 
-            match m with
-            | `Found {found_value} ->
-              begin match flat found_value with
-                  {flat_val = GlobalReference n; flat_attr} -> 
-                  begin match DQ.front n with
-                    (* In case of a global reference, lookup the reference and remember all local attributes *)
-                      Some (x,xs) -> let k' = fun flat_val -> k (unflat {flat_val; flat_attr}) in
-                      def_of_ x xs k' got
-                    | None -> assert_failure
-                                (Printf.sprintf "Empty global reference when looking up %s" (Inter.Path.show (DQ.cons x xs)))
-                  end
-                (* In any other case, apply the predicate *)
-                | _ -> k found_value
-              end
-            | _ as result -> assert_failure (Printf.sprintf "Could not find test-path.\n%s\n %s\n" (show_search_result result) (show_elements_struct got))
-          in def_of_ x xs k got
-        end
-      | None -> assert_failure "Cannot lookup empty path"
+    let component cs k got = match cs with
+        [] -> raise (Failure "empty name for lookup")
+      | c::cs ->
+        let open ModlibLookup in 
+        k (lookup_continue (state_of_lib got) c cs)
+    
+    (* Lookup name and flatten attributes *)
+    let def_of path component k got =
+      let open ModlibLookup in
+      let state = forward_state (state_of_lib got) path in
+      k (lookup_continue state component [])
+
+    let class_at path k got =
+      let open ModlibLookup in
+      let state = forward_state (state_of_lib got) path in
+      match DQ.rear state.history with
+        None -> raise (Failure "Cannot happen")
+      | Some(_,os) -> k (Class os.entry_structure)
+
+    let type_at path k got =
+      match (lookup_path_direct got path) with `Found {found_value} -> k found_value | _ -> assert_failure "Cannot find path"
+    
   end
 
   module Has = struct
@@ -279,6 +276,9 @@ module P = struct
       | Class {public} when vis && IntMap.mem n public.super -> k (IntMap.find n public.super)
       | Class {protected} when (not vis) && IntMap.mem n protected.super -> k (IntMap.find n protected.super)
       | cv -> assert_failure ("No Super Class: '"^(string_of_int n)^"' in: " ^ (show_class_value cv)) 
+
+    let field_type k = function
+      {field_class} -> k field_class
     
     let binding k = function
         {field_mod={mod_default=Some b}} -> k b
@@ -317,6 +317,15 @@ module P = struct
 
   module The = struct
     let first k = function [] -> assert_failure "Expected non-empty list" | x :: _ -> k x
+
+    let lookup_result k {ModlibLookup.lookup_success_value; lookup_success_state={current_attr;replaceable}} =
+      let cv = unflat {flat_attr=current_attr; flat_val = lookup_success_value} in
+      if replaceable then
+        k (Replaceable cv)
+      else
+        k cv
+
+    let declared_class k {class_} = k class_
   end
   
   module Is = struct
@@ -332,6 +341,10 @@ module P = struct
             valid_ctxt_for xs ctxts
           | None -> assert_failure ("End of path reached, but context non-empty: " ^ Inter.Path.show ctxt.source_path)
         end
+
+    let successful k = function
+        ModlibLookup.Success s -> k s
+      | _ -> assert_failure "Lookup failed"
     
     let ok k = function
         Failed -> assert_failure "Result was not OK."
@@ -411,4 +424,4 @@ open P
   descr >:: ( (Parse.as_typedef **> Compute.signature **> Compute.env_of (Path.of_list classname) **> (Is.env expected)) input)*)
 
 let test_norm descr input classname pred =
-  descr >:: (Parse.as_typedef **> Compute.implementation **> Find.def_of (Path.of_list classname) **> pred) input
+  descr >:: (Parse.as_typedef **> Compute.implementation **> Find.class_at (Path.of_list classname) **> pred) input

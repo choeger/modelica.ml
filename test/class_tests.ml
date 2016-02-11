@@ -39,12 +39,15 @@ open Inter
 open TestUtils
 open P
 
+let ident = Syntax_fragments.any
+let pol = Path.of_list 
+
 (** Test case generator, checks the predicate on a path for a signature from source.
     The path is a singleton (def). 
     The predicate is abstracted over path to avoid tedious redundancy *)
 let class_ input c pred =
-  let path = Path.of_list [cm c] in
-  (Printf.sprintf "Normalize '%s'" input) >:: (Parse.as_typedef **> Compute.signature **> Find.def_of path **> (pred path)) input
+  (Printf.sprintf "Normalize '%s'" input) >:: (Parse.as_typedef **> Compute.signature **> (Find.def_of Path.empty (any c)) **>
+                                               Is.successful **> The.lookup_result **> (pred (pol [cm c]))) input
 
 (** Test signatures directly *)
 let signature desc input pred =
@@ -63,12 +66,14 @@ let class_with_public_M source_path = Class {empty_object_struct with source_pat
     
 let class_with_protected_M source_path = Class {empty_object_struct with source_path ; protected = {empty_elements with class_members = StrMap.singleton "M" {empty_modified_class with class_ = class_M (DQ.snoc (DQ.snoc source_path `Protected) (cm "M"))}}}
 
-let pol = Path.of_list 
+let class_def_of p cm k = Find.def_of p (any cm) **> Is.successful **> The.lookup_result k
 
 (** Actual test cases *)
 let test_cases = [
-  class_ "type T = Real" "T"  (fun _ -> Is.class_value real_t) ;
+  (class_ "type T = Real" "T"  (fun _ -> Is.class_value real_t) : OUnit2.test) ;
 
+  class_ "replaceable type T = Real" "T"  (fun _ -> Is.replaceable **> Is.class_value real_t)  ;
+  
   class_ "class M Real x; end M" "M" (fun p -> Is.class_value (class_M p));
   
   class_ "record M Real x; end M" "M" (fun p -> Is.class_value (record_M p));
@@ -82,45 +87,45 @@ let test_cases = [
   signature
     "Normalization of replaceables"
     "class A class B replaceable type T = Real; end B; type T = B.T ; end A"
-    ((Find.def_of (pol [cm "A"; cm "B"; cm "T"])) **> Is.replaceable **> (Is.class_value (type_ real))) ;
+    ((class_def_of (pol [cm "A"; cm "B"]) "T") **> Is.replaceable **> (Is.class_value (type_ real))) ;
 
   signature
     "References to replaceables should yield dynamics"
     "class A class B replaceable type T = Integer; end B; type T = B.T ; end A"
-    (Find.def_of (pol [cm "A" ; cm "T"]) **> (Is.class_value (type_ (dynref (pol [cm "A";cm "B";cm "T"]))))) ;
+    (Find.type_at (pol [cm "A"; cm "T"]) **> (Is.class_value (type_ (dynref (pol [cm "A";cm "B";cm "T"]))))) ;
 
   signature
     "Forwarding Builtin Types"
     "class A type B = Real; class C type S = B; end C; end A"
-    (Find.def_of (pol [cm "A"; cm "C" ; cm "S"]) **> Is.class_value real) ;
+    (class_def_of (pol [cm "A"; cm "C" ]) "S" **> Is.class_value real) ;
 
   signature
     "Forwarding of Imported Builtin Types"
     "class A type B = Real; class C import D = A.B; class E type F = D; end E; end C; end A"
-    (Find.def_of (pol [cm "A"; cm "C"; cm "E"; cm "F"]) **> Is.class_value (type_ real));
+    (class_def_of (pol [cm "A"; cm "C"; cm "E"]) "F" **> Is.class_value (type_ real));
 
   signature
     "Shadowing of imports"
     "class A type S = Real; import T = A.S; class B type T = Integer; T x; end B; end A"
-    (Find.def_of (pol [cm "A"; cm "B"; fld "x"]) **> Is.class_value (type_ int));
+    (class_def_of (pol [cm "A"; cm "B"]) "x" **> Is.class_value (type_ int));
   
   signature
     "Inheritance of forwarded Builtin Types"
     "class A class B1 type T = Real; end B1; extends B1; end A"
-    (Find.def_of (pol [cm "A" ; sup 0; cm "T"]) **> Is.class_value real );
+    (class_def_of (pol [cm "A" ; sup 0]) "T" **> Is.class_value real );
 
   signature
     "Inheritance of nested forwarded Builtin Types"
     "class A class B class C type T = Real; end C; end B; 
              class D extends B; end D; 
      end A" 
-    (Find.def_of (pol [cm "A"; cm "D"; sup 0; cm "C"; cm "T"]) **> Is.class_value (type_ real)) ;
+    (class_def_of (pol [cm "A"; cm "D"; sup 0; cm "C"]) "T" **> Is.class_value (type_ real)) ;
 
   signature
     "Inheritance of Fields"
     "class AA class B Real b; end B; 
               class C extends B; end C; end AA"
-    (Find.def_of (pol [cm "AA"; cm "C"; sup 0; fld "b"]) **> Is.class_value Normalized.Real) ;
+    (class_def_of (pol [cm "AA"; cm "C"; sup 0]) "b" **> Is.class_value Normalized.Real) ;
 
   signature
     "Lookup of redeclared Elements"
@@ -131,7 +136,7 @@ let test_cases = [
        class C = B2(redeclare type T2 = Integer); 
        type T = C.T2 ; 
      end A"
-    (Find.def_of (pol [cm "A"; cm "T"]) (Is.replaceable (Is.class_value (type_ (int))))) ;
+    (class_def_of (pol [cm "A"]) "T" (Is.replaceable (Is.class_value (type_ (int))))) ;
 
   signature
     "Lookup of indirectly redeclared elements"
@@ -144,7 +149,7 @@ let test_cases = [
         model D3 = B3(redeclare type T3 = T3); 
        end C3; 
      end A3"
-    (Find.def_of (pol [cm "A3"; cm "C3"; cm "D3"; cm "T3"]) **> (Is.replaceable (Is.class_value (type_ real)))) ;
+    (class_def_of (pol [cm "A3"; cm "C3"; cm "D3"]) "T3" **> (Is.replaceable (Is.class_value (type_ real)))) ;
 
   signature
     "Lookup of nested redeclarations"
@@ -157,7 +162,7 @@ let test_cases = [
        end C4;
        C4 c(b(redeclare type T = Real));
      end A4"
-    (Find.def_of (pol [cm "A4"; fld "c" ; fld "b"; cm "T"]) **> Is.replaceable (Is.class_value (type_ real))) ;
+    (Find.component (List.map any ["A4"; "c"; "b"; "T"]) **> Is.successful **> The.lookup_result **> Is.replaceable (Is.class_value (type_ real))) ;
 
   signature
     "Variability lookup"
@@ -170,10 +175,10 @@ let test_cases = [
        end C5;
        C5 c(b(x = 3.0));
      end A5"
-    (Find.def_of (pol [cm "A5"; fld "c" ; fld "b"; fld "x"]) **> Is.class_value (const (Normalized.Real))) ;
+    (Find.component (List.map any ["A5"; "c"; "b"; "x"]) **> Is.successful **> The.lookup_result  **> Is.class_value (const (Normalized.Real))) ;
 
   signature
-    "Lookup of Inheritied Fields with Variability"
+    "Lookup of Inherited Fields with Variability"
     "class A6
        model B
          constant Real x;
@@ -183,7 +188,7 @@ let test_cases = [
        end C;
        C c;
      end A6"
-    (Find.def_of (pol [cm "A6"; fld "c" ; sup 0; fld "x"]) **> (Is.class_value (const (Normalized.Real)))) ;
+    (class_def_of (pol [cm "A6"; cm "C" ; sup 0]) "x" **> (Is.class_value (const (Normalized.Real)))) ;
   
   signature
     "Redeclarations inside Components"
@@ -200,14 +205,14 @@ let test_cases = [
        end D;
        D d;
      end A7"
-    (Find.def_of (pol [cm "A7"; fld "d" ; fld "b"; cl "T"]) **> Is.replaceable (Is.class_value (type_ real))) ;
+    (Find.component (List.map any ["A7"; "d" ; "b"; "T"]) **> Is.successful **> The.lookup_result **> Is.replaceable (Is.class_value (type_ real))) ;
 
   signature
     "Field Type Lookup"
     "class A8
        Real x(start = 2.0);
      end A8"
-    (Find.def_of (pol [cm "A8"; fld "x"]) **> Is.class_value Normalized.Real) ;
+    (class_def_of (pol [cm "A8"]) "x" **> Is.class_value Normalized.Real) ;
 
   signature
     "Nested Field Lookup"
@@ -215,7 +220,7 @@ let test_cases = [
        model B Real x(start = 2.0); end B;
        B b(x(start = 42.0));
      end A9"
-    (Find.def_of (pol [cm "A9" ; fld "b"; fld "x"]) **> Is.class_value Normalized.Real) ;
+    (class_def_of (pol [cm "A9" ; fld "b"]) "x" **> Is.class_value Normalized.Real) ;
 
 (*  signature
     "Indirect Field Type Redeclaration"
@@ -236,8 +241,7 @@ let test_cases = [
        model D extends C(b(redeclare type T = T)); end D;
        D d;
      end A11"
-    (* No superclass in lookup, modification of b in inheritance should yield a redeclared element directly *)
-    (Find.def_of (pol [cm "A11" ; fld "d"; fld "b"; cl "T";]) **> Is.replaceable (Is.class_value int)) ;
+    (Find.component (List.map any ["A11";"d";"b";"T"]) **> Is.successful **> The.lookup_result **> Is.replaceable (Is.class_value int)) ;
 
   signature
     "Redeclare Extends Test"
@@ -246,7 +250,7 @@ let test_cases = [
        model C replaceable model B = B; end C;
        model D extends C; redeclare model extends B redeclare type T = Real; T t(start=0.0); end B; end D;    
      end A12"
-    (Find.def_of (pol [cm "A12"; cl "D"; cl "B"; cl "T"]) **> Is.class_value real);
+    (class_def_of (pol [cm "A12"; cl "D"; cl "B"]) "T" **> Is.class_value real);
 
 (*  (* Attempt to test a typical medium library pattern *)
   signature
