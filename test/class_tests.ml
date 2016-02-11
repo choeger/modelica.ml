@@ -220,7 +220,7 @@ let test_cases = [
        model B Real x(start = 2.0); end B;
        B b(x(start = 42.0));
      end A9"
-    (class_def_of (pol [cm "A9" ; fld "b"]) "x" **> Is.class_value Normalized.Real) ;
+    (Find.component (List.map any ["A9"; "b" ; "x"]) **> Is.successful **> The.lookup_result **> Is.class_value Normalized.Real) ;
 
 (*  signature
     "Indirect Field Type Redeclaration"
