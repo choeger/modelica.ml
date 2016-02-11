@@ -214,9 +214,14 @@ and norm lhs =
     begin match components with
         x::xs ->
         begin match lookup_lexical_in lhs.lookup_result x xs with
-          Success {lookup_success_state={current_path}; lookup_success_value} ->
-            let () = BatLog.logf "%s ==> %s\n" (Syntax.show_components components) (Path.show current_path) in
-            return (DynamicReference current_path)
+            Success {lookup_success_state={current_path}; lookup_success_value} ->
+            begin match lhs.new_element with
+                `SuperClass _ ->
+                (* Decompress superclasses on the fly - this should speed up later passes, otherwise yield a GlobalReference! *)
+                return lookup_success_value
+              | _ -> 
+                return (DynamicReference current_path)
+            end
         | Error err ->
           fail_lookup err
         | Recursion r -> norm_recursive r
