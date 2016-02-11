@@ -81,6 +81,24 @@ let rec add_imports imports state = match imports with
     [] -> ((),state)
   | i::imports -> add_imports imports {state with env = add_import state.env i}
 
+let shadow_imports public protected state =
+  let name_of = function
+    | Short tds -> tds.td_name
+    | Composition tds -> tds.td_name
+    | Enumeration tds -> tds.td_name
+    | OpenEnumeration tds -> tds.td_name
+    | DerSpec tds -> tds.td_name
+    | Extension tds -> tds.td_name
+  in
+
+  let folder = {Syntax.identity_folder with
+                fold_typedef = (fun _ td state -> {state with env = StrMap.remove (name_of td.commented).txt state.env}) ;
+                fold_definition = (fun _ def state -> {state with env = StrMap.remove def.commented.def_name state.env}) ;
+               }
+  in
+
+  ((), folder.fold_elements folder public (folder.fold_elements folder protected state))
+
 let return x = fun s -> (x, s)
 
 let bind ma f = fun s -> let (a, s') = ma s in
@@ -210,6 +228,7 @@ let rec mtranslate_tds = function
     in_context (
       do_ ;
       add_imports tds.type_exp.imports ;
+      shadow_imports tds.type_exp.public tds.type_exp.protected ;
       (* Class name *)
       down_class tds.td_name ;
       (* Class skeleton *)
@@ -246,6 +265,7 @@ let rec mtranslate_tds = function
     in_context (
       do_ ;
       add_imports cmp.imports ;
+      shadow_imports cmp.public cmp.protected ;
       down_class tds.td_name ;
       open_class tds.sort (repl tds.type_options) ;
       mtranslate_elements cmp.public ;
@@ -458,14 +478,6 @@ type translated_unit = {
   impl_code : value_program ;
   payload : payload_stmt list;
 } [@@deriving show,yojson]
-
-let name_of = function
-  | Short tds -> tds.td_name
-  | Composition tds -> tds.td_name
-  | Enumeration tds -> tds.td_name
-  | OpenEnumeration tds -> tds.td_name
-  | DerSpec tds -> tds.td_name
-  | Extension tds -> tds.td_name
 
 open FileSystem
 
