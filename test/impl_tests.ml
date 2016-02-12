@@ -171,11 +171,16 @@ let test_cases = [
     [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref [cconstfld "x"])))) ;
 
   test_norm "Inherited Name Resolution Inside Binding"
-    "class A class B constant Real x = 42.; end B; class C extends B; protected constant Real y = x; end C; end A"
+    "class A class E end E; class B constant Real x = 42.; end B; class C extends E; extends B; protected constant Real y = x; end C; end A"
     [`ClassMember "A"; `ClassMember "C"]
     (Has.field protected "y"
        (Is.bound_to (ComponentReference (knownref [cconstfld "x"]))))  ;
 
+  test_norm "Indirect Inherited Name Resolution"
+    "class A class B Real a; end B; class C extends B; end C; class D C c; Real x = c.a; end D; end A"
+    [`ClassMember "A"; `ClassMember "D"]
+    (Has.field public "x" **> Is.bound_to (cre (knownref [cfld "c"; cfld "a"]))) ;
+    
   test_norm
     "Lookup a modified constant in a simple Modelica class using extensions" 
     "package A model C extends B(x = 21.); end C; model B constant Real x = 42.; end B; end A" 
