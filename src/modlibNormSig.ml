@@ -51,7 +51,7 @@ exception Stratification of Path.t * string
 (** 
    A stratification result holds the last valid context of the existing prefix and the non existing suffix of the stratified path 
 *)
-type stratification_result = { lookup_result : lookup_state; protected : bool ; new_element : Path.elem_t }
+type stratification_result = { lookup_result : lookup_state; protected : bool ; new_element : Path.elem_t } 
 
 (** The target of a stratified path *)
 let target { lookup_result; protected; new_element} =
@@ -70,7 +70,6 @@ let rec stratify state next todo = match next with
       | None -> {lookup_result=state; protected=false; new_element = k}
     end
   | `Any x ->
-    BatLog.logf "Strat: %s . %s\n" (Path.show state.current_path) x ;
     match lookup_continue state {subscripts=[]; ident={txt=x;loc=Location.none}} [] with
       Success {lookup_success_state={current_path}} ->
       begin match DQ.rear current_path with
@@ -83,7 +82,6 @@ let rec stratify state next todo = match next with
             | Some (y, ys) ->
               (* This is an intermediate modified value, must exist locally *)
               if (not (Path.equal cs state.current_path)) then
-                 BatLog.logf "Strat %s WARN: %s != %s\n" x (Path.show cs) (Path.show state.current_path) ;
               assert (Path.equal cs state.current_path) ;
               next_fwd state (DQ.singleton c) y ys
           end
@@ -267,8 +265,7 @@ let rec norm_prog i p =
     let {lhs=ptr;rhs} = p.(i) in
     Report.do_ ;
     lhs <-- stratify_ptr ptr ;
-    norm <-- norm lhs rhs;
-    let () = BatLog.logf "stratified %s\n=  %s\n:=  %s\n==  %s\n" (show_class_ptr ptr) (Path.show (target lhs)) (show_class_term rhs) (show_class_value norm) in
+    norm <-- norm lhs rhs;    
     let o' = update (target lhs) (norm_cv norm) o in
     set_output (o') ;
     norm_prog (i+1) p
