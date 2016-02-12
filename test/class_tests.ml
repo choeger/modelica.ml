@@ -100,6 +100,11 @@ let test_cases = [
     (class_def_of (pol [cm "A"; cm "C" ]) "S" **> Is.class_value real) ;
 
   signature
+    "Local Forwarding of Builtin Types"
+    "replaceable class A type B = Real; B b; end A"
+    (class_def_of (pol [cm "A"]) "b" **> Is.class_value (type_ real)) ;  
+  
+  signature
     "Forwarding of Imported Builtin Types"
     "class A type B = Real; class C import D = A.B; class E type F = D; end E; end C; end A"
     (class_def_of (pol [cm "A"; cm "C"; cm "E"]) "F" **> Is.class_value (type_ real));
