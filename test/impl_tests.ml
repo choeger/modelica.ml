@@ -307,6 +307,16 @@ let test_cases = [
        (Has.modification_kind CK_Constant     &&&
         (Is.modified_to (Real 23.)))) ;
 
+  test_norm
+    "Redeclarations in the scope of a superclass"
+    "model P model M replaceable model A end A; model N A a; end N; end M;
+             model M2 extends M; redeclare model A constant Real x = 42.; end A; 
+                      model N2 extends N; constant Real y = a.x; end N2;
+             end M2;
+     end P"
+    [cm "P"; cm "M2"; cm "N2"]
+    (Has.field public "y" **> Is.bound_to (cre (knownref [cfld "a"; cconstfld "x"])));
+  
 ]
 
 let suite = "Implementation Normalization" >::: test_cases
