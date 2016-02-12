@@ -136,12 +136,10 @@ let rec get_class_element_in state {Normalized.class_members; super; fields} x x
     get_class_element {state with current_ref} (`FieldType x.ident.txt) (StrMap.find x.ident.txt fields).field_class xs
   end
   else begin
-    (*BatLog.logf "Looking in %d superclasses for %s\n" (IntMap.cardinal super) x.ident.txt ;*)
     (pickfirst_class state (x::xs) (IntMap.bindings super) )
   end
   
 and get_class_element_os state ({public;protected} as os) x xs =
-  (*BatLog.logf "Looking in: %s\n" (Path.show os.source_path) ;*)
   let f = get_class_element_in state public x xs in
   match f with
     Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
@@ -153,12 +151,12 @@ and get_class_element_os state ({public;protected} as os) x xs =
 and pickfirst_class state name = function
     [] -> Error {lookup_error_state=state; lookup_error_todo=name}
   | (k,v)::vs ->
-    (*BatLog.logf "Superclass %d = %s\n" k (show_class_value v.class_) ;*)
     let f = get_class_element state (`SuperClass k) v.class_ name in
     begin match f with
-        Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
+        Error {lookup_error_state={current_ref}} when DQ.size current_ref == DQ.size state.current_ref ->
         (* Nothing found, search next superclass *)
         pickfirst_class state name vs
+      | Error {lookup_error_state={current_ref}} as r -> BatLog.logf "Stop looking for (%s) . %s in superclasses. Found %s\n" (show_known_ref state.current_ref) (show_components name) (show_known_ref current_ref) ; r
       | r -> r
     end
 
@@ -201,7 +199,6 @@ and get_class_element state (k:history_entry_kind) e p =
 
     (* follow global references through self to implement redeclarations *)
   | DynamicReference g | GlobalReference g ->
-    BatLog.logf "Continuing lookup in %s\n" (Path.show g) ;
     let q = DQ.of_enum (Enum.filter (function (`FieldType _| `ClassMember _) -> true | _ -> false) (DQ.enum g)) in
 
     (* Append to trace, TODO: found_visible/found_replaceable *)
@@ -210,7 +207,6 @@ and get_class_element state (k:history_entry_kind) e p =
            i.e. path[last[h']] ++ q' == q
     *)
     let (history, q') = find_prefix (state.history, q) in
-    BatLog.logf "Suffix %s\n" (Path.show q') ;
         
     (* Create the new search task *)
     let new_p = List.of_enum (Enum.filter_map (function (`ClassMember x | `FieldType x) -> Some {ident={txt=x;loc=none};subscripts=[]} | _ -> None) (DQ.enum q')) in    
@@ -284,12 +280,11 @@ let rec forward state k c (todo:Path.t) =
   let state = {state with current_path} in
   match c with
   (* always append history, even if todo is empty *)
-    Class (os) ->
+  (Replaceable (Class os) | Class (os)) ->
     let history = append_to_history state k os in
     forward_os {state with history} os todo
   | c -> begin
       match DQ.front todo with
-        None -> state
       | Some(x,xs) ->
         raise (ExpansionException ("expected a class. got: " ^ (show_class_value c)))
     end
@@ -329,7 +324,7 @@ let forward_state state todo =
 (** Start lookup with the given state, follow lexical scoping rules *)
 let rec lookup_lexical_in state x xs =
   match DQ.rear state.history with
-    None -> raise EmptyScopeHistory
+    None -> Error {lookup_error_state=state; lookup_error_todo=x::xs}
   | Some(ys,y) ->
     match get_class_element_os state y.entry_structure x xs with
       Error {lookup_error_state={current_ref}} when current_ref==state.current_ref ->
