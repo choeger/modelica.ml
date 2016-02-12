@@ -217,7 +217,10 @@ and update_class_value lhs rhs = function
       | Some(`Protected, q) -> Class {os with protected = update_ q rhs protected}
       | Some _ -> Class {os with public = update_ lhs rhs public}
     end
-  | Replaceable cv -> Replaceable (update_class_value lhs rhs cv)
+  | Replaceable cv ->
+    begin match (update_class_value lhs rhs cv) with
+        (Replaceable cv' | cv') -> Replaceable cv'
+    end
   | (Recursive _ | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _ | DynamicReference _) as v ->
     begin match DQ.front lhs with
         None -> rhs
