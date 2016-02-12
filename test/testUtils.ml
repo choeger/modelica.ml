@@ -344,7 +344,8 @@ module P = struct
 
     let successful k = function
         ModlibLookup.Success s -> k s
-      | _ -> assert_failure "Lookup failed"
+      | Error err -> assert_failure ("Lookup Error: " ^ (show_components err.lookup_error_todo))
+      | _ -> assert_failure ("Lookup failed") 
     
     let ok k = function
         Failed -> assert_failure "Result was not OK."
