@@ -240,12 +240,17 @@ and get_class_element state (k:history_entry_kind) e p =
   | Enumeration flds ->
     begin match p with
         [] -> Success {lookup_success_state=finish_component state; lookup_success_value=Enumeration flds}
+      | [{ident={txt="start" | "min" | "max" | "fixed" | "quantity"}} as x] ->
+        let state = {(finish_component state) with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
+        Success {lookup_success_state=state;
+                 lookup_success_value=Enumeration flds} 
+        
       | [x] when StrSet.mem x.ident.txt flds ->
         let state = {(finish_component state) with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
         Success {lookup_success_state=state;
                  lookup_success_value=Enumeration flds} 
       | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
-    end
+end
   | (Int | Real | String | Bool) as v ->
     let rest = DQ.of_enum (List.enum (List.map (fun component -> {kind=CK_BuiltinAttr; component}) p)) in    
     let state = finish_component state in

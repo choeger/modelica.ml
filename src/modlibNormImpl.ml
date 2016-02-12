@@ -116,7 +116,7 @@ let resolve_builtin first rest =
   (* Array functions, see 10.3 *)
   | "size" | "ndims" -> builtin CK_BuiltinFunction
   | "scalar" | "vector" | "matrix" -> builtin CK_BuiltinFunction
-  | "cat" | "zeros" | "fill" | "ones" | "identity" | "diagonal" -> builtin CK_BuiltinFunction
+  | "array" | "cat" | "zeros" | "fill" | "ones" | "identity" | "diagonal" | "linspace" -> builtin CK_BuiltinFunction
 
   (* Builtin Classes *)
   | "String" | "StateSelect" | "Connections" | "AssertionLevel" -> builtin CK_BuiltinClass
@@ -326,6 +326,7 @@ let rec normalize_stmts history ({super;fields;class_members} as es)=
           end
       end
     | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
+      BatLog.logf "Error looking up modification target %s\n" (show_components todo) ;
       raise (ModificationTargetNotFound todo)
 
 
