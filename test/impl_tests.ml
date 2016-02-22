@@ -318,7 +318,17 @@ let test_cases = [
     (*
     [cm "P"; cm "M2"; cm "N2"]
     (Has.field public "y" **> Is.bound_to (cre (knownref [cfld "a"; cconstfld "x"])));*)
-  
+
+  test_norm
+    "Recursive records"
+    "package P 
+     operator record A replaceable Real a; operator '*' function multiply import P.A; input A a1; input A a2; output A a = A(a1.a * a2.a); end multiply; end '*'; end A;
+     end P"
+    [cm "P"; cm "A"; cm "'*'"; cm "multiply"] (Has.field public "a" **> Is.bound_to
+                                                 (App {fun_=rootref [cclass "P"; cclass "A"]; named_args=[];
+                                                       args=[
+                                                         Mul {left=(cre (knownref [cfld "a1"; cfld "a"])); right=cre (knownref [cfld "a2"; cfld "a"])}
+                                                       ]})) ;
 ]
 
 let suite = "Implementation Normalization" >::: test_cases

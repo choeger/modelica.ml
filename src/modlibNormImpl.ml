@@ -252,7 +252,6 @@ let rec normalize_classmod_stmts self kind {class_; class_mod} =
         BatLog.logf "Could not find: %s\n" (show_components todo) ;
         raise (ModificationTargetNotFound todo)
     in
-    BatLog.logf "Found %s\n" (show_known_ref field_name) ;
     let exp = resolve StrMap.empty self exp in
 
     (* merge modification and continue *)
@@ -269,9 +268,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
   | [] -> es
   | {field_name=y::ys;exp}::stmts ->
     (* normalize the modified component *)
-    BatLog.logf "\nResolving modification in %s\n" (show_object_struct self.tip.clbdy) ;
     let exp = resolve StrMap.empty self exp in
-    BatLog.logf "Looking for %s in %s\n" y.ident.txt (Path.show self.tip.clbdy.source_path) ;
     (* Lookup with an empty path to get the _relative_ result *)
     match get_class_element_in {(state_of_self self) with current_path = Path.empty} es y ys with
     | Success {lookup_success_state={current_ref; current_path}} ->
@@ -356,12 +353,13 @@ let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts}
         in
         let s = impl_mapper pub_state in
         let public = s.map_elements_struct s os.public in
-
+        
         let ppath = DQ.snoc os.source_path `Protected in
         let current_stmts = if PathMap.mem ppath strat_stmts then PathMap.find ppath strat_stmts else [] in        
         let s = impl_mapper {pub_state with current_stmts} in
         let protected = s.map_elements_struct s os.protected in
-        {os with public; protected; behavior});
+        {os with public; protected; behavior}
+      );
 
     map_elements_struct = (fun self {class_members; super; fields} ->
         (* deal with modified short-defined classes *)

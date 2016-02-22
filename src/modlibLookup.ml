@@ -109,12 +109,10 @@ let rec get_class_element_in state {Normalized.class_members; super; fields} x x
   if StrMap.mem x.ident.txt class_members then begin
     let current_ref = DQ.snoc state.current_ref {kind = CK_Class; component=x} in
     let cv = (StrMap.find x.ident.txt class_members).class_ in
-    BatLog.logf "Evaluating class member %s\n" x.ident.txt ;
     get_class_element {state with current_ref} (`ClassMember x.ident.txt) cv xs
   end
   else if StrMap.mem x.ident.txt fields then begin
     let current_ref = DQ.snoc state.current_ref {Syntax.kind = CK_Continuous; component=x} in
-    BatLog.logf "Evaluating member %s\n" x.ident.txt ;
     get_class_element {state with current_ref} (`FieldType x.ident.txt) (StrMap.find x.ident.txt fields).field_class xs
   end
   else begin
@@ -122,11 +120,9 @@ let rec get_class_element_in state {Normalized.class_members; super; fields} x x
   end
   
 and get_class_element_os state ({public;protected} as os) x xs =
-  BatLog.logf "Looking for %s in %s [%s]\n" x.ident.txt (Path.show os.source_path) (Path.show state.self.tip.clbdy.source_path);
   let f = get_class_element_in state public x xs in
   match f with
     Error {lookup_error_state={current_ref}} when undefined x.ident.txt public ->
-    BatLog.logf "Nothing found searching for %s in %s\n" x.ident.txt (show_object_struct os);
     (* Nothing found, search protected section *)
     let current_path = DQ.snoc state.current_path `Protected in
     get_class_element_in {state with current_path} protected x xs
@@ -142,7 +138,6 @@ and pickfirst_class state x xs = function
         Success {lookup_success_state={state with current_ref}; lookup_success_value=LPrimitive Unit}
       | Shape shape when StrMap.mem x.ident.txt shape ->
         (* Always re-evaluate the super class to catch all redeclarations *)
-        BatLog.logf "Evaluating super class %s\n" (show_class_value v.super_type) ;
         let super = get_class_element state (`SuperClass k) v.super_type [] in
         begin match super with
           | Success {lookup_success_state; lookup_success_value=LClass {clup;clbdy}} ->
@@ -165,7 +160,11 @@ and pickfirst_class state x xs = function
 *)
 and get_class_element state k e p =  
   let open Normalized in
-  BatLog.logf "Coming from %s.\n Looking at %s\n todo:\n%s.\n" (Path.show state.self.tip.clbdy.source_path) (show_class_value e) (show_components p) ;
+  (match p with
+    [{ident={txt="im"}}] ->
+    BatLog.logf "Looking for im in %s\n" (show_class_value e)
+  |  _ -> ());
+    
   let current_path = Path.snoc state.current_path k in
   let state = {state with current_path} in
   
@@ -180,21 +179,19 @@ and get_class_element state k e p =
     let state = {(finish_component state) with current_path} in
     function
       [] ->
-      BatLog.logf "Result replaceable? %b\n" state.current_attr.fa_replaceable ;
       let lookup_success_value = map_lv (fun sval ->
-          if state.current_attr.fa_replaceable then BatLog.logf "Result is replaceable" ;
           let {flat_attr; flat_val} = merge_attributes state.current_attr sval in
           unflat {flat_val;flat_attr}) v       
       in
       Success {lookup_success_state=state;lookup_success_value}
-    | x::xs -> begin match v with
+    | x::xs ->      
+      begin match v with
           LClass {clbdy} -> get_class_element_os state clbdy x xs                              
         | LPrimitive cv ->
           begin match cv with
             | Int | Real | String | Bool ->
               let rest = DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs)) in
               let lookup_success_state = {state with current_ref = DQ.append state.current_ref rest} in
-              BatLog.logf "Result replaceable? %b\n" state.current_attr.fa_replaceable ;
               let flat = merge_attributes state.current_attr cv in
               Success {lookup_success_state;
                        lookup_success_value=LPrimitive (unflat flat)} 
@@ -220,7 +217,6 @@ and get_class_element state k e p =
   
   let rec helper state = function
   | Class os ->
-    BatLog.logf "Looking in class: %s\n" (Path.show os.source_path) ;    
     assert (not (Path.equal os.source_path state.self.tip.clbdy.source_path)) ;
     let tip = {clup = Some state.self; clbdy = os} in
     let self =  {up = tip.clup; tip} in
@@ -237,11 +233,10 @@ and get_class_element state k e p =
     let rec upwards self = function
         0 -> {self with up = self.tip.clup}
       | n -> begin match self.up with None -> raise HierarchyError
-                                    | Some up -> BatLog.logf "Up is %s\n" (Path.show up.tip.clbdy.source_path); upwards up (n-1)
+                                    | Some up -> upwards up (n-1)
         end
     in
     let self = upwards state.self upref in
-    BatLog.logf "Went up %d. New tip is: %s\n" upref (Path.show self.tip.clbdy.source_path) ;
     let state = {state with self} in
     begin match DQ.front downref with
         None ->
@@ -273,7 +268,7 @@ and get_class_element state k e p =
     end
     
   (* Replaceable/Constr means to look into it *)
-  | Replaceable v -> BatLog.logf "Replaceable!\n" ; helper {state with current_attr = {state.current_attr with fa_replaceable=true}} v
+  | Replaceable v -> helper {state with current_attr = {state.current_attr with fa_replaceable=true}} v
   | Constr {constr=Cau c; arg} -> helper {state with current_attr = {state.current_attr with fa_cau = Some c}} arg
   | Constr {constr=Con c; arg} -> helper {state with current_attr = {state.current_attr with fa_con = Some c}} arg
   | Constr {constr=Var v; arg} -> helper {state with current_attr = {state.current_attr with fa_var = Some v}} arg

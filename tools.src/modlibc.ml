@@ -128,11 +128,11 @@ let run_compile global root =
           let c = Compress.compress_elements signature in
           BatLog.logf "Compression Ok.\n%!" ;
           let c' = clean global c in
-        
           let js = Normalized.elements_struct_to_yojson c' in
+          BatLog.logf "Signature Serialization Ok.\n%!";
           let sig_dump = Yojson.Safe.pretty_to_string js in
           write_out sig_dump (sig_file ()) ;
-          BatLog.logf "Signature Dump (%d) Ok.\n" (String.length sig_dump);
+          BatLog.logf "Signature Dump (%d) Ok.\n%!" (String.length sig_dump);
 
           let js = Normalized.elements_struct_to_yojson implementation in
           let impl_dump = Yojson.Safe.pretty_to_string js in

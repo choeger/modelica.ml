@@ -200,8 +200,8 @@ let rec mfold a f fm list state = match list with
     mfold (f a a') f fm xs s
 
 let apply_import n state = match n with
-  | x::xs when StrMap.mem x.txt state.env -> ((StrMap.find x.txt state.env) @ xs, state)
-  | xs -> (xs, state)
+  | x::xs when StrMap.mem x.txt state.env -> (RootReference ((StrMap.find x.txt state.env) @ xs), state)
+  | xs -> (Reference xs, state)
 
 let get state = (state, state)
 
@@ -288,7 +288,7 @@ and mtranslate_texp post =
   | TName [{txt="String"}] -> define (post PString)
 
   | TName n -> do_ ; r <-- apply_import n ;
-    define (post (Reference r))
+    define (post r)
   | TRootName n -> define (post (RootReference n))
 
   | TArray {base_type;dims} -> appl base_type (CArray (List.length dims))

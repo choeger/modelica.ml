@@ -38,7 +38,12 @@ type 'a result = Ok of 'a | Failed
 
 type message = { level : level ; where : Location.t ; what : string }
 
-let show_message {level;what} = Printf.sprintf "%s: %s" (show_level level) what
+let show_loc loc =
+  Location.print Format.str_formatter loc ; Format.flush_str_formatter ()
+
+let show_message {level;where;what} = if where != Location.none then
+    Printf.sprintf "%s\n%s: %s" (show_loc where) (show_level level) what 
+    else Printf.sprintf "%s: %s" (show_level level) what
 
 let print_message o msg = IO.nwrite o (show_message msg)
 
@@ -109,7 +114,7 @@ let fail_unresolved {searching; result} =
 
 let fail_lookup {lookup_error_state=state; lookup_error_todo=todo} =
   do_ ;
-  log{level=Error;where=Location.none;
+  log{level=Error;where=(match todo with [] -> Location.none | fst::_ -> fst.ident.loc);
       what=Printf.sprintf "Could not find %s in:\n%s\n"
           (show_components todo)
           (dump_lookup_state state)} ;

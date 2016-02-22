@@ -98,6 +98,7 @@ let norm_pkg_root ?(notify=fun _ -> ()) root =
   let notify last =
     incr d; notify {last; max; done_ = !d}
   in
-  return {signature; implementation = ModlibNormImpl.norm signature notify payloads stmts}
+  let implementation = ModlibNormImpl.norm signature notify payloads stmts in    
+  return {signature; implementation}
   
       
