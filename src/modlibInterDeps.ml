@@ -75,7 +75,7 @@ let rec reads r i {lhs; rhs} =
   | Constr {arg} ->  reads r i {lhs; rhs=arg}
   | Close -> r                         
   | Reference n ->
-    let sources = prefixes (Name.scope_of_ptr lhs) in 
+    let sources = prefixes (Name.of_ptr lhs) in 
     let what = Name.of_list (lunloc n) in
     add_reads i (FirstOf {what; sources}) r
 

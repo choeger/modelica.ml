@@ -41,12 +41,13 @@ open P
 
 let ident = Syntax_fragments.any
 let pol = Path.of_list 
-
+let nol = Name.of_list
+            
 (** Test case generator, checks the predicate on a path for a signature from source.
     The path is a singleton (def). 
     The predicate is abstracted over path to avoid tedious redundancy *)
 let class_ input c pred =
-  (Printf.sprintf "Normalize '%s'" input) >:: (Parse.as_typedef **> Compute.signature **> (Find.def_of Path.empty (any c)) **>
+  (Printf.sprintf "Normalize '%s'" input) >:: (Parse.as_typedef **> Compute.signature **> (Find.def_of Path.empty [any c]) **>
                                                Is.successful **> The.lookup_result **> (pred (pol [cm c]))) input
 
 (** Test signatures directly *)
@@ -66,7 +67,7 @@ let class_with_public_M source_path = Class {empty_object_struct with source_pat
     
 let class_with_protected_M source_path = Class {empty_object_struct with source_path ; protected = {empty_elements with class_members = StrMap.singleton "M" {empty_modified_class with class_ = class_M (DQ.snoc (DQ.snoc source_path `Protected) (cm "M"))}}}
 
-let class_def_of p cm k = Find.def_of p (any cm) **> Is.successful **> The.lookup_result k
+let class_def_of p cm k = Find.def_of p (List.map any cm) **> Is.successful **> The.lookup_result k
 
 (** Actual test cases *)
 let test_cases = [
@@ -87,50 +88,50 @@ let test_cases = [
   signature
     "Normalization of replaceables"
     "class A class B replaceable type T = Real; end B; type T = B.T ; end A"
-    ((class_def_of (pol [cm "A"; cm "B"]) "T") **> Is.replaceable **> (Is.class_value (type_ real))) ;
+    ((class_def_of (pol [cm "A"; cm "B"]) ["T"]) **> Is.replaceable **> (Is.class_value (type_ real))) ;
 
   signature
     "References to replaceables should yield dynamics"
     "class A class B replaceable type T = Integer; end B; type T = B.T ; end A"
-    (Find.type_at (pol [cm "A"; cm "T"]) **> (Is.class_value (type_ (dynref (pol [cm "A";cm "B";cm "T"]))))) ;
+    (Find.type_at (pol [cm "A"; cm "T"]) **> (Is.class_value (type_ (dynref 0 (nol ["B"; "T"]))))) ;
 
   signature
     "Forwarding Builtin Types"
     "class A type B = Real; class C type S = B; end C; end A"
-    (class_def_of (pol [cm "A"; cm "C" ]) "S" **> Is.class_value real) ;
+    (class_def_of (pol [cm "A"; cm "C" ]) ["S"] **> Is.class_value real) ;
 
   signature
     "Local Forwarding of Builtin Types"
     "replaceable class A type B = Real; B b; end A"
-    (class_def_of (pol [cm "A"]) "b" **> Is.class_value (type_ real)) ;  
+    (class_def_of (pol [cm "A"]) ["b"] **> Is.class_value (type_ real)) ;  
   
   signature
     "Forwarding of Imported Builtin Types"
     "class A type B = Real; class C import D = A.B; class E type F = D; end E; end C; end A"
-    (class_def_of (pol [cm "A"; cm "C"; cm "E"]) "F" **> Is.class_value (type_ real));
+    (class_def_of (pol [cm "A"; cm "C"; cm "E"]) ["F"] **> Is.class_value (type_ real));
 
   signature
     "Shadowing of imports"
     "class A type S = Real; import T = A.S; class B type T = Integer; T x; end B; end A"
-    (class_def_of (pol [cm "A"; cm "B"]) "x" **> Is.class_value (type_ int));
+    (class_def_of (pol [cm "A"; cm "B"]) ["x"] **> Is.class_value (type_ int));
   
   signature
     "Inheritance of forwarded Builtin Types"
     "class A class B1 type T = Real; end B1; extends B1; end A"
-    (class_def_of (pol [cm "A" ; sup 0]) "T" **> Is.class_value real );
+    (class_def_of (pol [cm "A"]) ["T"] **> Is.class_value real );
 
   signature
     "Inheritance of nested forwarded Builtin Types"
     "class A class B class C type T = Real; end C; end B; 
              class D extends B; end D; 
      end A" 
-    (class_def_of (pol [cm "A"; cm "D"; sup 0; cm "C"]) "T" **> Is.class_value (type_ real)) ;
+    (class_def_of (pol [cm "A"; cm "D"]) ["C"; "T"] **> Is.class_value (type_ real)) ;
 
   signature
     "Inheritance of Fields"
     "class AA class B Real b; end B; 
               class C extends B; end C; end AA"
-    (class_def_of (pol [cm "AA"; cm "C"; sup 0]) "b" **> Is.class_value Normalized.Real) ;
+    (class_def_of (pol [cm "AA"; cm "C"]) ["b"] **> Is.class_value Normalized.Real) ;
 
   signature
     "Lookup of redeclared Elements"
@@ -141,7 +142,7 @@ let test_cases = [
        class C = B2(redeclare type T2 = Integer); 
        type T = C.T2 ; 
      end A"
-    (class_def_of (pol [cm "A"]) "T" (Is.replaceable (Is.class_value (type_ (int))))) ;
+    (class_def_of (pol [cm "A"]) ["T"] (Is.replaceable (Is.class_value (type_ (int))))) ;
 
   signature
     "Lookup of indirectly redeclared elements"
@@ -154,7 +155,7 @@ let test_cases = [
         model D3 = B3(redeclare type T3 = T3); 
        end C3; 
      end A3"
-    (class_def_of (pol [cm "A3"; cm "C3"; cm "D3"]) "T3" **> (Is.replaceable (Is.class_value (type_ real)))) ;
+    (class_def_of (pol [cm "A3"; cm "C3"; cm "D3"]) ["T3"] **> (Is.replaceable (Is.class_value (type_ real)))) ;
 
   signature
     "Lookup of nested redeclarations"
@@ -193,7 +194,7 @@ let test_cases = [
        end C;
        C c;
      end A6"
-    (class_def_of (pol [cm "A6"; cm "C" ; sup 0]) "x" **> (Is.class_value (const (Normalized.Real)))) ;
+    (class_def_of (pol [cm "A6"; cm "C"]) ["x"] **> (Is.class_value (const (Normalized.Real)))) ;
   
   signature
     "Redeclarations inside Components"
@@ -217,7 +218,7 @@ let test_cases = [
     "class A8
        Real x(start = 2.0);
      end A8"
-    (class_def_of (pol [cm "A8"]) "x" **> Is.class_value Normalized.Real) ;
+    (class_def_of (pol [cm "A8"]) ["x"] **> Is.class_value Normalized.Real) ;
 
   signature
     "Nested Field Lookup"
@@ -255,24 +256,24 @@ let test_cases = [
        model C replaceable model B = B; end C;
        model D extends C; redeclare model extends B redeclare type T = Real; T t(start=0.0); end B; end D;    
      end A12"
-    (class_def_of (pol [cm "A12"; cl "D"; cl "B"]) "T" **> Is.class_value real);
+    (class_def_of (pol [cm "A12"; cl "D"; cl "B"]) ["T"] **> Is.class_value real);
 
-(*  (* Attempt to test a typical medium library pattern *)
-  signature
+  
+  (* Attempt to test a typical medium library pattern *)
+    signature
     "Forwarding a Redeclaration into a Component (Media Library Pattern)"
     "package MiniMedium
-       package DefaultMedium type T = Integer; end DefaultMedium ;
-       package NonDefaultMedium type T = Real; end NonDefaultMedium;
+       package DefaultMedium end DefaultMedium ;
+       package NonDefaultMedium constant Real foo = 42.; end NonDefaultMedium;
        class Interface replaceable package Medium = DefaultMedium; end Interface;
        
-       class SomeComponent extends Interface; constant Medium.T s = 42; end SomeComponent;
+       class SomeComponent extends Interface; Medium medium; end SomeComponent;
        
        class SomeModel extends Interface(redeclare package Medium = NonDefaultMedium); 
-                       SomeComponent component(redeclare package Medium = Medium); 
+             SomeComponent component(redeclare package Medium = Medium, medium(foo = 23.)); 
        end SomeModel;
      end MiniMedium"
-    (Compute.structural_type_of (pol [cm "MiniMedium"; cm "SomeModel"; fld "component"; cm "Medium"; cm "T"]) **>
-     Is.struct_val **> {sv_desc=Normalized.SReal; sv_attr={Normalized.empty_attr with fa_sort = Some Type}}) ;*)
+    (class_def_of (pol [cm "MiniMedium"; cm "SomeModel"]) ["component"] **> Is.class_value real);
   
 ]
 

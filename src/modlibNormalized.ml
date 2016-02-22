@@ -61,8 +61,17 @@ type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                  | Replaceable of class_value
                  | GlobalReference of Path.t
                  | Recursive of rec_term
-                 | DynamicReference of Path.t
+                 | DynamicReference of reference_struct
   [@@deriving eq,show,yojson,folder,mapper]
+
+and reference_struct = {upref : int ; downref : Name.t}
+
+and super_class = {super_shape : super_shape ;
+                   super_type : class_value;
+                   super_mod : field_modification StrMap.t [@default StrMap.empty]}
+
+and super_shape = Shape of component_kind StrMap.t
+                | Primitive
 
 and rec_term = { rec_lhs : class_path; rec_rhs : class_term }
 
@@ -86,7 +95,7 @@ and modified_class = { class_ : class_value ;
                        class_mod : field_modification StrMap.t [@default StrMap.empty]}
 
 and elements_struct = { class_members : modified_class StrMap.t [@default StrMap.empty];
-                        super : modified_class IntMap.t [@default IntMap.empty];
+                        super : super_class IntMap.t [@default IntMap.empty];
                         fields : class_field StrMap.t [@default StrMap.empty]
                       }
 
@@ -103,7 +112,14 @@ let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () =
    map_object_struct = (fun self os -> {os with public = self.map_elements_struct self os.public ;
                                                 protected = self.map_elements_struct self os.protected ;
                                                 behavior = map_behavior os.behavior}) ;
-  
+
+   map_super_class = (fun self {super_shape; super_type; super_mod} ->
+       let super_shape = self.map_super_shape self super_shape in
+       let super_type = self.map_class_value self super_type in
+       let super_mod = StrMap.map (self.map_field_modification self) super_mod in
+       {super_shape; super_type; super_mod}
+     );
+   
    map_modified_class = (fun self {class_; class_mod} ->
        let class_ = self.map_class_value self class_ in
        let class_mod = StrMap.map (self.map_field_modification self) class_mod in
@@ -116,7 +132,7 @@ let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () =
                       
    map_elements_struct = (fun self {class_members; super; fields} ->
        let class_members = StrMap.map (self.map_modified_class self) class_members in
-       let super = IntMap.map (self.map_modified_class self) super in
+       let super = IntMap.map (self.map_super_class self) super in
        let fields = StrMap.map (self.map_class_field self) fields in
        {class_members; super; fields}) ;      
 }
@@ -126,14 +142,15 @@ type flat_attributes = {
   fa_var : variability option [@default None];
   fa_con : connectivity option [@default None];
   fa_cau : causality option [@default None];
+  fa_replaceable : bool [@default false];
 }	[@@deriving show,yojson]		     
 
 type flat_repr = {
   flat_val : class_value ;
-  flat_attr : flat_attributes [@default {fa_sort=None;fa_var=None;fa_con=None;fa_cau=None}]
+  flat_attr : flat_attributes [@default {fa_sort=None;fa_var=None;fa_con=None;fa_cau=None;fa_replaceable=false}]
 } [@@deriving show,yojson]
 
-let no_attributes = {fa_con = None; fa_cau = None; fa_sort = None; fa_var = None}
+let no_attributes = {fa_con = None; fa_cau = None; fa_sort = None; fa_var = None; fa_replaceable = false}
 
 let rec merge_attributes fa =
   let flat_ = merge_attributes in
@@ -143,22 +160,19 @@ let rec merge_attributes fa =
   | Constr {arg; constr = Cau c} when fa.fa_cau = None -> flat_ {fa with fa_cau = Some c} arg
   | Constr {arg; constr = Sort s} when fa.fa_sort = None -> flat_ {fa with fa_sort = Some s} arg
   | Constr {arg; constr} -> flat_ fa arg
-  | Replaceable cv -> begin match flat_ fa cv with
-        {flat_val = Replaceable cv ; flat_attr } as fv -> fv
-      | fv -> {fv with flat_val = Replaceable fv.flat_val}
-    end
+  | Replaceable cv -> flat_ {fa with fa_replaceable = true} cv
   | flat_val -> {flat_val; flat_attr = fa}  
 
 let flat = merge_attributes no_attributes
 
 let rec unflat = function
-  | {flat_val = Replaceable flat_val} as fv -> Replaceable (unflat {fv with flat_val})
-  | {flat_val; flat_attr={fa_sort;fa_var;fa_cau;fa_con}} ->
+  | {flat_val; flat_attr={fa_sort;fa_var;fa_cau;fa_con;fa_replaceable}} ->
     let unflat_sort s cv = match s with None -> cv | Some s -> Constr {arg=cv; constr=Sort s} in
     let unflat_cau c cv = match c with None -> cv | Some c -> Constr {arg=cv; constr=Cau c} in
     let unflat_con c cv = match c with None -> cv | Some c -> Constr {arg=cv; constr=Con c} in
     let unflat_var v cv = match v with None -> cv | Some v -> Constr {arg=cv; constr=Var v} in
-    flat_val |> (unflat_sort fa_sort) |> (unflat_var fa_var) |> (unflat_con fa_con) |> (unflat_cau fa_cau)
+    let unflat_repl v cv = if v then Replaceable cv else cv in
+    flat_val |> (unflat_sort fa_sort) |> (unflat_var fa_var) |> (unflat_con fa_con) |> (unflat_cau fa_cau) |> (unflat_repl fa_replaceable)
 
 let norm_cv = flat %> unflat
 
@@ -169,6 +183,7 @@ let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=emp
 let empty_class = Class empty_object_struct
 let no_modification = {mod_kind=CK_Class; mod_nested = StrMap.empty; mod_default=None}
 let empty_modified_class = {class_ = empty_class; class_mod = StrMap.empty}
+let empty_super_class = {super_type = empty_class; super_mod = StrMap.empty; super_shape=Shape StrMap.empty}
 
 type prefix_found_struct = { found : class_path ; not_found : component list } [@@deriving show,yojson]
 
@@ -195,6 +210,13 @@ let rec update_ (lhs:class_path) rhs ({class_members;fields;super} as elements) 
   | Some (`ClassMember x, r) -> {elements with class_members = update_map r rhs x class_members}
   | Some (`Protected,_) -> raise (IllegalPath "")
 
+and update_super_class lhs rhs ({super_type; super_shape} as cm) =
+  {cm with super_type = update_class_value lhs rhs super_type;
+           super_shape=update_super_shape lhs rhs super_shape;           
+  }
+
+and update_super_shape lhs rhs super_shape = match DQ.front lhs with None -> rhs.map_super_shape rhs super_shape | _ -> super_shape
+
 and update_modified_class lhs rhs ({class_} as cm) =
   {cm with class_ = update_class_value lhs rhs class_}
 
@@ -208,12 +230,12 @@ and update_field_map lhs rhs x m =
 and update_field_class_value lhs rhs f = {f with field_class = update_class_value lhs rhs f.field_class}
 
 and update_intmap lhs rhs i map =  
-  IntMap.modify_def empty_modified_class i (update_modified_class lhs rhs) map
+  IntMap.modify_def empty_super_class i (update_super_class lhs rhs) map
 
 and update_class_value lhs rhs = function
   | Constr {constr; arg} -> Constr {constr ; arg = (update_class_value lhs rhs arg)}
   | Class ({public; protected} as os) -> begin match DQ.front lhs with
-        None -> rhs
+        None -> rhs.map_class_value rhs (Class (empty_object_struct))
       | Some(`Protected, q) -> Class {os with protected = update_ q rhs protected}
       | Some _ -> Class {os with public = update_ lhs rhs public}
     end
@@ -223,7 +245,7 @@ and update_class_value lhs rhs = function
     end
   | (Recursive _ | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _ | DynamicReference _) as v ->
     begin match DQ.front lhs with
-        None -> rhs
+        None -> rhs.map_class_value rhs v
       | Some (x,xs) -> raise (CannotUpdate(Path.show_elem_t x, show_class_path xs, show_class_value v))
     end
 
@@ -242,7 +264,7 @@ let rec follow_path global found_path found_value path = match DQ.front path wit
       match found_value with
       | Class os -> follow_path_os global found_path os xs x
       (* follow global references *)
-      | DynamicReference g | GlobalReference g -> begin
+      | GlobalReference g -> begin
           match DQ.front g with
             None -> raise (IllegalPath "")
           | Some (y,ys) -> begin 
@@ -273,7 +295,7 @@ and follow_path_os global found_path {protected; public} todo = function
 and follow_path_es global found_path {class_members;super;fields} todo = function
     `SuperClass n when IntMap.mem n super ->
     follow_path global (DQ.snoc found_path (`SuperClass n))
-      (IntMap.find n super).class_ todo
+      (IntMap.find n super).super_type todo
 
   | `SuperClass n -> raise (IllegalPath ("super(" ^ (string_of_int n) ^ ")"))
 

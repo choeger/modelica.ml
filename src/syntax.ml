@@ -36,6 +36,8 @@ open Utils
     @author Christoph Höger
 *)
 
+exception AstInvariant
+
 open Sexplib.Conv (* string_of_sexp *)
        
 module Flags = struct
@@ -69,7 +71,7 @@ type loc_t = Location.t = {
     loc_ghost: bool;
   } [@@deriving show,eq,yojson,mapper,folder,sexp]
 
-  and 'a located = 'a Location.loc = {txt : 'a; loc : loc_t [@default Location.none] [@sexp_drop_default]}
+  and 'a located = 'a Location.loc = {txt : 'a; loc : loc_t [@default Location.none] [@sexp_drop_default] [@opaque]}
 
   and str = string located
 
@@ -296,7 +298,7 @@ type loc_t = Location.t = {
                        
   and known_component = { kind : component_kind ; component : component }
 
-  and component = { ident : str ; subscripts : exp list }
+  and component = { ident : str ; subscripts : exp list [@default []] }
 
   and idx = { variable : str ; range : exp option } 
 
@@ -334,3 +336,7 @@ type loc_t = Location.t = {
   and modification = { types : type_redeclaration list ;
                        components : component_redeclaration list ;
                        modifications : component_modification list ; } 
+let ck_of_var = 
+  let open Flags in
+  function None -> CK_Continuous | Some Constant -> CK_Constant | Some Parameter -> CK_Parameter | Some Discrete -> CK_Discrete
+

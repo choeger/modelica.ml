@@ -66,77 +66,62 @@ module Format = StdFormat
 
 exception StructuralError of string
 
-module IntMap = struct include Map.Make(Int)
-  let compare (k,v) (k',v') = Int.compare k k'
-  let to_yojson a m =
-    (* We encode intMaps as lists, using the entry number as key, this means that we cannot encode sparsely populated maps,
-                            but since IntMaps in the abstract syntax are only used to ease the lookup, that should be fine. Maybe switch to vectors later. *)
-    let max = (cardinal m) in
-    for i = 0 to max - 1 do
-      if not (mem i m) then
-        raise (StructuralError (Printf.sprintf "Yojson failed. IntMap is not densely packed. Missing element %d out of %d." i max))
-    done ;
-    `List (List.map (fun (k,v) -> a v) (List.sort compare (bindings m)))
-
-  let of_yojson f js =
-    let rec h mr v =
-      match mr with
-        `Ok m -> begin
-          match f v with
-            `Error _ as e -> e
-          | `Ok v' -> `Ok (add (cardinal m) v' m)
-        end
-      | `Error _ as e -> e
-    in
-    match js with `List ls -> List.fold_left h (`Ok empty) ls
-                | _ -> `Error "expected a json-list"                                             
-
-  let of_list bs = of_enum (List.enum bs)
-  open StdFormat 
-  let pp pp_v fmt s =
-    let pp_comma fmt () = fprintf fmt "," in
-    let pp_pair fmt (k,v) = fprintf fmt "%d@ =@ %a" k pp_v v in
-    fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
-
+module type RichOrderedType = sig
+  type t [@@deriving show,eq,ord,yojson]
 end
 
-module StrMap = struct include Map.Make(String)
+module RichStr = struct
+  type t = string[@@deriving show,eq,ord,yojson]
+end
+
+module RichInt = struct
+  type t = int[@@deriving show,eq,ord,yojson]
+end
+
+module RichMap(Ord : RichOrderedType) = struct
+  include Map.Make(Ord)
+
   let union m1 m2 = Enum.fold (fun m (k,v) -> add k v m) m1 (enum m2)
   let find_or_else v x m = if mem x m then find x m else v
-  let to_yojson a m = `Assoc (List.map (fun (k,v) -> (k,a v)) (bindings m))                                            
+  let to_yojson a m = `List (List.map (fun (k,v) -> `Tuple [Ord.to_yojson k; a v]) (bindings m))                                            
 
   let of_yojson f js =
-    let rec h mr (k,v) =
-      match mr with
-        `Ok m -> begin
-          match f v with
-            `Error _ as e -> e
-          | `Ok v' -> `Ok (add k v' m)
+    let rec h mr kv =
+      match (mr,kv) with
+        `Ok m, (`Tuple [k;v]) -> begin
+          match (Ord.of_yojson k, f v) with
+            (_, (`Error _ as e)) | (`Error _ as e, _) -> e
+          | (`Ok k', `Ok v') -> `Ok (add k' v' m)
         end
-      | `Error _ as e -> e
+      | (`Ok _, _) -> `Error "expected a 2-tuple"
+      | (`Error _ as e, _) -> e
     in
-    match js with `Assoc ls -> List.fold_left h (`Ok empty) ls
-                | _ -> `Error "expected a json-object"                                             
-
+    match js with `List ls -> List.fold_left h (`Ok empty) ls
+                | _ -> `Error "expected a json-list"                                         
 
   let of_list bs = of_enum (List.enum bs)
   open StdFormat 
   let pp pp_v fmt s =
     let pp_comma fmt () = fprintf fmt "," in
-    let pp_pair fmt (k,v) = fprintf fmt "%s@ =@ %a" k pp_v v in
+    let pp_pair fmt (k,v) = fprintf fmt "%a@ =@ %a" Ord.pp k pp_v v in
     fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
+
+  let show poly_a = [%derive.show : 'a t]
+
+  let eq poly_a = [%derive.eq : 'a t]
 end
 
-module StrSet = struct include Set.Make(String) 
-  let to_yojson s = `List (List.map (fun e -> `String e) (elements s))
+module RichSet(Ord : RichOrderedType) = struct
+  include Set.Make(Ord) 
+  let to_yojson s = `List (List.map (fun e -> Ord.to_yojson e) (elements s))
 
   let of_yojson js =
     let rec h sr v =
       match sr with
         `Ok s -> begin
-          match v with
-          | `String v' -> `Ok (add v' s)
-          | _ as e -> `Error "Expected a json-string"
+          match Ord.of_yojson v with
+          | `Ok v' -> `Ok (add v' s)
+          | `Error _ as e -> e
         end
       | `Error _ as e -> e
     in
@@ -144,12 +129,21 @@ module StrSet = struct include Set.Make(String)
                 | _ -> `Error "expected a json-list"                                             
 
   open StdFormat
-  let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_print_string) (elements s)
+  let pp fmt s = let pp_comma fmt () = fprintf fmt "," in fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma Ord.pp) (elements s)
 
   let show s = pp (Format.str_formatter) s ; Format.flush_str_formatter ()
+
+  module Map = RichMap(Ord)
+  
+  let mkmap f s =
+    Map.of_enum (Enum.map (fun k -> (k, f k)) (enum s))
 end
 
-module IntSet = struct include Set.Make(Int) end
+module IntSet = RichSet(RichInt)
+module StrSet = RichSet(RichStr)
+
+module IntMap = RichMap(RichInt)
+module StrMap = RichMap(RichStr)
 
 module List = List
   
@@ -192,15 +186,9 @@ let unloc {Location.txt} = txt
 let lunloc xs = List.map unloc xs
 
 module Name = struct         
-  type t = string DQ.t [@@deriving show, yojson]
-
-  let str_compare a b = String.compare a b 
-
-  let compare a b = Enum.compare str_compare (DQ.enum a) (DQ.enum b)
+  type t = string DQ.t [@@deriving show,eq,ord,yojson]
 
   let hash = Hashtbl.hash
-
-  let equal a b = compare a b = 0
 
   let empty = DQ.empty
 
@@ -212,24 +200,20 @@ module Name = struct
 
   let singleton = DQ.singleton
 
-  let rec scope_of_ptr_ tmp dq = match DQ.front dq with
-    | None -> tmp
-    | Some ((`FieldType _ | `Any _ | `SuperClass _ ), _) -> tmp
-    | Some (`Protected, r) -> scope_of_ptr_ tmp r
-    | Some ((`ClassMember x), r) -> scope_of_ptr_ (DQ.snoc tmp x) r
+  let front = DQ.front
 
-  let scope_of_ptr dq = match (DQ.rear dq) with
-      Some(xs,`ClassMember x) -> (scope_of_ptr_ DQ.empty xs)
-    | _ -> (scope_of_ptr_ DQ.empty dq)
+  let rear = DQ.rear
 
+  let size = DQ.size
+  
   let rec of_ptr_ tmp dq = match DQ.front dq with
     | None -> tmp
     | Some ((`SuperClass _  | `Protected), r) -> of_ptr_ tmp r
-    | Some ((`FieldType x), r) -> of_ptr_ (DQ.snoc tmp ("type_of_" ^ x)) r
+    | Some ((`FieldType x), r) -> of_ptr_ (DQ.snoc tmp x) r
     | Some ((`ClassMember x | `Any x), r) -> of_ptr_ (DQ.snoc tmp x) r
 
   let of_ptr dq = of_ptr_ DQ.empty dq
 end
 
-module NameMap = Map.Make(Name)
-module NameSet = Set.Make(Name)
+module NameMap = RichMap(Name)
+module NameSet = RichSet(Name)

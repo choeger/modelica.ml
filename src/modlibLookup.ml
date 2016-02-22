@@ -33,41 +33,50 @@ module Inter = ModlibInter
 module Normalized = ModlibNormalized
 open Inter
 open Syntax
+open Syntax_fragments
 open Normalized
     
 exception EmptyName
 exception ExpansionException of string
 exception ForwardFailure of Path.elem_t
 exception EmptyScopeHistory
-
-type history_entry_kind = [`FieldType of string | `ClassMember of string | `SuperClass of int] [@@deriving yojson,show]
-
-type history_entry_t = { entry_structure : object_struct; entry_kind : history_entry_kind} [@@deriving yojson]
-
-let pp_history_entry_t fmt = function
-    { entry_structure ; entry_kind = `ClassMember x} -> Format.fprintf fmt "class %s = %a" x Path.pp entry_structure.source_path
-  | { entry_structure ; entry_kind = `SuperClass i} -> Format.fprintf fmt "super %d = %a" i Path.pp entry_structure.source_path
-
+exception HierarchyError
+exception DecompressionError
+  
 type trace_t = Path.t DQ.t [@@deriving show,yojson]
 
-type history_t = history_entry_t DQ.t [@@deriving show,yojson]
+type lnode = { up : lnode option; tip : lclass }
+
+and lclass = { clup : lnode option; clbdy : object_struct; }
+  [@@deriving show,yojson]
+
+type lookup_value = LClass of lclass | LPrimitive of class_value
+  [@@deriving show,yojson]
+
+let class_value_of_lookup = function LClass {clbdy} -> Class clbdy | LPrimitive cv -> cv
+
+let map_lv f = function LClass {clup; clbdy} -> LClass {clup; clbdy}
+                      | LPrimitive v -> LPrimitive (f v)
 
 type lookup_state = {
-  history : history_t; (** The visited classes *)
+  self : lnode ;
   trace : trace_t; (** The found references *)
-  replaceable : bool; (** Visited a replaceable declaration *)
   current_path : Path.t ; (** The path to the current class value *)
   current_attr : flat_attributes ;
   current_ref : Syntax.known_ref; (** The search request as a resolved component *)
   current_scope : int; (** Relative current scope *)
 } [@@deriving show,yojson]
 
-let empty_lookup_state = {history=DQ.empty; trace=DQ.empty; replaceable = false ; current_path=Path.empty; current_attr=no_attributes; current_ref=DQ.empty; current_scope=0}
+let rec root_class_of self = match self.up with None -> self.tip | Some self -> root_class_of self
+
+let empty_lookup_state = {trace=DQ.empty; self={up=None;tip={clup=None; clbdy=empty_object_struct}};
+                          current_path=Path.empty;
+                          current_attr=no_attributes; current_ref=DQ.empty; current_scope=0}
 
 let dump_lookup_state {current_path} = Printf.sprintf "Last class: %s\n" (Path.show current_path)
 
 type lookup_success_struct = { lookup_success_state : lookup_state ;
-                               lookup_success_value : class_value ;
+                               lookup_success_value : lookup_value ;
                              } [@@deriving show,yojson]
 
 type lookup_error_struct = { lookup_error_state : lookup_state ;
@@ -83,81 +92,70 @@ type lookup_result = Success of lookup_success_struct
                    | Error of lookup_error_struct
   [@@deriving show,yojson]
 
-let path_of_history h = match DQ.front h with
-    Some(root,classes) ->
-    (* First entry is the unnamed root class *)
-    DQ.map (fun {entry_kind} -> (entry_kind :> Path.elem_t)) classes
-  | _ -> Path.empty (* Should not happen, but empty path is safe default *)
 
-(** wrap a history of visited classes into a new lookup state *)
-let state_of_history history = {history;
-                                replaceable = false;
-                                trace = DQ.empty ;
-                                current_ref = DQ.empty;
-                                current_attr = no_attributes;
-                                current_scope = 0;
-                                current_path = path_of_history history}
+(** wrap a scope of visited classes into a new lookup state *)
+let state_of_self self = {self;
+                          trace = DQ.empty ;
+                          current_ref = DQ.empty;
+                          current_attr = no_attributes;
+                          current_scope = 0;
+                          current_path = self.tip.clbdy.source_path}
 
-(** Find the first (from bottom) class which is a prefix of $path in $history and the corresponding suffix 
-    If the last entry is a superclass, the corresponding extending class is returned.
-    This should yield the context of a given path relativ to the current search history.
-*)
-let rec find_prefix (history, path) =
-  let rec ip p1 p2 =
-    match DQ.front p1 with None -> Some p2 | Some(x,xs) -> begin match DQ.front p2 with Some(y,ys) when y = x -> ip xs ys | _ -> None end
-  in
-  let rec drop_superclasses history = match DQ.rear history with
-      Some(history, {entry_kind=`SuperClass _}) -> drop_superclasses history
-    | _ -> history
-  in
-  match DQ.rear history with
-    Some (history', {entry_kind=`SuperClass _; entry_structure=os}) ->
-    begin match ip os.source_path path with
-        None -> find_prefix (history', path)
-      | Some suffix -> (drop_superclasses history, suffix)
-    end
-  | Some (history', {entry_kind=`FieldType _ | `ClassMember _; entry_structure=os}) ->
-    begin match ip os.source_path path with
-        None -> find_prefix (history', path)
-      | Some suffix -> (history, suffix)
-    end
-  | None -> raise (Failure "Fatal error, no root-scope found")
+let undefined x {Normalized.class_members; super; fields} =
+  let not_inherited _ v b = b && (match v.super_shape with Shape flds -> not (StrMap.mem x flds) | _ -> true) in
+  not (StrMap.mem x class_members) && not (StrMap.mem x fields) && (IntMap.fold not_inherited super true)
 
-let append_to_history {history;current_path} entry_kind os =
-  DQ.snoc history {entry_structure=os; entry_kind}
-                
 let rec get_class_element_in state {Normalized.class_members; super; fields} x xs =  
   if StrMap.mem x.ident.txt class_members then begin
     let current_ref = DQ.snoc state.current_ref {kind = CK_Class; component=x} in
-    get_class_element {state with current_ref} (`ClassMember x.ident.txt) (StrMap.find x.ident.txt class_members).class_ xs
+    let cv = (StrMap.find x.ident.txt class_members).class_ in
+    BatLog.logf "Evaluating class member %s\n" x.ident.txt ;
+    get_class_element {state with current_ref} (`ClassMember x.ident.txt) cv xs
   end
   else if StrMap.mem x.ident.txt fields then begin
     let current_ref = DQ.snoc state.current_ref {Syntax.kind = CK_Continuous; component=x} in
+    BatLog.logf "Evaluating member %s\n" x.ident.txt ;
     get_class_element {state with current_ref} (`FieldType x.ident.txt) (StrMap.find x.ident.txt fields).field_class xs
   end
   else begin
-    (pickfirst_class state (x::xs) (IntMap.bindings super) )
+    (pickfirst_class state x xs (IntMap.bindings super) )
   end
   
 and get_class_element_os state ({public;protected} as os) x xs =
+  BatLog.logf "Looking for %s in %s [%s]\n" x.ident.txt (Path.show os.source_path) (Path.show state.self.tip.clbdy.source_path);
   let f = get_class_element_in state public x xs in
   match f with
-    Error {lookup_error_state={current_ref}} when current_ref == state.current_ref ->
+    Error {lookup_error_state={current_ref}} when undefined x.ident.txt public ->
+    BatLog.logf "Nothing found searching for %s in %s\n" x.ident.txt (show_object_struct os);
     (* Nothing found, search protected section *)
     let current_path = DQ.snoc state.current_path `Protected in
     get_class_element_in {state with current_path} protected x xs
   | _ as r -> r (* Something found *)
 
-and pickfirst_class state name = function
-    [] -> Error {lookup_error_state=state; lookup_error_todo=name}
+and pickfirst_class state x xs = function
+    [] -> Error {lookup_error_state=state; lookup_error_todo=x::xs}
   | (k,v)::vs ->
-    let f = get_class_element state (`SuperClass k) v.class_ name in
-    begin match f with
-        Error {lookup_error_state={current_ref}} when DQ.size current_ref == DQ.size state.current_ref ->
-        (* Nothing found, search next superclass *)
-        pickfirst_class state name vs
-      | Error {lookup_error_state={current_ref}} as r -> BatLog.logf "Stop looking for (%s) . %s in superclasses. Found %s\n" (show_known_ref state.current_ref) (show_components name) (show_known_ref current_ref) ; r
-      | r -> r
+    begin
+      match v.super_shape with
+      | Primitive ->
+        let current_ref = DQ.append state.current_ref (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr;component}) (x::xs))) in
+        Success {lookup_success_state={state with current_ref}; lookup_success_value=LPrimitive Unit}
+      | Shape shape when StrMap.mem x.ident.txt shape ->
+        (* Always re-evaluate the super class to catch all redeclarations *)
+        BatLog.logf "Evaluating super class %s\n" (show_class_value v.super_type) ;
+        let super = get_class_element state (`SuperClass k) v.super_type [] in
+        begin match super with
+          | Success {lookup_success_state; lookup_success_value=LClass {clup;clbdy}} ->
+            let super_state = {state with self={state.self with up=clup};
+                                          current_path = DQ.snoc state.current_path (`SuperClass k);
+                              } in
+            get_class_element_os super_state clbdy x xs
+            
+        | Success {lookup_success_state; lookup_success_value} ->
+            raise (Failure ("Lookup of " ^ x.ident.txt ^ "in a non-structured type"))
+        | (Error _ | Recursion _) as e -> e
+        end
+      | Shape _ -> pickfirst_class state x xs vs
     end
 
 (**
@@ -165,119 +163,133 @@ and pickfirst_class state name = function
   $k : kind of this class value
   $p : components todo
 *)
-and get_class_element state (k:history_entry_kind) e p =
-  let open Normalized in 
-  let current_path = Path.snoc state.current_path (k :> Path.elem_t) in
+and get_class_element state k e p =  
+  let open Normalized in
+  BatLog.logf "Coming from %s.\n Looking at %s\n todo:\n%s.\n" (Path.show state.self.tip.clbdy.source_path) (show_class_value e) (show_components p) ;
+  let current_path = Path.snoc state.current_path k in
   let state = {state with current_path} in
-
-  let ck_of_var = 
-    let open Flags in
-    function None -> CK_Continuous | Some Constant -> CK_Constant | Some Parameter -> CK_Parameter | Some Discrete -> CK_Discrete
-  in
   
   let finish_component state = match DQ.rear state.current_ref with    
     (* update last component reference with collected flat attribute *)
-      None | Some (_,{kind=CK_Class}) -> {state with current_attr = {no_attributes with fa_sort = state.current_attr.fa_sort}}
+      None
+    | Some (_,{kind=CK_Class}) -> state
     | Some(xs, x) -> {state with current_ref = (DQ.snoc xs {x with kind=ck_of_var state.current_attr.fa_var})}
+  in
+
+  let project state v =
+    let state = {(finish_component state) with current_path} in
+    function
+      [] ->
+      BatLog.logf "Result replaceable? %b\n" state.current_attr.fa_replaceable ;
+      let lookup_success_value = map_lv (fun sval ->
+          if state.current_attr.fa_replaceable then BatLog.logf "Result is replaceable" ;
+          let {flat_attr; flat_val} = merge_attributes state.current_attr sval in
+          unflat {flat_val;flat_attr}) v       
+      in
+      Success {lookup_success_state=state;lookup_success_value}
+    | x::xs -> begin match v with
+          LClass {clbdy} -> get_class_element_os state clbdy x xs                              
+        | LPrimitive cv ->
+          begin match cv with
+            | Int | Real | String | Bool ->
+              let rest = DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs)) in
+              let lookup_success_state = {state with current_ref = DQ.append state.current_ref rest} in
+              BatLog.logf "Result replaceable? %b\n" state.current_attr.fa_replaceable ;
+              let flat = merge_attributes state.current_attr cv in
+              Success {lookup_success_state;
+                       lookup_success_value=LPrimitive (unflat flat)} 
+            | Enumeration flds ->
+              begin match x with                  
+                | {ident={txt="start" | "min" | "max" | "fixed" | "quantity"}} as x when xs = [] ->
+                  let lookup_success_state = {state with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
+                  let flat = merge_attributes state.current_attr cv in
+                  Success {lookup_success_state;
+                           lookup_success_value=LPrimitive (unflat flat)} 
+        
+                | x when StrSet.mem x.ident.txt flds && xs = [] ->
+                  let lookup_success_state = {state with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
+                  let flat = merge_attributes state.current_attr cv in
+                  Success {lookup_success_state;
+                           lookup_success_value=LPrimitive (unflat flat)} 
+                | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
+              end
+            | _ -> raise (Failure ("Such builtins should not occur here (" ^ x.ident.txt ^ ")") )
+          end
+      end
   in
   
   let rec helper state = function
   | Class os ->
-    (*BatLog.logf "Looking in class: %s\n" (Path.show os.source_path) ;*)
-    let state = finish_component state in
-    begin match p with
-        [] -> Success {lookup_success_value=e; lookup_success_state=state}
-      | x::xs ->
-        let history = append_to_history state k os in
-        get_class_element_os {state with history; current_path} os x xs 
-    end
+    BatLog.logf "Looking in class: %s\n" (Path.show os.source_path) ;    
+    assert (not (Path.equal os.source_path state.self.tip.clbdy.source_path)) ;
+    let tip = {clup = Some state.self; clbdy = os} in
+    let self =  {up = tip.clup; tip} in
+    let lv = LClass tip in    
+    project {state with self} lv p
 
   (* we might encounter recursive elements *)
   | Recursive lookup_recursion_term -> Recursion {lookup_recursion_term;
                                                   lookup_recursion_state=state;
                                                   lookup_recursion_todo=p}
 
-    (* follow global references through self to implement redeclarations *)
-  | DynamicReference g | GlobalReference g ->
-    let q = DQ.of_enum (Enum.filter (function (`FieldType _| `ClassMember _) -> true | _ -> false) (DQ.enum g)) in
-
-    (* Append to trace, TODO: found_visible/found_replaceable *)
-    let trace = DQ.snoc state.trace g in
-    (* History and suffix of searched path 
-           i.e. path[last[h']] ++ q' == q
-    *)
-    let (history, q') = find_prefix (state.history, q) in
-        
-    (* Create the new search task *)
-    let new_p = List.of_enum (Enum.filter_map (function (`ClassMember x | `FieldType x) -> Some {ident={txt=x;loc=none};subscripts=[]} | _ -> None) (DQ.enum q')) in    
-    let current_path = path_of_history history in
-    let new_state = {state with current_path;history;trace} in
-
-    (* Merge all flat attributes from a pointer *)
-    let merge_state state found_state =
-      let (|||) fst = function Some x -> Some x | None -> fst in
-      
-      (* TODO: merge trace here? *)
-      {state with replaceable = state.replaceable or found_state.replaceable ;
-                  current_attr = {fa_var = state.current_attr.fa_var ||| found_state.current_attr.fa_var ;
-                                  fa_cau = state.current_attr.fa_cau ||| found_state.current_attr.fa_cau ;
-                                  fa_con = state.current_attr.fa_con ||| found_state.current_attr.fa_con ;
-                                  fa_sort = state.current_attr.fa_sort ||| found_state.current_attr.fa_sort ;}
-      }
+    (* follow dynamic references through self to implement redeclarations *)
+  | DynamicReference {upref; downref} ->
+    let rec upwards self = function
+        0 -> {self with up = self.tip.clup}
+      | n -> begin match self.up with None -> raise HierarchyError
+                                    | Some up -> BatLog.logf "Up is %s\n" (Path.show up.tip.clbdy.source_path); upwards up (n-1)
+        end
     in
-    
-    begin match lookup_continue_or_yield new_state new_p with
-        Success {lookup_success_value;lookup_success_state=found_state} -> helper (merge_state state found_state) lookup_success_value
-      | r -> r
+    let self = upwards state.self upref in
+    BatLog.logf "Went up %d. New tip is: %s\n" upref (Path.show self.tip.clbdy.source_path) ;
+    let state = {state with self} in
+    begin match DQ.front downref with
+        None ->
+        project state (LClass self.tip) p
+      | Some (y,ys) ->
+        begin
+        (* Evaluate dynamic reference: back to tip, open recursion *)
+          match get_class_element_os state state.self.tip.clbdy (any y) (List.map any (Name.to_list ys)) with
+            Success success ->
+            (* Continue search *)
+            let  {self; current_attr} = success.lookup_success_state in
+            project {state with self; current_attr} success.lookup_success_value p
+          | e -> e
+        end
+    end
+
+  | GlobalReference g ->
+    begin match Name.front (Name.of_ptr g) with
+      Some(x,xs) ->
+        let root = root_class_of state.self in
+        let state = {state with self={up=None; tip=root}} in
+        begin match get_class_element_os state root.clbdy (any x) (List.map any (Name.to_list xs)) with
+        Success success ->
+            (* Continue search *)
+            project {state with self = success.lookup_success_state.self} success.lookup_success_value p
+          | e -> e
+        end
+      | None -> raise EmptyName
     end
     
   (* Replaceable/Constr means to look into it *)
-  | Replaceable v -> helper {state with replaceable = true} v
+  | Replaceable v -> BatLog.logf "Replaceable!\n" ; helper {state with current_attr = {state.current_attr with fa_replaceable=true}} v
   | Constr {constr=Cau c; arg} -> helper {state with current_attr = {state.current_attr with fa_cau = Some c}} arg
   | Constr {constr=Con c; arg} -> helper {state with current_attr = {state.current_attr with fa_con = Some c}} arg
   | Constr {constr=Var v; arg} -> helper {state with current_attr = {state.current_attr with fa_var = Some v}} arg
   | Constr {constr=Sort s; arg} -> helper {state with current_attr = {state.current_attr with fa_sort = Some s}} arg
-  | Enumeration flds ->
-    begin match p with
-        [] -> Success {lookup_success_state=finish_component state; lookup_success_value=Enumeration flds}
-      | [{ident={txt="start" | "min" | "max" | "fixed" | "quantity"}} as x] ->
-        let state = {(finish_component state) with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
-        Success {lookup_success_state=state;
-                 lookup_success_value=Enumeration flds} 
-        
-      | [x] when StrSet.mem x.ident.txt flds ->
-        let state = {(finish_component state) with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
-        Success {lookup_success_state=state;
-                 lookup_success_value=Enumeration flds} 
-      | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
-end
-  | (Int | Real | String | Bool) as v ->
-    let rest = DQ.of_enum (List.enum (List.map (fun component -> {kind=CK_BuiltinAttr; component}) p)) in    
-    let state = finish_component state in
-    let lookup_success_state = {state with current_ref = DQ.append state.current_ref rest} in
-    Success {lookup_success_state; lookup_success_value=v}
-                
-  | v -> begin match p with
-        [] -> Success {lookup_success_state=finish_component state; lookup_success_value=v}
-      | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
-    end
+                                     
+  | v -> project state (LPrimitive v) p
   in
   helper state e
 
 (** Start lookup with the given state *)
 and lookup_continue state x xs =
-  match DQ.rear state.history with
-    None -> raise EmptyScopeHistory
-  | Some(ys,y) ->
-    get_class_element_os state y.entry_structure x xs
+  get_class_element_os state state.self.tip.clbdy x xs
 
 and lookup_continue_or_yield state = function
     [] ->
-    begin match DQ.rear state.history with
-        None -> raise EmptyScopeHistory
-      | Some(_,y) ->
-        Success {lookup_success_state=state; lookup_success_value=Class y.entry_structure}
-    end
+    Success {lookup_success_state=state; lookup_success_value=LClass state.self.tip}
     | x::xs -> lookup_continue state x xs
 
 let rec forward state k c (todo:Path.t) =
@@ -285,9 +297,9 @@ let rec forward state k c (todo:Path.t) =
   let state = {state with current_path} in
   match c with
   (* always append history, even if todo is empty *)
-  (Replaceable (Class os) | Class (os)) ->
-    let history = append_to_history state k os in
-    forward_os {state with history} os todo
+    (Replaceable (Class os) | Class (os)) ->
+    let self = {tip = {clup=Some state.self; clbdy=os}; up=Some state.self} in
+    forward_os {state with self} os todo
   | c -> begin
       match DQ.front todo with
       | Some(x,xs) ->
@@ -311,7 +323,7 @@ and forward_elements state ({class_members; super; fields} as es) (todo:Path.t) 
     forward state (`ClassMember x) (StrMap.find x class_members).class_ xs
       
   | Some(`SuperClass i, xs) when IntMap.mem i super ->
-    forward state (`SuperClass i) (IntMap.find i super).class_  xs
+    raise (ExpansionException ("Cannot forward into a superclass: " ^ (Path.show state.current_path)))
 
   | Some (x, _) ->
     BatLog.logf "Fowarding failed. No element %s in %s" (Path.show_elem_t x) (Path.show state.current_path) ;
@@ -321,37 +333,34 @@ and forward_elements state ({class_members; super; fields} as es) (todo:Path.t) 
 
 (** Forward a lookup state by an (existing) (relative) pointer *)
 let forward_state state todo = 
-  match DQ.rear state.history with
-    None -> raise EmptyScopeHistory
-  | Some(_,y) ->
-    forward_os state y.entry_structure todo
+  forward_os state state.self.tip.clbdy todo
 
 (** Start lookup with the given state, follow lexical scoping rules *)
 let rec lookup_lexical_in state x xs =
-  match DQ.rear state.history with
-    None -> Error {lookup_error_state=state; lookup_error_todo=x::xs}
-  | Some(ys,y) ->
-    match get_class_element_os state y.entry_structure x xs with
-      Error {lookup_error_state={current_ref}} when current_ref==state.current_ref ->
-      (* Found nothing, climb up scope *)
-      lookup_lexical_in {(state_of_history ys) with current_scope=state.current_scope+1} x xs
-    | r -> r
-
+  if undefined x.ident.txt state.self.tip.clbdy.public &&
+     undefined x.ident.txt state.self.tip.clbdy.protected then
+    (* Found nothing, climb up scope *)
+    begin match state.self.up with
+        None -> Error {lookup_error_state=state; lookup_error_todo=x::xs}
+      | Some self -> lookup_lexical_in {state with self;current_scope=state.current_scope+1} x xs
+    end
+  else begin
+    get_class_element_os state state.self.tip.clbdy x xs
+  end
 (** Create a lookup state from a normalized signature (i.e. root class) *)
 let state_of_lib lib =
-  {history = DQ.singleton {entry_structure = {empty_object_struct with public = lib}; entry_kind = `ClassMember ""};
-   replaceable=false;
+  {self={tip={clup=None; clbdy={empty_object_struct with public=lib}};up=None};
    trace = DQ.empty ;
    current_ref = DQ.empty;
    current_attr = no_attributes;
    current_scope = 0;
-   current_path = DQ.empty}  
+   current_path = DQ.empty}
 
 let lookup o p =
   let open Normalized in
   let state = state_of_lib o in
   match p with
-    [] -> Success {lookup_success_value = Class {empty_object_struct with public = o};
+    [] -> Success {lookup_success_value = LClass state.self.tip;
                    lookup_success_state = state} ;
   | x::xs ->    
     lookup_lexical_in state x xs

@@ -67,7 +67,7 @@ module Path = struct
 
   let size = DQ.size
   
-  let cm x = `ClassMember x
+  let cm x = `ClassMember x  
 end
 
 type class_path = Path.t [@@deriving eq,show,yojson]

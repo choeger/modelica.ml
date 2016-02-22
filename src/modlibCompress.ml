@@ -48,16 +48,18 @@ type decompression = {
 }
 
 let rec compress = function
-    Class os ->
+(*    Class os ->
     Class {os with public = compress_elements os.public; protected = compress_elements os.protected }
   | Constr {constr; arg} -> Constr {constr; arg = compress arg}
-  | Replaceable v -> Replaceable (compress v)
+      | Replaceable v -> Replaceable (compress v) *)
   | v -> v
-
+(*
 and compress_modified_class cm = {cm with class_ = compress cm.class_}
 
-and compress_elements es = {fields = StrMap.map pack_field es.fields;
-                            super = IntMap.map compress_modified_class es.super;
+and compress_super_class sc = match sc.super_shape with 
+*)
+and compress_elements es = es (*{fields = StrMap.map pack_field es.fields;
+                            super = IntMap.map compress_super_class es.super;
                             class_members = StrMap.map compress_modified_class es.class_members }
 
 and pack_field f = {f with field_class = pack_class f.field_class}
@@ -119,9 +121,9 @@ let decompress_dep dcm g i {superclass_name} =
     List.fold_left (fun g j -> DepGraph.add_edge g i j) g (PathMap.find superclass_name dcm)
   else
     DepGraph.add_vertex g i
-
+*)
 let decompress es =
-  let dcs = Array.of_list (elements_decompressions DQ.empty [] es) in
+  (*let dcs = Array.of_list (elements_decompressions DQ.empty [] es) in
   let dcm = Array.fold_lefti decompress_map PathMap.empty dcs in
   let dcg = Array.fold_lefti (decompress_dep dcm) DepGraph.empty dcs in
   let sccs = Scc.scc_list dcg in
@@ -137,12 +139,14 @@ let decompress es =
       Report.do_ ;
       log {level=Error;what;where=none}; fail
   in  
-
+  *)
   Report.do_ ;
   o <-- output ;
-  set_output {o with class_members = StrMap.union o.class_members es.class_members} ;     
+  return o
+  (*set_output {o with class_members = StrMap.union o.class_members es.class_members} ;     
   dcs <-- reorder_sccs sccs;
-  do_decompression 0 (Array.of_list dcs)
+    do_decompression 0 (Array.of_list dcs) *)
+  
 
 let load_from_json js =
   let cv = elements_struct_of_yojson js in

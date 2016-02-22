@@ -195,7 +195,7 @@ module ClassValueFragments = struct
 
   let cl_path xs = DQ.of_list (List.map cl xs)
 
-  let dynref x = DynamicReference x
+  let dynref upref downref = DynamicReference {upref;downref}
 end
 
 module P = struct
@@ -243,17 +243,15 @@ module P = struct
         k (lookup_continue (state_of_lib got) c cs)
     
     (* Lookup name and flatten attributes *)
-    let def_of path component k got =
+    let def_of path cs k got =
       let open ModlibLookup in
       let state = forward_state (state_of_lib got) path in
-      k (lookup_continue state component [])
+      k (lookup_continue_or_yield state cs)
 
     let class_at path k got =
       let open ModlibLookup in
       let state = forward_state (state_of_lib got) path in
-      match DQ.rear state.history with
-        None -> raise (Failure "Cannot happen")
-      | Some(_,os) -> k (Class os.entry_structure)
+      k (Class state.self.tip.clbdy)
 
     let type_at path k got =
       match (lookup_path_direct got path) with `Found {found_value} -> k found_value | _ -> assert_failure "Cannot find path"
@@ -289,6 +287,12 @@ module P = struct
         k (StrMap.find fld class_mod)
       else
         assert_failure ("No modification to '" ^ fld ^ "'")  
+
+    let super_class_modification fld k {super_mod} =
+      if StrMap.mem fld super_mod then
+        k (StrMap.find fld super_mod)
+      else
+        assert_failure ("No modification to '" ^ fld ^ "'")  
     
     let modification fld k {field_mod} =
       if StrMap.mem fld field_mod.mod_nested then
@@ -303,7 +307,7 @@ module P = struct
       if StrMap.mem x m then
         k (StrMap.find x m)
       else        
-        assert_failure ("No element '" ^ x ^ "'")
+        assert_failure ("No element '" ^ x ^ "'" )
 
     let equations k {equations} = k equations
 
@@ -318,14 +322,13 @@ module P = struct
   module The = struct
     let first k = function [] -> assert_failure "Expected non-empty list" | x :: _ -> k x
 
-    let lookup_result k {ModlibLookup.lookup_success_value; lookup_success_state={current_attr;replaceable}} =
-      let cv = unflat {flat_attr=current_attr; flat_val = lookup_success_value} in
-      if replaceable then
-        k (Replaceable cv)
-      else
-        k cv
+    let lookup_result k {ModlibLookup.lookup_success_value; lookup_success_state={current_attr}} =
+      let cv = unflat (merge_attributes current_attr (Lookup.class_value_of_lookup lookup_success_value)) in
+      k cv
 
     let declared_class k {class_} = k class_
+
+    let class_modification k {class_mod} = k class_mod
   end
   
   module Is = struct
@@ -377,6 +380,9 @@ module P = struct
         {mod_default=Some e} -> exp expected e
       | _ -> assert_failure "Expected a binding modification."
 
+    let equal_to_modification expected = 
+      assert_equal ~printer:(StrMap.show pp_field_modification) ~cmp:(StrMap.eq equal_field_modification) expected 
+    
     let equation expected eq =
       assert_equal ~cmp:equal_equation ~pp_diff:diff_eq ~printer:show_equation expected (Parser_tests.prep_eq eq)
 

@@ -44,11 +44,10 @@ type payload_stmts = Syntax.behavior PathMap.t
 
 type impl_state = { notify : Path.t -> unit ;
                     strat_stmts : strat_stmts ; payload : payload_stmts ;
-                    current_stmts : strat_stmt list ; current_classes : history_t }
+                    current_stmts : strat_stmt list ; current_class : lnode }
 
 exception NoSuchField of str
 exception DoubleModification of str
-exception AstInvariant
 exception SubscriptsOnClass of str
 exception NoSuchClass of str
 exception ProjectFromFunction of str
@@ -125,11 +124,11 @@ let resolve_builtin first rest =
 
 exception ResolutionError of lookup_error_struct
 
-let rec resolve_env env history first rest =
+let rec resolve_env env self first rest =
   if StrMap.mem first.ident.txt env then
     (false, DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest)))
   else
-    let state = state_of_history history in
+    let state = state_of_self self in
     match lookup_lexical_in state first rest with
       Success {lookup_success_state={current_ref;current_scope=0}} -> (false, current_ref)
     | Success {lookup_success_state={current_ref;current_scope=up}} ->
@@ -142,33 +141,30 @@ let rec resolve_env env history first rest =
         | _ -> raise (Failure "History not lexical?")
       in
         
-      let rec upwards history up =
-        match DQ.rear history with None -> if up = 0 then DQ.empty else raise (Failure "scope number mismatch")
-                                 | Some(xs,x) ->
-                                   if (up = 0) then class_name_of_path current_ref x.entry_structure.source_path
-                                   else upwards xs (up-1)
+      let rec upwards self up =
+        match self.up with None -> if up = 0 then DQ.empty else raise HierarchyError
+                         | Some self' ->
+                           if (up = 0) then class_name_of_path current_ref self.tip.clbdy.source_path
+                           else upwards self' (up-1)
       in
         
-      (true, upwards history up)
+      (true, upwards self up)
 
-    | Error {lookup_error_state={history}} when DQ.size history = 0 ->
+    | Error {lookup_error_state={self={up=None}}} ->
       (true, resolve_builtin first rest)
 
     | Error err ->
       BatLog.logf "Error looking up %s\nLast scope:%s\n" (Syntax.show_components err.lookup_error_todo) (Path.show err.lookup_error_state.current_path);
       raise (ResolutionError err)
     
-let resolve_ur env history {root;components} =
+let resolve_ur env self {root;components} =
   match components with
     cmp :: components ->
     if root then
-      match DQ.front history with
-        Some (e, _) ->
-        let (_, cs) = resolve_env StrMap.empty (DQ.singleton e) cmp components in
-        RootRef cs
-      | None -> raise (Failure "no root class found")
+      let (_, cs) = resolve_env StrMap.empty {tip=root_class_of self;up=None} cmp components in
+      RootRef cs
     else begin
-      match resolve_env env history cmp components with
+      match resolve_env env self cmp components with
         (false,cs) -> KnownRef cs
       | (true,cs) -> RootRef cs
     end
@@ -244,18 +240,20 @@ let rec merge_mod exp mod_component nested_component mods =
 exception ModificationTargetNotFound of components
 
 (* Normalize all statements in a direct class modification *)
-let rec normalize_classmod_stmts history kind {class_; class_mod} =
+let rec normalize_classmod_stmts self kind {class_; class_mod} =
   function
   | [] -> {class_; class_mod}
   | {field_name=[]}::_ -> raise (Failure "empty modification on class")
   | {field_name; exp}::stmts ->
     (* normalize the modified component *)
-    let field_name = match get_class_element (state_of_history history) kind class_  field_name with
+    let field_name = match get_class_element (state_of_self self) kind class_  field_name with
         Success {lookup_success_state={current_ref}} -> current_ref
       | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
+        BatLog.logf "Could not find: %s\n" (show_components todo) ;
         raise (ModificationTargetNotFound todo)
     in
-    let exp = resolve StrMap.empty history exp in
+    BatLog.logf "Found %s\n" (show_known_ref field_name) ;
+    let exp = resolve StrMap.empty self exp in
 
     (* merge modification and continue *)
     let class_mod =
@@ -263,28 +261,28 @@ let rec normalize_classmod_stmts history kind {class_; class_mod} =
         None -> raise (Failure "empty modification on class")
       | Some(y,ys) -> merge_mod exp y ys class_mod
     end in
-    normalize_classmod_stmts history kind {class_; class_mod} stmts
+    normalize_classmod_stmts self kind {class_; class_mod} stmts
 
 (* Normalize all statements in the given element structure *)
-let rec normalize_stmts history ({super;fields;class_members} as es)=
+let rec normalize_stmts self ({super;fields;class_members} as es)=
   function
   | [] -> es
   | {field_name=y::ys;exp}::stmts ->
     (* normalize the modified component *)
-    let exp = resolve StrMap.empty history exp in
-    match get_class_element_in {empty_lookup_state with history} es y ys with
+    BatLog.logf "\nResolving modification in %s\n" (show_object_struct self.tip.clbdy) ;
+    let exp = resolve StrMap.empty self exp in
+    BatLog.logf "Looking for %s in %s\n" y.ident.txt (Path.show self.tip.clbdy.source_path) ;
+    (* Lookup with an empty path to get the _relative_ result *)
+    match get_class_element_in {(state_of_self self) with current_path = Path.empty} es y ys with
     | Success {lookup_success_state={current_ref; current_path}} ->
-      let fst = match Path.front current_path with
-          Some(`Protected,ps) -> begin match Path.front ps with
-              Some(`Protected,_) -> raise (Failure "Internal Error: Double protected path")
-            | Some(fst,_) -> fst
-            | None -> raise (Failure "Internal Error: Empty Path")
-          end
+      let rec fst p = match Path.front p with
         | None -> raise (Failure "Internal Error: Empty Path")
-        | Some(fst,_) -> fst
+        | Some(`Protected, p) -> fst p
+        | Some(f,_) -> f
       in
-      begin match fst with
-          `ClassMember x ->
+      begin match fst current_path with
+          `Protected -> raise (Failure "Internal Error: Unexpected end of path")
+        | `ClassMember x ->
           begin match Path.front current_ref with
               Some({kind=CK_Class; component}, cr) ->
               (* Modified a class *)
@@ -295,9 +293,9 @@ let rec normalize_stmts history ({super;fields;class_members} as es)=
                     None -> raise (Failure "empty modification on class")
                   | Some(y,ys) -> merge_mod exp y ys class_mod
                 end in
-              normalize_stmts history {es with class_members = StrMap.add x {class_;class_mod} class_members} stmts
+              normalize_stmts self {es with class_members = StrMap.add x {class_;class_mod} class_members} stmts
 
-            | Some({kind},_) -> raise (Failure "Expected to modify a class")
+            | Some(kc,_) -> raise (Failure ("Expected to modify a class " ^ x ^ ", got: " ^ (show_known_component kc)))
             | None -> raise (Failure "Lookup Result inconsistent")
           end
         | `FieldType x ->
@@ -313,43 +311,37 @@ let rec normalize_stmts history ({super;fields;class_members} as es)=
               let fld = StrMap.find x fields in
               (* merge modification and continue *)
               let class_field = insert fld cr in
-              normalize_stmts history {es with fields = StrMap.add x class_field fields} stmts
+              normalize_stmts self {es with fields = StrMap.add x class_field fields} stmts
                 
             | None -> raise (Failure "Lookup Result inconsistent")
           end
         | `SuperClass n ->
           begin match Path.front current_ref with
               Some(y,ys) ->
-              let {class_;class_mod} = IntMap.find n super in
-              let class_mod = merge_mod exp y ys class_mod in
-              normalize_stmts history {es with super = IntMap.add n {class_;class_mod} super} stmts
+              let {super_mod} as sc = IntMap.find n super in
+              let super_mod = merge_mod exp y ys super_mod in
+              normalize_stmts self {es with super = IntMap.add n {sc with super_mod} super} stmts
           end
       end
     | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
-      BatLog.logf "Error looking up modification target %s\n" (show_components todo) ;
+      let () = BatLog.logf "Error looking up modification target %s\n" (show_components todo) in
       raise (ModificationTargetNotFound todo)
 
 
-let rec impl_mapper {notify; strat_stmts; payload; current_classes; current_stmts} =
+let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts} =
   let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some {kind=CK_Class;component={ident={txt=x;loc=Location.none};subscripts=[]}} | _ -> None) (DQ.enum path)) in
   
   { ModlibNormalized.identity_mapper with
     
     map_object_struct = (fun self os ->
         (* Update the lookup environment *)
-        let current_classes =
-          let entry_kind =
-            match DQ.rear os.source_path with
-              Some (_, `ClassMember x) -> `ClassMember x
-            | _ -> raise (Failure "Implementation normalization on non-lexical class")
-          in
-          DQ.snoc current_classes {entry_kind; entry_structure = os}
+        let current_class = {tip={clup=Some current_class; clbdy=os}; up=Some current_class}          
         in
         let behavior =
           if PathMap.mem os.source_path payload
           then
             let () = notify os.source_path in
-            resolve_behavior current_classes (PathMap.find os.source_path payload)
+            resolve_behavior current_class (PathMap.find os.source_path payload)
           else
             os.behavior
         in
@@ -360,7 +352,7 @@ let rec impl_mapper {notify; strat_stmts; payload; current_classes; current_stmt
           strat_stmts ;
           current_stmts;
           payload;
-          current_classes }
+          current_class }
         in
         let s = impl_mapper pub_state in
         let public = s.map_elements_struct s os.public in
@@ -385,20 +377,20 @@ let rec impl_mapper {notify; strat_stmts; payload; current_classes; current_stmt
             let class_ = self.map_class_value self class_ in
             {class_; class_mod}
           else
-            let current_path = DQ.snoc (path_of_history current_classes) (`ClassMember name) in            
+            let current_path = DQ.snoc (current_class.tip.clbdy.source_path) (`ClassMember name) in            
             let stmts = if PathMap.mem current_path strat_stmts then PathMap.find current_path strat_stmts else [] in
             
-            normalize_classmod_stmts current_classes (`ClassMember name) {class_;class_mod} stmts
+            normalize_classmod_stmts current_class (`ClassMember name) {class_;class_mod} stmts
         in
             
         let class_members = StrMap.mapi map_cm class_members in
         
         (* normalize and attach statements to fields *)
-        normalize_stmts current_classes {super;fields;class_members} current_stmts
+        normalize_stmts current_class {super;fields;class_members} current_stmts
       );
   }
 
 let norm lib notify payload strat_stmts =
-  let m = impl_mapper {notify; strat_stmts; payload; current_stmts = []; current_classes = (state_of_lib lib).history} in
+  let m = impl_mapper {notify; strat_stmts; payload; current_stmts = []; current_class = (state_of_lib lib).self} in
   m.map_elements_struct m lib
                                       

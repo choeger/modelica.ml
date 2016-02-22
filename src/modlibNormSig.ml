@@ -51,7 +51,7 @@ exception Stratification of Path.t * string
 (** 
    A stratification result holds the last valid context of the existing prefix and the non existing suffix of the stratified path 
 *)
-type stratification_result = { lookup_result : lookup_state; protected : bool ; new_element : Path.elem_t } 
+type stratification_result = { lookup_result : lookup_state; protected : bool ; new_element : Path.elem_t } [@@deriving show]
 
 (** The target of a stratified path *)
 let target { lookup_result; protected; new_element} =
@@ -62,6 +62,14 @@ let target { lookup_result; protected; new_element} =
     lookup_result.current_path
   in
   Path.snoc parent new_element
+
+let relative p1 p2 =
+  let rec eat_prefix p1 p2 = match (Path.front p1,Path.front p2) with
+      Some(x,xs),Some(y,ys) when x = y -> eat_prefix xs ys
+    | _ -> (Name.of_ptr p1, Name.of_ptr p2)
+  in
+  let (p1,p2) = eat_prefix p1 p2 in
+  {upref=Name.size p1; downref=p2}
 
 let rec stratify state next todo = match next with
     (`ClassMember _ | `FieldType _ | `SuperClass _ | `Protected) as k ->
@@ -111,6 +119,37 @@ let stratify_ptr ptr =
     Report.do_ ;
     log{level=Error;where=none;what=Printf.sprintf "Stratification error: No element %s in %s" not_found (show_class_path found)}; fail
 
+let set_value n = {Normalized.identity_mapper with map_class_value = fun _ _ -> n}
+
+let set_super shape cv = {Normalized.identity_mapper with map_class_value = (fun _ _ -> cv) ;
+                                                          map_super_shape = (fun _ _ -> BatLog.logf "Setting shape to %s\n" (show_super_shape shape); shape)}
+
+let rec shapeof lhs = function
+  | Int | Bool | Real | String | Unit | ProtoExternalObject -> Primitive
+  | Enumeration ids -> Shape (StrSet.mkmap (fun k -> Syntax.CK_BuiltinAttr) ids)
+  | Class os ->
+    let pub_cls =
+        StrMap.fold (fun k _ s -> StrMap.add k Syntax.CK_Class s) os.public.class_members StrMap.empty in
+    let pub_flds = 
+        StrMap.fold (fun k v s -> StrMap.add k (Syntax.ck_of_var (flat v.field_class).flat_attr.fa_var) s) os.public.fields pub_cls in
+    let prot_cls =
+        StrMap.fold (fun k _ s -> StrMap.add k Syntax.CK_Class s) os.protected.class_members pub_flds in
+    let prot_flds =
+        StrMap.fold (fun k v s -> StrMap.add k (Syntax.ck_of_var (flat v.field_class).flat_attr.fa_var) s) os.protected.fields prot_cls in    
+    let pub_shape = IntMap.fold (fun k v s -> match v.super_shape with Shape s' -> StrMap.union s' s | Primitive -> s) os.public.super prot_flds in
+    let prot_shape = IntMap.fold (fun k v s -> match v.super_shape with Shape s' -> StrMap.union s' s | Primitive -> s) os.protected.super pub_shape in
+    Shape prot_shape
+  | Recursive _ -> Shape StrMap.empty
+  | Constr {arg} -> shapeof lhs arg
+  | Replaceable arg -> shapeof lhs arg
+  | cv ->
+    match get_class_element lhs.lookup_result lhs.new_element cv [] with
+      Success {lookup_success_value} -> shapeof lhs (class_value_of_lookup lookup_success_value)
+    | _ -> Shape StrMap.empty (* TODO: log/report error *)
+
+let dynref_found {lookup_success_state={current_ref;current_scope}} =
+  DynamicReference {upref=current_scope; downref=DQ.map (fun {Syntax.component} -> component.ident.txt) current_ref}
+
 let rec norm_recursive {lookup_recursion_term = rec_term;
                         lookup_recursion_state;
                         lookup_recursion_todo} =  
@@ -123,11 +162,11 @@ let rec norm_recursive {lookup_recursion_term = rec_term;
     let lookup_result = forward_state (state_of_lib o) xs in
     let protected = match Path.rear xs with Some(_, `Protected) -> true | _ -> false in
     n <-- norm {lookup_result; protected; new_element=k} rec_term.rec_rhs ;
-    set_output (update rec_term.rec_lhs n o) ;
+    set_output (update rec_term.rec_lhs (set_value n) o) ;
 
     (* Lookup in the result of the unfolding *)
     begin match get_class_element lookup_recursion_state k n lookup_recursion_todo with
-        Success {lookup_success_value} -> return lookup_success_value
+        Success {lookup_success_value} -> return (class_value_of_lookup lookup_success_value)
       | Error result -> fail_lookup result
       | Recursion r -> norm_recursive r
     end              
@@ -156,36 +195,39 @@ and norm lhs =
     end
 
   | RedeclareExtends ->
-    begin match DQ.rear lhs.lookup_result.history with
-      (* redeclared is the class containing the virtual extends statement *)
-        Some(history, {entry_kind=(`FieldType x | `ClassMember x); entry_structure=redeclared}) ->
-        begin match DQ.rear history with
-          (* tip of history is enclosing class containing the replaceable *)
-            Some(_, {entry_structure=os; entry_kind}) ->
-            (* Go back in scope *)
-            let state = state_of_history history in
-
-            (* Create a virtual lookup target by removing all elements *)
-            let base_only = {os with public = {empty_elements with super = os.public.super};
-                                     protected = {empty_elements with super = os.protected.super}} in
-            begin
-              match get_class_element_os state base_only {ident={txt=x; loc=Location.none};subscripts=[]} [] with
-                Success {lookup_success_value} -> return lookup_success_value
+    (* self is the class containing the virtual extends statement *)
+    let redeclared = lhs.lookup_result.self in
+    begin match redeclared.up with
+        Some(parent) ->
+        (* parent is enclosing class containing the replaceable *)
+        BatLog.logf "REDECLARE EXTENDS : %s\n" (Path.show (target lhs));
+        let x = match DQ.rear redeclared.tip.clbdy.source_path with
+            Some(_,(`ClassMember x | `FieldType x)) -> x
+          | _ -> raise Syntax.AstInvariant
+        in
+        BatLog.logf "RedeclareExtends in %s\n" (Path.show redeclared.tip.clbdy.source_path) ;
+            
+        (* Go back in scope *)
+        let state = state_of_self parent in
+            
+        (* Create a virtual lookup target by removing all elements *)
+        let base_only = {parent.tip.clbdy with public = {empty_elements with super = parent.tip.clbdy.public.super};
+                                               protected = {empty_elements with super = parent.tip.clbdy.protected.super}} in
+        begin
+          match get_class_element_os state base_only {ident={txt=x; loc=Location.none};subscripts=[]} [] with
+            Success succ -> return (dynref_found succ)
                                                     
-              | Recursion _ -> Report.do_ ;
-                log{where=none;level=Error;what="Trying to extend from recursive element."};
-                fail
+          | Recursion _ -> Report.do_ ;
+            log{where=none;level=Error;what="Trying to extend from recursive element."};
+            fail
 
-              | Error result ->
-                Report.do_ ;
-                log{where=none;level=Error;
-                    what=Printf.sprintf "Could not find redeclared base class %s\n" x};
-                fail_lookup result
-            end
-          | _ -> BatLog.logf "Illegal redeclare extends\n"; fail
+          | Error result ->
+            Report.do_ ;
+            log{where=none;level=Error;
+                what=Printf.sprintf "Could not find redeclared base class %s\n" x};
+            fail_lookup result
         end
       | None -> BatLog.logf "Illegal redeclare extends: No enclosing class found."; fail
-      | Some (xs,x) -> BatLog.logf "Illegal redeclare extends: Enclosing is: '%s'\n" (show_history_entry_kind x.entry_kind) ; fail
     end
 
   | RootReference r ->
@@ -205,23 +247,17 @@ and norm lhs =
 
   | KnownPtr p -> Report.do_ ;
     strat <-- stratify_ptr p ;
-    return (DynamicReference (target strat))
+    return (DynamicReference (relative lhs.lookup_result.current_path (target strat)))
 
   | Reference n ->
     let components = List.map (fun ident -> {Syntax.ident;subscripts=[]}) n in
     begin match components with
         x::xs ->
         begin match lookup_lexical_in lhs.lookup_result x xs with
-            Success {lookup_success_state={current_path}; lookup_success_value} ->
-            begin match lhs.new_element with
-                `SuperClass _ ->
-                (* Decompress superclasses on the fly - this should speed up later passes, otherwise yield a GlobalReference! *)
-                return lookup_success_value
-              | _ -> 
-                return (DynamicReference current_path)
-            end
-        | Error err ->
-          fail_lookup err
+            Success succ -> return (dynref_found succ)
+          | Error err ->
+            BatLog.logf "Last class: %s\n" (show_object_struct err.lookup_error_state.self.tip.clbdy) ;
+            fail_lookup err
         | Recursion r -> norm_recursive r
       end
     | [] -> raise EmptyName
@@ -265,8 +301,15 @@ let rec norm_prog i p =
     let {lhs=ptr;rhs} = p.(i) in
     Report.do_ ;
     lhs <-- stratify_ptr ptr ;
-    norm <-- norm lhs rhs;    
-    let o' = update (target lhs) (norm_cv norm) o in
+    norm <-- norm lhs rhs;
+    let () = BatLog.logf "Norm %s = %s \n =^=\n %s\n" (Path.show (target lhs)) (show_class_term rhs) (show_class_value norm) in
+    let patch =
+      match lhs.new_element with
+        `SuperClass n ->
+        set_super (shapeof lhs norm) norm             
+      | _ -> set_value (norm_cv norm)
+    in
+    let o' = update (target lhs) patch o in
     set_output (o') ;
     norm_prog (i+1) p
 
@@ -311,7 +354,7 @@ let rec close_terms i p =
              lookup_recursion_todo = [] ;
              lookup_recursion_term = open_rhs } in    
     closed <-- norm_recursive r ;
-    set_output (update open_lhs closed o) ;
+    set_output (update open_lhs (set_value closed) o) ;
     close_terms (i+1) p
 
 let norm_pkg_root root =
