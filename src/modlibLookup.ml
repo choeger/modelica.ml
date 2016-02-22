@@ -159,12 +159,7 @@ and pickfirst_class state x xs = function
   $p : components todo
 *)
 and get_class_element state k e p =  
-  let open Normalized in
-  (match p with
-    [{ident={txt="im"}}] ->
-    BatLog.logf "Looking for im in %s\n" (show_class_value e)
-  |  _ -> ());
-    
+  let open Normalized in  
   let current_path = Path.snoc state.current_path k in
   let state = {state with current_path} in
   
