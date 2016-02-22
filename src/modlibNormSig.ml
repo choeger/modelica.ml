@@ -262,8 +262,7 @@ and norm lhs =
         x::xs ->
         begin match lookup_lexical_in lhs.lookup_result x xs with
             Success succ -> return (dynref_found succ)
-          | Error err ->
-            BatLog.logf "Last class: %s\n" (show_object_struct err.lookup_error_state.self.tip.clbdy) ;
+          | Error err ->            
             fail_lookup err
         | Recursion r -> norm_recursive lhs r
       end
