@@ -152,8 +152,8 @@ type flat_repr = {
 
 let no_attributes = {fa_con = None; fa_cau = None; fa_sort = None; fa_var = None; fa_replaceable = false}
 
-let rec merge_attributes fa =
-  let flat_ = merge_attributes in
+let rec extract_attributes fa =
+  let flat_ = extract_attributes in
   function
   | Constr {arg; constr = Var v} when fa.fa_var = None -> flat_ {fa with fa_var = Some v} arg
   | Constr {arg; constr = Con c} when fa.fa_con = None -> flat_ {fa with fa_con = Some c} arg
@@ -163,7 +163,7 @@ let rec merge_attributes fa =
   | Replaceable cv -> flat_ {fa with fa_replaceable = true} cv
   | flat_val -> {flat_val; flat_attr = fa}  
 
-let flat = merge_attributes no_attributes
+let flat = extract_attributes no_attributes
 
 let rec unflat = function
   | {flat_val; flat_attr={fa_sort;fa_var;fa_cau;fa_con;fa_replaceable}} ->

@@ -323,7 +323,7 @@ module P = struct
     let first k = function [] -> assert_failure "Expected non-empty list" | x :: _ -> k x
 
     let lookup_result k {ModlibLookup.lookup_success_value; lookup_success_state={current_attr}} =
-      let cv = unflat (merge_attributes current_attr (Lookup.class_value_of_lookup lookup_success_value)) in
+      let cv = unflat (extract_attributes current_attr (Lookup.class_value_of_lookup lookup_success_value)) in
       k cv
 
     let declared_class k {class_} = k class_

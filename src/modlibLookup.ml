@@ -175,7 +175,7 @@ and get_class_element state k e p =
     function
       [] ->
       let lookup_success_value = map_lv (fun sval ->
-          let {flat_attr; flat_val} = merge_attributes state.current_attr sval in
+          let {flat_attr; flat_val} = extract_attributes state.current_attr sval in
           unflat {flat_val;flat_attr}) v       
       in
       Success {lookup_success_state=state;lookup_success_value}
@@ -183,29 +183,27 @@ and get_class_element state k e p =
       begin match v with
           LClass {clbdy} -> get_class_element_os state clbdy x xs                              
         | LPrimitive cv ->
-          begin match cv with
+          let {flat_val; flat_attr} as flat = extract_attributes state.current_attr cv in
+          begin match flat_val with
             | Int | Real | String | Bool ->
               let rest = DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs)) in
               let lookup_success_state = {state with current_ref = DQ.append state.current_ref rest} in
-              let flat = merge_attributes state.current_attr cv in
               Success {lookup_success_state;
                        lookup_success_value=LPrimitive (unflat flat)} 
             | Enumeration flds ->
               begin match x with                  
                 | {ident={txt="start" | "min" | "max" | "fixed" | "quantity"}} as x when xs = [] ->
                   let lookup_success_state = {state with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
-                  let flat = merge_attributes state.current_attr cv in
                   Success {lookup_success_state;
                            lookup_success_value=LPrimitive (unflat flat)} 
         
                 | x when StrSet.mem x.ident.txt flds && xs = [] ->
                   let lookup_success_state = {state with current_ref = DQ.snoc state.current_ref {kind=CK_BuiltinAttr; component=x}} in
-                  let flat = merge_attributes state.current_attr cv in
                   Success {lookup_success_state;
                            lookup_success_value=LPrimitive (unflat flat)} 
                 | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
               end
-            | _ -> raise (Failure ("Such builtins should not occur here (" ^ x.ident.txt ^ ")") )
+            | v -> raise (Failure ("Such builtins should not occur here (" ^ x.ident.txt ^ ": " ^ (show_class_value v) ^ ")") )
           end
       end
   in
