@@ -307,6 +307,18 @@ let test_cases = [
        (Has.modification_kind CK_Constant     &&&
         (Is.modified_to (Real 23.)))) ;
 
+  
+  test_norm
+    "Nested redeclare extends"
+    "class A13
+       model B replaceable Real x; end B;
+       model C replaceable model B = B; end C;
+       model D extends C; redeclare model extends B end B; end D;
+       model E extends D; redeclare model extends B end B; B b; Real y = b.x; end E;           
+     end A13"
+    [cm "A13"; cm "E";] (Has.field public "y" **> Is.bound_to **> (cre (knownref [cfld "b"; cfld "x"]))) ;
+  
+  
   test_norm
     "Redeclarations in the scope of a superclass"
     "model P model M replaceable model A end A; model N A a; end N; end M;
@@ -314,10 +326,8 @@ let test_cases = [
                       model N2 extends N; constant Real y = a.x; end N2;
              end M2;
      end P"
-    [cm "P"] (Is.class_value real) ;
-    (*
     [cm "P"; cm "M2"; cm "N2"]
-    (Has.field public "y" **> Is.bound_to (cre (knownref [cfld "a"; cconstfld "x"])));*)
+    (Has.field public "y" **> Is.bound_to (cre (knownref [cfld "a"; cconstfld "x"])));
 
   test_norm
     "Recursive records"

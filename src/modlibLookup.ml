@@ -150,7 +150,8 @@ and pickfirst_class state x xs = function
             raise (Failure ("Lookup of " ^ x.ident.txt ^ "in a non-structured type"))
         | (Error _ | Recursion _) as e -> e
         end
-      | Shape _ -> pickfirst_class state x xs vs
+      | Shape s ->
+        pickfirst_class state x xs vs
     end
 
 (**
@@ -181,7 +182,8 @@ and get_class_element state k e p =
       Success {lookup_success_state=state;lookup_success_value}
     | x::xs ->      
       begin match v with
-          LClass {clbdy} -> get_class_element_os state clbdy x xs                              
+          LClass {clbdy} ->
+          get_class_element_os {state with current_attr = no_attributes} clbdy x xs                              
         | LPrimitive cv ->
           let {flat_val; flat_attr} as flat = extract_attributes state.current_attr cv in
           begin match flat_val with
@@ -222,22 +224,52 @@ and get_class_element state k e p =
                                                   lookup_recursion_todo=p}
 
     (* follow dynamic references through self to implement redeclarations *)
-  | DynamicReference {upref; downref} ->
+  | DynamicReference {upref; base; downref} ->
     let rec upwards self = function
         0 -> {self with up = self.tip.clup}
       | n -> begin match self.up with None -> raise HierarchyError
                                     | Some up -> upwards up (n-1)
         end
-    in
+    in    
     let self = upwards state.self upref in
     let state = {state with self} in
     begin match DQ.front downref with
         None ->
         project state (LClass self.tip) p
+      | Some (y,_) when base ->
+        (* TODO: assert rest is empty *)
+
+        (* Find the superclass of the inherited field *)
+        let find_y _ super = match super.super_shape with
+            Shape s -> StrMap.mem y s
+          | _ -> false
+        in
+        let pubf = IntMap.filter find_y self.tip.clbdy.public.super in
+        let protf = IntMap.filter find_y self.tip.clbdy.protected.super in
+        let (k, v) =
+        if IntMap.is_empty pubf then
+          if IntMap.is_empty protf then
+            raise (Failure ("Redeclare extends not inherited"))
+          else
+            IntMap.choose protf
+        else
+          IntMap.choose pubf
+        in
+        let super = get_class_element state (`SuperClass k) v.super_type [] in
+        begin match super with
+          | Success success ->
+            (* Continue search *)
+            let  {self; current_attr} = success.lookup_success_state in
+            project {state with self; current_attr} success.lookup_success_value [any y]
+              
+          | Success _ -> raise (Failure ("Error when looking for redeclare-extends base class")) (* TODO *)
+          | e -> e
+        end
       | Some (y,ys) ->
         begin
-        (* Evaluate dynamic reference: back to tip, open recursion *)
-          match get_class_element_os state state.self.tip.clbdy (any y) (List.map any (Name.to_list ys)) with
+          (* Evaluate dynamic reference: back to tip, open recursion *)
+          match get_class_element_os
+                  state state.self.tip.clbdy (any y) (List.map any (Name.to_list ys)) with
             Success success ->
             (* Continue search *)
             let  {self; current_attr} = success.lookup_success_state in
@@ -328,7 +360,8 @@ let rec lookup_lexical_in state x xs =
   if undefined x.ident.txt state.self.tip.clbdy.public &&
      undefined x.ident.txt state.self.tip.clbdy.protected then
     (* Found nothing, climb up scope *)
-    begin match state.self.up with
+    begin
+      match state.self.up with
         None -> Error {lookup_error_state=state; lookup_error_todo=x::xs}
       | Some self -> lookup_lexical_in {state with self;current_scope=state.current_scope+1} x xs
     end

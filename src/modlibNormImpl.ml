@@ -153,9 +153,10 @@ let rec resolve_env env self first rest =
     | Error {lookup_error_state={self={up=None}}} ->
       (true, resolve_builtin first rest)
 
-    | Error err ->
-      BatLog.logf "Error looking up %s\nLast scope:%s\n" (Syntax.show_components err.lookup_error_todo) (Path.show err.lookup_error_state.current_path);
-      raise (ResolutionError err)
+    | Error {lookup_error_todo=x::_} ->
+      BatLog.logf "No field %s in %s.\n" x.ident.txt (show_object_struct self.tip.clbdy) ;
+      raise (NoSuchField x.ident)
+    | Error _ -> raise (Failure "Lookup failed with empty todo...")
     
 let resolve_ur env self {root;components} =
   match components with

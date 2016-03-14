@@ -142,7 +142,7 @@ let run_compile global root =
           0        
         | Failed -> BatLog.logf "Normalization Error\n" ; 1
       with
-        NormImpl.NoSuchField fld -> let bt = Printexc.get_backtrace () in BatLog.logf "%s\n\n   at: %s\n" bt (print_loc fld.loc) ; BatLog.logf "Error: No such field '%s'\n" fld.txt ; 1
+      | NormImpl.NoSuchField fld -> let bt = Printexc.get_backtrace () in BatLog.logf "%s\n\n   at: %s\n" bt (print_loc fld.loc) ; BatLog.logf "Error: No such field '%s'\n" fld.txt ; 1
       | NormImpl.DoubleModification fld -> BatLog.logf "   at: %s\n" (print_loc fld.loc) ; BatLog.logf "Error: Double Modification of '%s'\n" fld.txt ; 1
     end 
   | None -> BatLog.logf "Syntax Error\n" ; 1

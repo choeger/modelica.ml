@@ -175,16 +175,18 @@ let cm = Modlib.Inter.Path.cm
 module ClassValueFragments = struct
   let empty object_sort source_path = (Class {empty_object_struct with object_sort; source_path })                                               
 
-  let type_ arg = Constr {constr=Sort Type; arg}
+  let type_ arg = Constr {constr=Sort Syntax.Flags.Type; arg}
 
-  let const arg = Constr {constr=Var Constant; arg}
+  let const arg = Constr {constr=Var Syntax.Flags.Constant; arg}
 
-  let real = type_ Real
+  let real = Real
 
-  let int = type_ Int
+  let int = Int
 
-  let real_t = real
+  let real_t = type_ real
 
+  let int_t = type_ int
+  
   let replaceable t = Replaceable t
 
   let sup n = `SuperClass n
@@ -195,7 +197,7 @@ module ClassValueFragments = struct
 
   let cl_path xs = DQ.of_list (List.map cl xs)
 
-  let dynref upref downref = DynamicReference {upref;downref}
+  let dynref upref downref = DynamicReference {upref;base=false;downref}
 end
 
 module P = struct
@@ -354,10 +356,13 @@ module P = struct
         Failed -> assert_failure "Result was not OK."
       | Ok a -> k a
 
+    let constant k = function
+        Constr {arg; constr=Var Constant} -> k arg
+      | got -> assert_failure ("Expected a constant type, got: " ^ (show_class_value got))
+    
     let replaceable k = function
         Replaceable v -> k v
       | got -> assert_failure ("Expected a replaceable type, got: " ^ (show_class_value got))
-
     
     let erase_location = ModlibNormalized.cv_mapper ~map_expr:Parser_tests.prep_expr ()
                                                            

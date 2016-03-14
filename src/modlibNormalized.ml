@@ -64,7 +64,7 @@ type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                  | DynamicReference of reference_struct
   [@@deriving eq,show,yojson,folder,mapper]
 
-and reference_struct = {upref : int ; downref : Name.t}
+and reference_struct = {upref : int ; base : bool; downref : Name.t}
 
 and super_class = {super_shape : super_shape ;
                    super_type : class_value;

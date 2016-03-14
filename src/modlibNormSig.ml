@@ -69,7 +69,7 @@ let relative p1 p2 =
     | _ -> (Name.of_ptr p1, Name.of_ptr p2)
   in
   let (p1,p2) = eat_prefix p1 p2 in
-  {upref=Name.size p1; downref=p2}
+  {upref=Name.size p1; base=false; downref=p2}
 
 let rec stratify state next todo = match next with
     (`ClassMember _ | `FieldType _ | `SuperClass _ | `Protected) as k ->
@@ -139,20 +139,23 @@ let rec shapeof lhs = function
     let pub_shape = IntMap.fold (fun k v s -> match v.super_shape with Shape s' -> StrMap.union s' s | Primitive -> s) os.public.super prot_flds in
     let prot_shape = IntMap.fold (fun k v s -> match v.super_shape with Shape s' -> StrMap.union s' s | Primitive -> s) os.protected.super pub_shape in
     Shape prot_shape
-  | Recursive _ -> Shape StrMap.empty
+  | Recursive _ -> raise (Failure "Recursive base class")
   | Constr {arg} -> shapeof lhs arg
   | Replaceable arg -> shapeof lhs arg
   | cv ->
     match get_class_element lhs.lookup_result lhs.new_element cv [] with
-      Success {lookup_success_value} -> shapeof lhs (class_value_of_lookup lookup_success_value)
-    | _ -> Shape StrMap.empty (* TODO: log/report error *)
+      Success {lookup_success_value} ->
+      let shape = shapeof lhs (class_value_of_lookup lookup_success_value) in
+      shape
+    | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
+      raise (Failure ("Error determining shape: " ^ (Path.show (target lhs)) ^ " - " ^ (Syntax.show_components todo) ^ " == " ^ (show_class_value cv))) (* TODO: log/report error *)
 
 let dynref_found {lookup_success_state={current_ref;current_scope}} =
   let downref = DQ.map (fun {Syntax.component} -> component.ident.txt) current_ref in
   if downref = DQ.empty && current_scope = 0 then
     raise (Failure "Did not expect this-reference!") ;
   
-  DynamicReference {upref=current_scope; downref}
+  DynamicReference {upref=current_scope; base=false; downref}
 
 let rec norm_recursive lhs {lookup_recursion_term = rec_term;
                             lookup_recursion_state;
@@ -221,7 +224,7 @@ and norm lhs =
                                                protected = {empty_elements with super = parent.tip.clbdy.protected.super}} in
         begin
           match get_class_element_os state base_only {ident={txt=x; loc=Location.none};subscripts=[]} [] with
-            Success succ -> return (dynref_found succ)
+            Success succ -> return (DynamicReference {upref=1; base=true; downref=Name.of_list [x]})
                                                     
           | Recursion _ -> Report.do_ ;
             log{where=none;level=Error;what="Trying to extend from recursive element."};

@@ -98,12 +98,12 @@ let test_cases = [
   signature
     "Forwarding Builtin Types"
     "class A type B = Real; class C type S = B; end C; end A"
-    (class_def_of (pol [cm "A"; cm "C" ]) ["S"] **> Is.class_value real) ;
+    (class_def_of (pol [cm "A"; cm "C" ]) ["S"] **> Is.class_value real_t) ;
 
   signature
     "Local Forwarding of Builtin Types"
     "replaceable class A type B = Real; B b; end A"
-    (class_def_of (pol [cm "A"]) ["b"] **> Is.class_value (type_ real)) ;  
+    (class_def_of (pol [cm "A"]) ["b"] **> Is.class_value real_t) ;  
   
   signature
     "Forwarding of Imported Builtin Types"
@@ -113,12 +113,12 @@ let test_cases = [
   signature
     "Shadowing of imports"
     "class A type S = Real; import T = A.S; class B type T = Integer; T x; end B; end A"
-    (class_def_of (pol [cm "A"; cm "B"]) ["x"] **> Is.class_value (type_ int));
+    (class_def_of (pol [cm "A"; cm "B"]) ["x"] **> Is.class_value (int_t));
   
   signature
     "Inheritance of forwarded Builtin Types"
     "class A class B1 type T = Real; end B1; extends B1; end A"
-    (class_def_of (pol [cm "A"]) ["T"] **> Is.class_value real );
+    (class_def_of (pol [cm "A"]) ["T"] **> Is.class_value real_t);
 
   signature
     "Inheritance of nested forwarded Builtin Types"
@@ -134,6 +134,20 @@ let test_cases = [
     (class_def_of (pol [cm "AA"; cm "C"]) ["b"] **> Is.class_value Normalized.Real) ;
 
   signature
+    "Scoped inheritance"
+    "class A class B class C class F = D; end C; class D type T = Real; end D; end B; 
+             class E extends B.C.F; type S = T; end E;
+     end A"
+    (class_def_of (pol [cm "A"; cm "E";]) ["S"] **> Is.class_value real_t) ;
+
+  signature
+    "Scoped nested inheritance"
+    "class A class B type R = Real; class C class F = D; end C; class D type T = R; end D; end B; 
+             class E extends B.C; class G extends F; type S = T; end G; end E;
+     end A"
+    (class_def_of (pol [cm "A"; cm "E"; cm "G"]) ["S"] **> Is.class_value real_t) ;
+  
+  signature
     "Lookup of redeclared Elements"
     "class A 
        class B2 
@@ -142,7 +156,7 @@ let test_cases = [
        class C = B2(redeclare type T2 = Integer); 
        type T = C.T2 ; 
      end A"
-    (class_def_of (pol [cm "A"]) ["T"] (Is.replaceable (Is.class_value (type_ (int))))) ;
+    (class_def_of (pol [cm "A"]) ["T"] (Is.replaceable (Is.class_value int_t))) ;
 
   signature
     "Lookup of indirectly redeclared elements"
@@ -211,7 +225,7 @@ let test_cases = [
        end D;
        D d;
      end A7"
-    (Find.component (List.map any ["A7"; "d" ; "b"; "T"]) **> Is.successful **> The.lookup_result **> Is.replaceable (Is.class_value (type_ real))) ;
+    (Find.component (List.map any ["A7"; "d" ; "b"; "T"]) **> Is.successful **> The.lookup_result **> Is.replaceable (Is.class_value real_t)) ;
 
   signature
     "Field Type Lookup"
@@ -247,7 +261,7 @@ let test_cases = [
        model D extends C(b(redeclare type T = T)); end D;
        D d;
      end A11"
-    (Find.component (List.map any ["A11";"d";"b";"T"]) **> Is.successful **> The.lookup_result **> Is.replaceable (Is.class_value int)) ;
+    (Find.component (List.map any ["A11";"d";"b";"T"]) **> Is.successful **> The.lookup_result **> Is.replaceable (Is.class_value int_t)) ;
 
   signature
     "Redeclare Extends Test"
@@ -256,8 +270,17 @@ let test_cases = [
        model C replaceable model B = B; end C;
        model D extends C; redeclare model extends B redeclare type T = Real; T t(start=0.0); end B; end D;    
      end A12"
-    (class_def_of (pol [cm "A12"; cl "D"; cl "B"]) ["T"] **> Is.class_value real);
+    (class_def_of (pol [cm "A12"; cl "D"; cl "B"]) ["T"] **> Is.class_value real_t);
 
+  signature
+    "Nested Redeclare Extends Test"
+    "class A13
+       model B replaceable type T = Integer; end B;
+       model C replaceable model B = B; end C;
+       model D extends C; redeclare model extends B type S = Real; end B; end D;
+       model E extends D; redeclare model extends B redeclare type T = S; T t(start=0.0); end B; end E;           
+     end A13"
+    (class_def_of (pol [cm "A13"; cl "E"; cl "B"]) ["T"] **> Is.class_value real_t);
   
   (* Attempt to test a typical medium library pattern *)
     signature
@@ -273,7 +296,7 @@ let test_cases = [
              SomeComponent component(redeclare package Medium = Medium, medium(foo = 23.)); 
        end SomeModel;
      end MiniMedium"
-    (class_def_of (pol [cm "MiniMedium"; cm "SomeModel"]) ["component"] **> Is.class_value real);
+    (class_def_of (pol [cm "MiniMedium"; cm "SomeModel"]) ["component"; "medium"; "foo"] **> Is.constant **> Is.class_value real);
   
 ]
 
