@@ -135,7 +135,8 @@ let run_compile global root =
           BatLog.logf "Signature Dump (%d) Ok.\n%!" (String.length sig_dump);
 
           let js = Normalized.elements_struct_to_yojson implementation in
-          let impl_dump = Yojson.Safe.pretty_to_string js in
+          BatLog.logf "Implementation serialization Ok.\n" ; 
+          let impl_dump = Yojson.Safe.to_string js in
           write_out impl_dump (impl_file ()) ;
           BatLog.logf "Implementation Dump (%d) Ok.\n" (String.length impl_dump);
 
