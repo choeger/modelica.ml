@@ -44,8 +44,22 @@ let add_signature sign =
 let add_input dir =
   inputs := dir :: (!inputs)
 
+type dep_t = ModDep of string | ClassDep of string [@@deriving yojson]
+type dependencies = dep_t list [@@deriving yojson]
+
+let add_deps dep_file =
+  let json = Yojson.Safe.from_file dep_file in
+  match dependencies_of_yojson json with
+    `Error e -> raise (Failure e)
+  | `Ok r ->
+    List.iter (function 
+        | ClassDep ("Real" | "Int" | "Bool" | "String") -> ()
+        | ClassDep s -> add_signature s
+        | _ -> ()) r
+
 let args = [
   "-s" , Arg.String add_signature, "The signature of a library this library depends on." ;
+  "-d" , Arg.String add_deps, "Read dependencies from a .modlib.depends file" ;
   "-o", Arg.Set_string outfile, "The output file-name" ;
   "-c", Arg.Set compress, "Compress the output files" ;
 ]
