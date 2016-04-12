@@ -102,7 +102,11 @@ let scan_root dir =
     let root_packages = List.fold_left collect_sub_pkg [] contents in
     let root_units = List.fold_left collect_source_files [] contents in
     {root_units; root_packages}
-  else {root_units = []; root_packages = []}
+  else if (is_source_file dir) && not (is_package_mo dir) then
+    (* Toplevel class *)
+    {root_units = [dir]; root_packages = []}
+  else
+    {root_units = []; root_packages = []}
 
 let rec parse_externals done_ = function
     [] -> Some done_
