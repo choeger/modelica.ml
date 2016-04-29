@@ -177,8 +177,8 @@ let add_idx env idx =
 
 
 let rec resolution_mapper env history = { Syntax.identity_mapper with
-                                          on_component_reference = {
-                                            Syntax.identity_mapper.on_component_reference with
+                                          dispatch_component_reference = {
+                                            Syntax.identity_mapper.dispatch_component_reference with
                                             map_UnknownRef = (fun _ ur -> resolve_ur env history ur);
                                           } ;
 
