@@ -143,11 +143,12 @@ let apply_imports env =
   
 let payload rhs state =
   (* Small optimization: Only cover actual payload *)
-  if rhs = Syntax_fragments.empty_behavior then
+  if rhs.annotated_elem = Syntax_fragments.empty_behavior && rhs.annotation=None then
     ((), state)
   else
     let mapper = import_mapper state.env in
-    let rhs = mapper.map_behavior mapper rhs in
+    let map_behavior = mapper.map_behavior mapper in
+    let rhs = mapper.map_annotated map_behavior mapper rhs in    
     let state' = {state with payload_code = {lhs=txt_only state.current_path; rhs} :: state.payload_code} in
     ((), state')
 
@@ -213,7 +214,8 @@ let next_anon state = (nl (`ClassMember ("anon" ^ (string_of_int state.anons))),
 
 let down_class {loc;txt} = down {loc; txt=`ClassMember txt}
 
-let rec mtranslate_tds = function
+let rec mtranslate_typedef td =
+  match td.commented with
   | Short tds -> do_ ;
     (* new path is the definition *)
     down_class tds.td_name ;
@@ -234,7 +236,7 @@ let rec mtranslate_tds = function
       (* Class skeleton *)
       open_class tds.sort (repl tds.type_options) ;
       (* Payload *)
-      payload tds.type_exp.cargo ;
+      payload {annotated_elem=tds.type_exp.cargo; annotation=td.comment.annotation} ;
       (* Public elements *)
       mtranslate_elements tds.type_exp.public ;	 
       (* Protected elements *)
@@ -386,8 +388,6 @@ and mtranslate_elements {extensions;typedefs;redeclared_types;defs;redeclared_de
   mseq mtranslate_def defs ;
   mseq mtranslate_typedef redeclared_types ;
   mseq mtranslate_def redeclared_defs
-
-and mtranslate_typedef td = mtranslate_tds td.commented
 
 and mtranslate_def def =
   do_ ;

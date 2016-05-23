@@ -40,7 +40,7 @@ type strat_stmt = { field_name : components ;
 (** Stratified value bindings *)
 type strat_stmts = strat_stmt list PathMap.t
 
-type payload_stmts = Syntax.behavior PathMap.t
+type payload_stmts = Syntax.behavior Syntax.annotated PathMap.t
 
 type impl_state = { notify : Path.t -> unit ;
                     strat_stmts : strat_stmts ; payload : payload_stmts ;
@@ -213,7 +213,8 @@ let resolve env history =
 
 let resolve_behavior history =
   let m = resolution_mapper StrMap.empty history in
-  m.map_behavior m
+  let map_behavior = m.map_behavior m in
+  m.map_annotated map_behavior m 
 
 (* 
    Merge modification [| $mod_name [.$nested_name] = $exp |] with a component into $mods 
@@ -335,13 +336,13 @@ let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts}
         (* Update the lookup environment *)
         let current_class = {tip={clup=Some current_class; clbdy=os}; up=Some current_class}          
         in
-        let behavior =
+        let {annotated_elem=behavior; annotation} =
           if PathMap.mem os.source_path payload
           then
             let () = notify os.source_path in
             resolve_behavior current_class (PathMap.find os.source_path payload)
           else
-            os.behavior
+            {annotated_elem=os.behavior; annotation=None}
         in
 
         let current_stmts = if PathMap.mem os.source_path strat_stmts then PathMap.find os.source_path strat_stmts else [] in                

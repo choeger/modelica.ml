@@ -108,8 +108,9 @@ type value_ptr = { scope : class_ptr ; field : Syntax.components } [@@deriving e
 (** Assignment of term in the global hierachy *)
 type value_stmt = (value_ptr, Syntax.exp) stmt [@@deriving show,yojson]
 
+
 (** Payload storage *)
-type payload_stmt = (class_ptr, Syntax.behavior) stmt [@@deriving show,yojson]
+type payload_stmt = (class_ptr, Syntax.behavior Syntax.annotated) stmt [@@deriving show,yojson]
 
 type class_program = class_stmt list [@@deriving show,yojson]
 

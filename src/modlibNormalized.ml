@@ -82,6 +82,7 @@ and object_struct = { object_sort : sort ;
                       public : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }];
                       protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }] ;
                       behavior : behavior [@default {algorithms=[]; equations=[]; initial_algorithms=[]; initial_equations=[]; external_=None}] ;
+                      annotation : modification option [@default None] ;
                     }
 
 and field_modification = { mod_kind : component_kind ;
@@ -178,7 +179,7 @@ let norm_cv = flat %> unflat
 
 let no_behavior = {algorithms=[]; equations=[]; initial_algorithms=[]; initial_equations=[]; external_=None}
 let empty_elements = {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }
-let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=empty_elements; protected=empty_elements; behavior=no_behavior}
+let empty_object_struct = {object_sort=Class; source_path=Path.empty; public=empty_elements; protected=empty_elements; behavior=no_behavior; annotation=None}
 
 let empty_class = Class empty_object_struct
 let no_modification = {mod_kind=CK_Class; mod_nested = StrMap.empty; mod_default=None}
