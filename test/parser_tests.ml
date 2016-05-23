@@ -290,6 +290,7 @@ let test_cases = [
    extend "extends Modelica.Icons.InterfacesPackage" extend_statement );
 
   defs "Real p" [uncommented {empty_def with def_name = "p" ; def_type = type_name ["Real"] ;}] ;
+  defs "Real p(foo={42})" [uncommented {empty_def with def_name = "p" ; def_type = TMod{mod_type=type_name ["Real"]; modification={types=[]; components=[]; modifications=[{comment=no_comment; commented={mod_each=false; mod_final=false; mod_name = [nl "foo"]; mod_value=Some(Rebind (Array [Int 42]))}}]}} ;}] ;
   defs "Real p, q" [uncommented {empty_def with def_name = "p" ; def_type = type_name ["Real"] ;} ;
                     uncommented {empty_def with def_name = "q" ; def_type = type_name ["Real"] ;}
                    ] ;  
@@ -354,7 +355,7 @@ let test_cases = [
                                             } );
 
   typedef "record A end A" (uncommented (Composition {empty_typedef with td_name =nl"A" ; sort=Record; type_exp = empty_composition})) ;
-
+  
   typedef "partial model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                  type_exp = empty_composition;
                                                                                  sort = Model ;

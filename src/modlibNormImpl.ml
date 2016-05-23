@@ -211,11 +211,6 @@ let resolve env history =
   let m = resolution_mapper env history in
   m.map_exp m
 
-let resolve_behavior history =
-  let m = resolution_mapper StrMap.empty history in
-  let map_behavior = m.map_behavior m in
-  m.map_annotated map_behavior m 
-
 (* 
    Merge modification [| $mod_name [.$nested_name] = $exp |] with a component into $mods 
 *)
@@ -238,6 +233,37 @@ let rec merge_mod exp mod_component nested_component mods =
   else
     let empty_mod = {mod_default=None; mod_nested=StrMap.empty ; mod_kind = mod_component.kind} in
     merge_mod exp mod_component nested_component (StrMap.add mod_name empty_mod mods)
+
+let rec norm_annotation history = function
+    [] -> StrMap.empty
+    (* Only deal with known annotations for now *)
+  | {commented={mod_name=[ident];
+                mod_value=Some (Nested {modifications=[{commented={mod_name=[l2];
+                                                                   mod_value=Some(Rebind (Array es))}}]})
+               }}::ms when ident.txt = "__amsun" ->
+    let field_mod = norm_annotation history ms in
+    (* Resolve all unquoted expressions *)
+    let r = resolution_mapper StrMap.empty history in
+    let map_unquote self {fun_; args; named_args} = match fun_ with
+        UnknownRef {root=false; components=[{ident; subscripts=[]}]} when ident.txt="unquote" ->
+        App {fun_; args=List.map (r.map_exp r) args;
+             named_args=List.map (r.map_named_arg r) named_args}
+      | _ -> App {fun_; args; named_args}
+    in
+    
+    let annotation_mapper = {Syntax.identity_mapper with
+                             dispatch_exp = {Syntax.identity_mapper.dispatch_exp with
+                                             map_App = map_unquote
+                                            }
+                            } in
+    let e' = Syntax.Array (List.map (annotation_mapper.map_exp annotation_mapper) es) in
+    merge_mod e'
+      {kind=CK_BuiltinClass; component={ident; subscripts=[]}}
+      (DQ.singleton {kind=CK_BuiltinAttr; component={ident=l2; subscripts=[]}})
+      (norm_annotation history ms)             
+  | _::ms -> norm_annotation history ms
+    
+    
 
 exception ModificationTargetNotFound of components
 
@@ -336,13 +362,25 @@ let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts}
         (* Update the lookup environment *)
         let current_class = {tip={clup=Some current_class; clbdy=os}; up=Some current_class}          
         in
-        let {annotated_elem=behavior; annotation} =
+        let (behavior, annotation) =
           if PathMap.mem os.source_path payload
           then
             let () = notify os.source_path in
-            resolve_behavior current_class (PathMap.find os.source_path payload)
+            let resolve_behavior history =
+              let m = resolution_mapper StrMap.empty history in
+              let map_behavior = m.map_behavior m in
+              map_behavior
+            in
+            let resolve_annotation history = function
+                None -> None
+              | Some m ->
+                let mod_nested = norm_annotation history m.modifications in
+                if mod_nested = StrMap.empty then None else Some {mod_nested; mod_default=None; mod_kind=CK_BuiltinClass}
+            in
+            let {annotated_elem; annotation} = PathMap.find os.source_path payload in
+            (resolve_behavior current_class annotated_elem, resolve_annotation current_class annotation)
           else
-            {annotated_elem=os.behavior; annotation=None}
+            (os.behavior, os.annotation)
         in
 
         let current_stmts = if PathMap.mem os.source_path strat_stmts then PathMap.find os.source_path strat_stmts else [] in                
@@ -360,7 +398,7 @@ let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts}
         let current_stmts = if PathMap.mem ppath strat_stmts then PathMap.find ppath strat_stmts else [] in        
         let s = impl_mapper {pub_state with current_stmts} in
         let protected = s.map_elements_struct s os.protected in
-        {os with public; protected; behavior}
+        {os with public; protected; behavior; annotation}
       );
 
     map_elements_struct = (fun self {class_members; super; fields} ->

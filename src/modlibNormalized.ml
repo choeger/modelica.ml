@@ -82,7 +82,7 @@ and object_struct = { object_sort : sort ;
                       public : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }];
                       protected : elements_struct [@default {class_members = StrMap.empty; super = IntMap.empty; fields = StrMap.empty }] ;
                       behavior : behavior [@default {algorithms=[]; equations=[]; initial_algorithms=[]; initial_equations=[]; external_=None}] ;
-                      annotation : modification option [@default None] ;
+                      annotation : field_modification option [@default None] ;
                     }
 
 and field_modification = { mod_kind : component_kind ;

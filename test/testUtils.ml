@@ -262,6 +262,10 @@ module P = struct
 
   module Has = struct
 
+    let annotation a k = function
+      | Class {annotation=Some m} when StrMap.mem a m.mod_nested -> k (StrMap.find a m.mod_nested)
+      | cv -> assert_failure ("No annotation '" ^ a ^ "' on: " ^ (show_class_value cv)) 
+    
     let class_member vis cm k = function
       | Class {public} when vis && StrMap.mem cm public.class_members -> k (StrMap.find cm public.class_members)
       | Class {protected} when (not vis) && StrMap.mem cm protected.class_members -> k (StrMap.find cm protected.class_members)
