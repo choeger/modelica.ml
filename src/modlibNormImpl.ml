@@ -234,14 +234,18 @@ let rec merge_mod exp mod_component nested_component mods =
     let empty_mod = {mod_default=None; mod_nested=StrMap.empty ; mod_kind = mod_component.kind} in
     merge_mod exp mod_component nested_component (StrMap.add mod_name empty_mod mods)
 
-let rec norm_annotation history = function
+let rec norm_annotation history =
+  let known_annotation = function
+      "__amsun" | "experiment" -> true | _ -> false
+  in
+  function
     [] -> StrMap.empty
     (* Only deal with known annotations for now *)
   | {commented={mod_name=[ident];
-                mod_value=Some (Nested {modifications})}}::ms when ident.txt = "__amsun" ->
+                mod_value=Some (Nested {modifications})}}::ms when known_annotation ident.txt ->
 
     let rec norm_nested field_mods = function
-        {commented={mod_name=[l2]; mod_value=Some(Rebind (Array es))}} :: mods ->
+        {commented={mod_name=[l2]; mod_value=Some(Rebind e)}} :: mods ->
         Printf.printf "AMSUN annotation: %s\n" l2.txt ;
         (* Resolve all unquoted expressions *)
         let r = resolution_mapper StrMap.empty history in
@@ -257,7 +261,7 @@ let rec norm_annotation history = function
                                                  map_App = map_unquote
                                                 }
                                 } in
-        let e' = Syntax.Array (List.map (annotation_mapper.map_exp annotation_mapper) es) in
+        let e' = annotation_mapper.map_exp annotation_mapper e in
         let field_mods' =
           merge_mod e'
             {kind=CK_BuiltinClass; component={ident; subscripts=[]}}
