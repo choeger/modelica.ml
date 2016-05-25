@@ -238,29 +238,36 @@ let rec norm_annotation history = function
     [] -> StrMap.empty
     (* Only deal with known annotations for now *)
   | {commented={mod_name=[ident];
-                mod_value=Some (Nested {modifications=[{commented={mod_name=[l2];
-                                                                   mod_value=Some(Rebind (Array es))}}]})
-               }}::ms when ident.txt = "__amsun" ->
-    let field_mod = norm_annotation history ms in
-    (* Resolve all unquoted expressions *)
-    let r = resolution_mapper StrMap.empty history in
-    let map_unquote self {fun_; args; named_args} = match fun_ with
-        UnknownRef {root=false; components=[{ident; subscripts=[]}]} when ident.txt="unquote" ->
-        App {fun_; args=List.map (r.map_exp r) args;
-             named_args=List.map (r.map_named_arg r) named_args}
-      | _ -> App {fun_; args; named_args}
-    in
+                mod_value=Some (Nested {modifications})}}::ms when ident.txt = "__amsun" ->
+
+    let rec norm_nested field_mods = function
+        {commented={mod_name=[l2]; mod_value=Some(Rebind (Array es))}} :: mods ->
+        Printf.printf "AMSUN annotation: %s\n" l2.txt ;
+        (* Resolve all unquoted expressions *)
+        let r = resolution_mapper StrMap.empty history in
+        let map_unquote self {fun_; args; named_args} = match fun_ with
+            UnknownRef {root=false; components=[{ident; subscripts=[]}]} when ident.txt="unquote" ->
+            App {fun_; args=List.map (r.map_exp r) args;
+                 named_args=List.map (r.map_named_arg r) named_args}
+          | _ -> App {fun_; args; named_args}
+        in
     
-    let annotation_mapper = {Syntax.identity_mapper with
-                             dispatch_exp = {Syntax.identity_mapper.dispatch_exp with
-                                             map_App = map_unquote
-                                            }
-                            } in
-    let e' = Syntax.Array (List.map (annotation_mapper.map_exp annotation_mapper) es) in
-    merge_mod e'
-      {kind=CK_BuiltinClass; component={ident; subscripts=[]}}
-      (DQ.singleton {kind=CK_BuiltinAttr; component={ident=l2; subscripts=[]}})
-      (norm_annotation history ms)             
+        let annotation_mapper = {Syntax.identity_mapper with
+                                 dispatch_exp = {Syntax.identity_mapper.dispatch_exp with
+                                                 map_App = map_unquote
+                                                }
+                                } in
+        let e' = Syntax.Array (List.map (annotation_mapper.map_exp annotation_mapper) es) in
+        let field_mods' =
+          merge_mod e'
+            {kind=CK_BuiltinClass; component={ident; subscripts=[]}}
+            (DQ.singleton {kind=CK_BuiltinAttr; component={ident=l2; subscripts=[]}})
+            field_mods
+        in
+        norm_nested field_mods' mods
+      | [] -> field_mods
+    in
+    norm_nested (norm_annotation history ms) modifications
   | _::ms -> norm_annotation history ms
     
     
@@ -375,7 +382,7 @@ let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts}
                 None -> None
               | Some m ->
                 let mod_nested = norm_annotation history m.modifications in
-                if mod_nested = StrMap.empty then None else Some {mod_nested; mod_default=None; mod_kind=CK_BuiltinClass}
+                if mod_nested = StrMap.empty then (Printf.printf "No AMSUN annotations\n" ; None) else Some {mod_nested; mod_default=None; mod_kind=CK_BuiltinClass}
             in
             let {annotated_elem; annotation} = PathMap.find os.source_path payload in
             (resolve_behavior current_class annotated_elem, resolve_annotation current_class annotation)
