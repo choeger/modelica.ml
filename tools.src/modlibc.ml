@@ -32,6 +32,7 @@ open Batteries
 open Utils
 open Modlib
 open Compress
+open Deps
     
 let public_signatures = ref []
 let inputs = ref []
@@ -47,9 +48,6 @@ let add_signature sign =
 let add_input dir =
   inputs := dir :: (!inputs)
 
-type dep_t = ModDep of string | ClassDep of string [@@deriving yojson]
-type dependencies = dep_t list [@@deriving yojson]
-
 let add_deps dep_file =
   let json = Yojson.Safe.from_file dep_file in
   match dependencies_of_yojson json with
@@ -57,8 +55,8 @@ let add_deps dep_file =
   | `Ok r ->
     List.iter (function
         (* ignore dependencies on built-ins *)
-        | ClassDep ("Real" | "Int" | "Bool" | "String") -> ()
-        | ClassDep s -> add_signature s
+        | ClassDep {class_name = ("Real" | "Int" | "Bool" | "String")} -> ()
+        | ClassDep {class_name} -> add_signature class_name
         | _ -> ()) r
 
 let args = [

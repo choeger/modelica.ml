@@ -25,7 +25,7 @@ Library modelica_ml
                   compiler-libs.common, ocamlgraph, ppx_deriving_yojson, ppx_monadic, ppx_import, ppx_sexp_conv, sexplib	
   Modules:        Modelica_parser, Modelica_lexer, Pprint_modelica,
                   Syntax, Syntax_fragments, FileSystem,
-                  Stats, Modlib, Utils, Report,
+                  Stats, Modlib, Utils, Report, Deps,
                   ModlibInter, ModlibCompress, ModlibTrans,
                   ModlibInterDeps, ModlibLookup, ModlibNormSig, ModlibNormalized, ModlibNormLib, ModlibNormImpl
 
@@ -55,6 +55,13 @@ Executable modlibc
   BuildDepends: modelica_ml
   BuildTools: ocamlbuild
   MainIs:     modlibc.ml
+
+Executable modlibdeps
+  Path:    tools.src
+  CompiledObject: best
+  BuildDepends: modelica_ml
+  BuildTools: ocamlbuild
+  MainIs:     modlibdeps.ml
 
 Executable modml_parseall
   Path:    examples

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 0d91d71b9804a430f0072be3274a9c7d)
+# DO NOT EDIT (digest: cd752f7da482d6a99d8504139f84c70b)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -100,6 +100,23 @@ true: annot, bin_annot
 <tools.src/modlibc.{native,byte}>: package(sexplib)
 <tools.src/modlibc.{native,byte}>: package(yojson)
 <tools.src/modlibc.{native,byte}>: use_modelica_ml
+# Executable modlibdeps
+<tools.src/modlibdeps.{native,byte}>: package(batteries)
+<tools.src/modlibdeps.{native,byte}>: package(compiler-libs.common)
+<tools.src/modlibdeps.{native,byte}>: package(menhirLib)
+<tools.src/modlibdeps.{native,byte}>: package(ocamlgraph)
+<tools.src/modlibdeps.{native,byte}>: package(ppx_deriving.eq)
+<tools.src/modlibdeps.{native,byte}>: package(ppx_deriving.ord)
+<tools.src/modlibdeps.{native,byte}>: package(ppx_deriving.show)
+<tools.src/modlibdeps.{native,byte}>: package(ppx_deriving_morphism)
+<tools.src/modlibdeps.{native,byte}>: package(ppx_deriving_yojson)
+<tools.src/modlibdeps.{native,byte}>: package(ppx_import)
+<tools.src/modlibdeps.{native,byte}>: package(ppx_monadic)
+<tools.src/modlibdeps.{native,byte}>: package(ppx_sexp_conv)
+<tools.src/modlibdeps.{native,byte}>: package(sedlex)
+<tools.src/modlibdeps.{native,byte}>: package(sexplib)
+<tools.src/modlibdeps.{native,byte}>: package(yojson)
+<tools.src/modlibdeps.{native,byte}>: use_modelica_ml
 <tools.src/*.ml{,i,y}>: package(batteries)
 <tools.src/*.ml{,i,y}>: package(compiler-libs.common)
 <tools.src/*.ml{,i,y}>: package(menhirLib)
