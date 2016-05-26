@@ -37,6 +37,9 @@ let public_signatures = ref []
 let inputs = ref []
 let outfile = ref ""
 let compress = ref false
+let cpaths = ref []
+
+let add_classpath p = cpaths := (p :: !cpaths)
 
 let add_signature sign =
   public_signatures := sign :: (!public_signatures)
@@ -52,7 +55,8 @@ let add_deps dep_file =
   match dependencies_of_yojson json with
     `Error e -> raise (Failure e)
   | `Ok r ->
-    List.iter (function 
+    List.iter (function
+        (* ignore dependencies on built-ins *)
         | ClassDep ("Real" | "Int" | "Bool" | "String") -> ()
         | ClassDep s -> add_signature s
         | _ -> ()) r
@@ -61,6 +65,7 @@ let args = [
   "-s" , Arg.String add_signature, "The signature of a library this library depends on." ;
   "-d" , Arg.String add_deps, "Read dependencies from a .modlib.depends file" ;
   "-o", Arg.Set_string outfile, "The output file-name" ;
+  "-C" , Arg.String add_classpath, "Search path for classes";
   "-c", Arg.Set compress, "Compress the output files" ;
 ]
 
@@ -69,8 +74,18 @@ let print_message i msg = BatLog.logf "%d: %s\n" i (Report.show_message msg)
 exception BadDependency of string
 
 let load global dep =
+  let class_paths = (Sys.getcwd ()) :: !cpaths in
+  let rec find_class name = function
+      [] -> raise (Failure ("Failed to load class '" ^ name ^ "'"))
+    | p::ps -> let f = (p ^ "/" ^ name ^ ".modlib.sign") in
+      try
+        Printf.printf "Attempting to load %s\n" f;
+        Yojson.Safe.from_file f
+      with
+        Sys_error _ -> find_class name ps
+  in
   BatLog.logf "Loading %s\n" dep ;
-  let js = Yojson.Safe.from_file dep in
+  let js = find_class dep class_paths in
   let o = Report.run (Compress.load_from_json js)
       {messages=[]; output=global}
   in
@@ -148,7 +163,9 @@ let run_compile global root =
           write_out sig_dump (sig_file ()) ;
           BatLog.logf "Signature Dump (%d) Ok.\n%!" (String.length sig_dump);
 
-          let js = Normalized.elements_struct_to_yojson implementation in
+          let c = Compress.compress_elements implementation in
+          let c' = clean global c in
+          let js = Normalized.elements_struct_to_yojson c' in
           BatLog.logf "Implementation serialization Ok.\n" ; 
           let impl_dump = Yojson.Safe.to_string js in
           write_out impl_dump (impl_file ()) ;
