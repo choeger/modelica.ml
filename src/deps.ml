@@ -31,3 +31,7 @@ and class_dep = { class_name : string ;
                   is_local : bool [@default false] }
   [@@deriving yojson]
 type dependencies = dep_t list [@@deriving yojson]
+
+let cl2ml = function
+  | "String" -> "ModelicaString"
+  | x -> x
