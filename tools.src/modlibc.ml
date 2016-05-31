@@ -72,7 +72,8 @@ let print_message i msg = BatLog.logf "%d: %s\n" i (Report.show_message msg)
 exception BadDependency of string
 
 let load global dep =
-  let class_paths = (Sys.getcwd ()) :: !cpaths in
+  let class_paths = ((Sys.getcwd ()) :: !cpaths) @ (String.nsplit (Sys.getenv "AMSUN_SIG_PATH") ":")
+  in
   let rec find_class name = function
       [] -> raise (Failure ("Failed to load class '" ^ name ^ "'"))
     | p::ps -> let f = (p ^ "/" ^ name ^ ".modlib.sign") in
