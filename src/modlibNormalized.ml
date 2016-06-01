@@ -345,3 +345,69 @@ let rec ft_of_cv = function
   | GlobalReference _ | Recursive _ | DynamicReference _ -> raise NotFlat
 
 let ft_of_cv_safe cv = try Some (ft_of_cv cv) with | NotFlat -> None
+
+type type_error = {type_error : string;
+                   error_src : exp}
+
+let max_var a b = match (a,b) with (None,_) -> None
+                                 | (_,None) -> None
+                                 | (Some _, Some Discrete) -> Some Discrete
+                                 | (Some Discrete, Some _) -> Some Discrete
+                                 | (Some (Parameter | Constant), Some Parameter) -> Some Parameter
+                                 | (Some Parameter, Some Constant) -> Some Parameter
+                                 | (Some Constant, Some Constant) -> Some Constant
+                                                                       
+let rec tf_of_e e =
+  let open Result.Monad in
+  let rec variability ?limit cs = match DQ.front cs with    
+      Some({kind=CK_Class | CK_Constant}, r) -> do_ ;
+      variability ~limit:Constant r ;     
+    | Some({kind=CK_Parameter; component}, r) ->
+      begin match limit with
+          Some Constant -> Bad {type_error=Printf.sprintf "Cannot access non-constant element '%s'" component.ident.txt;
+                                error_src = e}
+        | _ -> variability ~limit:Parameter r
+      end
+    | Some({kind=CK_Discrete; component}, r) ->
+      begin match limit with
+          Some (Parameter | Constant) -> Bad {type_error=Printf.sprintf "Cannot access non-discrete element '%s'" component.ident.txt;
+                                error_src = e}
+        | _ -> variability ~limit:Discrete r
+      end
+    | Some(_, r) -> variability ?limit r
+    | None -> return limit
+  in
+  match e with
+    ComponentReference (UnknownRef _ | KnownRef {known_type=None})->
+    Bad {type_error = "Unknown reference"; error_src=e}
+
+  | ComponentReference (KnownRef {known_components; known_type=Some t}) ->
+    do_ ;
+    v <-- variability known_components ; 
+    return (t, v)
+      
+  | And {left; right} -> do_ ;
+    (lt, lv) <-- tf_of_e left ;
+    (lt', lv') <-- tf_of_e right ;
+    begin match (lt, lt') with
+        (FTBool, FTBool)-> return (FTBool, max_var lv lv')
+      | (FTBool, _) -> Bad {error_src=right; type_error="Expected Boolean"}
+      | (_, _) -> Bad {error_src=left; type_error="Expected Boolean"}
+    end            
+    
+  | Mul {left; right} -> do_ ;
+    (lt, lv) <-- tf_of_e left ;
+    (lt', lv') <-- tf_of_e right ;
+    begin match (lt, lt') with
+        (FTInteger, FTInteger) -> return (FTInteger, max_var lv lv')
+      | (FTReal, FTReal) -> return (FTReal, max_var lv lv')
+      | _ -> Bad {error_src=e; type_error="Illegal Arithmetic Operands"}
+    end
+
+  | Real _ -> return (FTReal, None)
+  | Int _ -> return (FTInteger, None)
+  | String _ -> return (FTString, None)
+  | Bool _ -> return (FTBool, None)
+
+  | _ -> Bad {error_src=e; type_error="Type not yet implemented"}
+

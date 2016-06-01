@@ -82,7 +82,8 @@ let test_cases = [
     [`ClassMember "A"] (Has.field public "x" (Is.bound_to (Real 42.))) ;
 
 
-  (let app = {named_args=[]; fun_=UnknownRef {root=false;components=[{ident=nl "unquote"; subscripts=[]}]}; args=[cre (knownref ~typ:FTReal [cconstfld "x"])]} in
+  (let app = {named_args=[]; fun_=UnknownRef {root=false;components=[{ident=nl "unquote"; subscripts=[]}]};
+              args=[cre (knownref ~typ:FTReal [cconstfld "x"])]} in
   test_norm "Normalize Vendor specific Annotation"
     "class A constant Real x = 42.; annotation (__amsun(step = {unquote(x)})); end A"
     [`ClassMember "A"] (Has.annotation "__amsun" (Is.nested (Has.element "step" (Is.modified_to (Array [App app]))))) ) ;

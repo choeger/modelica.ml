@@ -258,11 +258,13 @@ let rec norm_annotation history =
         Printf.printf "AMSUN annotation: %s\n" l2.txt ;
         (* Resolve all unquoted expressions *)
         let r = resolution_mapper StrMap.empty history in
-        let map_unquote self {fun_; args; named_args} = match fun_ with
+        let map_unquote self {fun_; args; named_args} =
+          match fun_ with
             UnknownRef {root=false; components=[{ident; subscripts=[]}]} when ident.txt="unquote" ->
             App {fun_; args=List.map (r.map_exp r) args;
                  named_args=List.map (r.map_named_arg r) named_args}
-          | _ -> App {fun_; args; named_args}
+          | r -> 
+            App {fun_; args=List.map (self.map_exp self) args; named_args}
         in
     
         let annotation_mapper = {Syntax.identity_mapper with
