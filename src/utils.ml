@@ -67,15 +67,17 @@ module Format = StdFormat
 exception StructuralError of string
 
 module type RichOrderedType = sig
-  type t [@@deriving show,eq,ord,yojson]
+  type t [@@deriving show,eq,ord,yojson,sexp]
 end
 
 module RichStr = struct
-  type t = string[@@deriving show,eq,ord,yojson]
+  open Sexplib.Std
+  type t = string[@@deriving show,eq,ord,yojson,sexp]
 end
 
 module RichInt = struct
-  type t = int[@@deriving show,eq,ord,yojson]
+  open Sexplib.Std
+  type t = int[@@deriving show,eq,ord,yojson,sexp]
 end
 
 module RichMap(Ord : RichOrderedType) = struct
@@ -106,6 +108,14 @@ module RichMap(Ord : RichOrderedType) = struct
     let pp_pair fmt (k,v) = fprintf fmt "%a@ =@ %a" Ord.pp k pp_v v in
     fprintf fmt "@[{%a}@]" (pp_print_list ~pp_sep:pp_comma pp_pair) (bindings s)
 
+  open Sexplib.Std
+  open Sexplib.Conv
+  let t_of_sexp a_of_sexp s =
+    of_list (list_of_sexp (pair_of_sexp Ord.t_of_sexp a_of_sexp) s)
+
+  let sexp_of_t sexp_of_a s =
+    sexp_of_list (sexp_of_pair Ord.sexp_of_t sexp_of_a) (bindings s)
+  
   let show poly_a = [%derive.show : 'a t]
 
   let eq poly_a = [%derive.eq : 'a t]
@@ -185,8 +195,9 @@ let unloc {Location.txt} = txt
 
 let lunloc xs = List.map unloc xs
 
-module Name = struct         
-  type t = string DQ.t [@@deriving show,eq,ord,yojson]
+module Name = struct
+  open Sexplib.Std
+  type t = string DQ.t [@@deriving show,eq,ord,yojson,sexp]
 
   let hash = Hashtbl.hash
 

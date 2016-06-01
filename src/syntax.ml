@@ -71,6 +71,11 @@ type loc_t = Location.t = {
     loc_ghost: bool;
   } [@@deriving show,eq,yojson,mapper,folder,sexp]
 
+and flat_type = FTReal | FTString | FTBool | FTInteger
+              | FTEnum of string list
+              | FTObject of flat_type StrMap.t
+              | FTArray of flat_type list
+
   and 'a located = 'a Location.loc = {txt : 'a; loc : loc_t [@default Location.none] [@sexp_drop_default] [@opaque]}
 
   and str = string located
@@ -284,7 +289,7 @@ type loc_t = Location.t = {
 
   and unknown_ref = { root : bool ; components : components }
 
-  and known_ref = known_component DQ.t
+  and known_ref = {known_components : known_component DQ.t; known_type : flat_type option}
 
   and component_kind = CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete (* components of given variability *)
                      | CK_Class (* class or type *)

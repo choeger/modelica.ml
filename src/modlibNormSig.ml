@@ -151,7 +151,7 @@ let rec shapeof lhs = function
       raise (Failure ("Error determining shape: " ^ (Path.show (target lhs)) ^ " - " ^ (Syntax.show_components todo) ^ " == " ^ (show_class_value cv))) (* TODO: log/report error *)
 
 let dynref_found {lookup_success_state={current_ref;current_scope}} =
-  let downref = DQ.map (fun {Syntax.component} -> component.ident.txt) current_ref in
+  let downref = DQ.map (fun {Syntax.component} -> component.ident.txt) current_ref.known_components in
   if downref = DQ.empty && current_scope = 0 then
     raise (Failure "Did not expect this-reference!") ;
   

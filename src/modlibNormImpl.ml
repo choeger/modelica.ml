@@ -73,7 +73,10 @@ and extends_builtin_el lib {super} = IntMap.cardinal super = 1 && extends_builti
     
 (** Attempt to resolve $first.$rest as a builtin *)
 let resolve_builtin first rest =
-  let builtin kind = DQ.cons {kind; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) rest)) in
+  let builtin kind =
+    {known_components=DQ.cons {kind; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) rest));
+     known_type = None}
+  in
   match first.ident.txt with
   (* Free variable *)
   | "time" -> builtin CK_Time
@@ -126,7 +129,11 @@ exception ResolutionError of lookup_error_struct
 
 let rec resolve_env env self first rest =
   if StrMap.mem first.ident.txt env then
-    (false, DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest)))
+    (false, {
+        known_type = None;
+        known_components =
+          DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest))
+      })
   else
     let state = state_of_self self in
     match lookup_lexical_in state first rest with
@@ -136,13 +143,15 @@ let rec resolve_env env self first rest =
       (* TODO: encode this assertion as an OCaml type *)
       let rec class_name_of_path name p = match DQ.rear p with
         | None -> name 
-        | Some(xs, `ClassMember txt) -> class_name_of_path (DQ.cons {kind=CK_Class; component={ident={txt;loc=Location.none}; subscripts=[]}} name) xs
+        | Some(xs, `ClassMember txt) ->
+          let known_components = DQ.cons {kind=CK_Class; component={ident={txt;loc=Location.none}; subscripts=[]}} name.known_components in
+          class_name_of_path {name with known_components} xs
         | Some(xs, `Protected) -> class_name_of_path name xs
         | _ -> raise (Failure "History not lexical?")
       in
         
       let rec upwards self up =
-        match self.up with None -> if up = 0 then DQ.empty else raise HierarchyError
+        match self.up with None -> if up = 0 then {known_components=DQ.empty;known_type=None} else raise HierarchyError
                          | Some self' ->
                            if (up = 0) then class_name_of_path current_ref self.tip.clbdy.source_path
                            else upwards self' (up-1)
@@ -286,7 +295,7 @@ let rec normalize_classmod_stmts self kind {class_; class_mod} =
   | {field_name; exp}::stmts ->
     (* normalize the modified component *)
     let field_name = match get_class_element (state_of_self self) kind class_  field_name with
-        Success {lookup_success_state={current_ref}} -> current_ref
+        Success {lookup_success_state={current_ref}} -> current_ref.known_components
       | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
         BatLog.logf "Could not find: %s\n" (show_components todo) ;
         raise (ModificationTargetNotFound todo)
@@ -319,7 +328,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
       begin match fst current_path with
           `Protected -> raise (Failure "Internal Error: Unexpected end of path")
         | `ClassMember x ->
-          begin match Path.front current_ref with
+          begin match Path.front current_ref.known_components with
               Some({kind=CK_Class; component}, cr) ->
               (* Modified a class *)
               let {class_;class_mod} = StrMap.find x class_members in
@@ -335,7 +344,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
             | None -> raise (Failure "Lookup Result inconsistent")
           end
         | `FieldType x ->
-          begin match Path.front current_ref with
+          begin match Path.front current_ref.known_components with
             | Some({kind=CK_Class},_) -> raise (Failure "Expected to modify a component")
 
             | Some({kind = mod_kind; component}, cr) ->
@@ -352,7 +361,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
             | None -> raise (Failure "Lookup Result inconsistent")
           end
         | `SuperClass n ->
-          begin match Path.front current_ref with
+          begin match Path.front current_ref.known_components with
               Some(y,ys) ->
               let {super_mod} as sc = IntMap.find n super in
               let super_mod = merge_mod exp y ys super_mod in

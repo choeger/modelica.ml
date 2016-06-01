@@ -60,7 +60,7 @@ let parser_test_case parser lprinter sprinter prep input expected =
   ]
 
 let erase_location = { identity_mapper with map_loc_t = (fun _ _ -> Location.none) ;
-                                            map_known_ref = (fun s -> DQ.map (s.map_known_component s)) ;
+                                            map_known_ref = (fun s r -> {r with known_components=DQ.map (s.map_known_component s) r.known_components}) ;
                      }
 
 let prep_import = erase_location.map_import erase_location 
