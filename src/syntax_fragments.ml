@@ -146,6 +146,6 @@ let cbuiltinfun = known_component CK_BuiltinFunction
 
 let cbuiltinclass = known_component CK_BuiltinClass
     
-let knownref cks = KnownRef {known_components=DQ.of_list cks; known_type=None}
+let knownref ?typ cks = KnownRef {known_components=DQ.of_list cks; known_type=typ}
 
-let rootref cks = RootRef {known_components=DQ.of_list cks; known_type=None}
+let rootref ?typ cks = RootRef {known_components=DQ.of_list cks; known_type=typ}

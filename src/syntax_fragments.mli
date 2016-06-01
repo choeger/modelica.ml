@@ -88,8 +88,8 @@ val cconstfld : string -> Syntax.known_component
 val cfld : string -> Syntax.known_component
 val cbuiltinfun : string -> Syntax.known_component
 val cbuiltinclass : string -> Syntax.known_component
-val knownref : Syntax.known_component list -> Syntax.component_reference
-val rootref : Syntax.known_component list -> Syntax.component_reference
+val knownref : ?typ:flat_type -> Syntax.known_component list -> Syntax.component_reference
+val rootref : ?typ:flat_type -> Syntax.known_component list -> Syntax.component_reference
 val unknownref : string list -> Syntax.component_reference
 val time : Syntax.known_component
 
