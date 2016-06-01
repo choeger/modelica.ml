@@ -123,6 +123,7 @@ end
 
 module RichSet(Ord : RichOrderedType) = struct
   include Set.Make(Ord) 
+
   let to_yojson s = `List (List.map (fun e -> Ord.to_yojson e) (elements s))
 
   let of_yojson js =
@@ -147,6 +148,15 @@ module RichSet(Ord : RichOrderedType) = struct
   
   let mkmap f s =
     Map.of_enum (Enum.map (fun k -> (k, f k)) (enum s))
+
+  open Sexplib.Std
+  open Sexplib.Conv
+  let t_of_sexp s =
+    of_list (list_of_sexp Ord.t_of_sexp s)
+
+  let sexp_of_t s =
+    sexp_of_list Ord.sexp_of_t (elements s)
+
 end
 
 module IntSet = RichSet(RichInt)

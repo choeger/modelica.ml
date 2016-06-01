@@ -315,3 +315,33 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
 let lookup_path_direct global p = match DQ.front p with
     Some(x,xs) -> follow_path_es global DQ.empty global xs x
   | None -> raise (Failure "empty path")
+
+exception NotFlat
+
+let rec ft_of_cv = function
+    Int ->  FTInteger
+  | Real -> FTReal
+  | String -> FTString    
+  | Bool -> FTBool
+  | Unit | ProtoExternalObject -> FTObject StrMap.empty
+  | Enumeration s -> FTEnum s
+  | Constr {arg; constr=Array n} -> FTArray (ft_of_cv arg, n)
+  | Constr {arg} -> ft_of_cv arg
+  | Replaceable cv -> ft_of_cv cv
+  | Class {object_sort=Function; public={fields}} ->    
+    let mkarg (inputs,outputs) (x, {field_class}) =
+      let {flat_attr;flat_val} = flat field_class in
+      match flat_attr.fa_cau with
+        Some Input -> (StrMap.add x (ft_of_cv flat_val) inputs, outputs)
+      | Some Output -> (inputs, (ft_of_cv flat_val)::outputs)
+      | _ -> (inputs, outputs)
+    in
+    let (inputs, outputs) = List.fold_left mkarg (StrMap.empty, []) (StrMap.bindings fields) in
+    FTFunction (inputs, outputs)
+  | Class {public={fields}} ->
+    let ft_of_field {field_class} = ft_of_cv field_class in
+    FTObject (StrMap.map ft_of_field fields)
+      
+  | GlobalReference _ | Recursive _ | DynamicReference _ -> raise NotFlat
+
+let ft_of_cv_safe cv = try Some (ft_of_cv cv) with | NotFlat -> None

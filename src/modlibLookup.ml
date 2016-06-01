@@ -113,8 +113,9 @@ let rec get_class_element_in state {Normalized.class_members; super; fields} x x
     get_class_element {state with current_ref} (`ClassMember x.ident.txt) cv xs
   end
   else if StrMap.mem x.ident.txt fields then begin
-    let current_ref = {state.current_ref with known_components =
-                                                DQ.snoc state.current_ref.known_components {Syntax.kind = CK_Continuous; component=x}} in
+    let known_components = DQ.snoc state.current_ref.known_components {Syntax.kind = CK_Continuous; component=x} in
+    let known_type = ft_of_cv_safe (StrMap.find x.ident.txt fields).field_class in
+    let current_ref = {known_components; known_type} in
     get_class_element {state with current_ref} (`FieldType x.ident.txt) (StrMap.find x.ident.txt fields).field_class xs
   end
   else begin

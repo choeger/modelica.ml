@@ -72,9 +72,10 @@ type loc_t = Location.t = {
   } [@@deriving show,eq,yojson,mapper,folder,sexp]
 
 and flat_type = FTReal | FTString | FTBool | FTInteger
-              | FTEnum of string list
+              | FTEnum of StrSet.t
+              | FTFunction of flat_type StrMap.t * flat_type list
               | FTObject of flat_type StrMap.t
-              | FTArray of flat_type list
+              | FTArray of flat_type * int
 
   and 'a located = 'a Location.loc = {txt : 'a; loc : loc_t [@default Location.none] [@sexp_drop_default] [@opaque]}
 
