@@ -398,7 +398,7 @@ scope : INNER { Inner }
       | INNER OUTER { InnerOuter }
       | { Local }
           
-type_prefix : final = flag(FINAL) replaceable = flag(REPLACEABLE) scope=scope                  
+type_prefix : final = flag(FINAL) scope=scope  replaceable = flag(REPLACEABLE)                 
                 { { final ; scope ; replaceable } }
 
 array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
@@ -428,7 +428,7 @@ type_sort : CLASS { Class }
            | RECORD { Record } | FUNCTION { Function } | TYPE { Type } | OPERATOR { Operator } | OPERATOR RECORD { OperatorRecord } 
            | OPERATOR FUNCTION { OperatorFunction }
                      
-typedef_prefix : type_final = flag (FINAL) type_replaceable = flag(REPLACEABLE)
+typedef_prefix : type_final = flag (FINAL) scope type_replaceable = flag(REPLACEABLE)
                  encapsulated = flag(ENCAPSULATED) partial=flag(PARTIAL)                
                  { { type_final ; type_replaceable ; encapsulated ; partial } }
                      
