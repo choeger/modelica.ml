@@ -278,7 +278,7 @@ statement_body : procedure=component_reference LPAREN arguments = function_args 
                     { IfStmt { condition; then_ ; else_if; else_ } }
                | WHEN condition=expr THEN then_ = list(statement) else_if = list(elsewhen_statement) ENDWHEN
                     { WhenStmt { condition; then_ ; else_if; else_ = []} }                                                                                                                         
-               | FOR idx = list(index) LOOP body=list(statement) ENDFOR { ForStmt { idx; body } }
+               | FOR idx = separated_nonempty_list(COMMA, index) LOOP body=list(statement) ENDFOR { ForStmt { idx; body } }
                | WHILE while_=expr LOOP while_body = list(statement) ENDWHILE { WhileStmt { while_; while_body } }
                | target=lexpr COLONEQ source=expr { Assignment { target; source } }                       
 
@@ -298,7 +298,7 @@ equation_body : e = simple_expr { ExpEquation e }
                    { IfEquation { condition; then_ ; else_if; else_ } } 
               | WHEN condition=expr THEN then_ = list(equation) else_if = list(elsewhen_equation) ENDWHEN
                    { WhenEquation { condition; then_ ; else_if; else_ = []} }                                                                                                                         
-              | FOR idx = list(index) LOOP body=list(equation) ENDFOR { ForEquation { idx; body } }
+              | FOR idx = separated_nonempty_list(COMMA, index) LOOP body=list(equation) ENDFOR { ForEquation { idx; body } }
               | CONNECT LPAREN connlhs = component_reference COMMA connrhs = component_reference RPAREN { Connect {connlhs; connrhs} }
 
 variability : CONSTANT { Constant }
@@ -530,9 +530,11 @@ protected_composition_elements :
             | PUBLIC rest = public_composition_elements { rest }
 
 composition_external :
-            | EXTERNAL lang=STRING ext_call=option(external_call) annotation = option(annotation) SEMICOLON
+            | EXTERNAL lang=external_lang ext_call=option(external_call) annotation = option(annotation) SEMICOLON
             { {annotated_elem = {lang; ext_call}; annotation} }
             
+
+external_lang : l = STRING { l } | { "" }
 
 external_call :
               lhs=component_reference EQ ext_ident=IDENT LPAREN ext_args = separated_list(COMMA, expr) RPAREN { {ext_lhs=Some lhs; ext_ident; ext_args } }
