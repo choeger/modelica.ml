@@ -73,13 +73,13 @@ and extends_builtin_el lib {super} = IntMap.cardinal super = 1 && extends_builti
     
 (** Attempt to resolve $first.$rest as a builtin *)
 let resolve_builtin first rest =
-  let builtin kind =
+  let builtin ?known_type kind =
     {known_components=DQ.cons {kind; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) rest));
-     known_type = None}
+     known_type}
   in
   match first.ident.txt with
   (* Free variable *)
-  | "time" -> builtin CK_Time
+  | "time" -> builtin ~known_type:FTReal CK_Time
                 
   (* Numeric Functions and Conversion Functions, see 3.7.1 *)
   | "abs" | "sign" | "sqrt" | "div" 
@@ -121,9 +121,10 @@ let resolve_builtin first rest =
   | "array" | "cat" | "zeros" | "fill" | "ones" | "identity" | "diagonal" | "linspace" -> builtin CK_BuiltinFunction
 
   (* Builtin Classes *)
-  | "String" | "StateSelect" | "Connections" | "AssertionLevel" -> builtin CK_BuiltinClass
+  | "Boolean" | "Integer" | "String" | "StateSelect" | "Connections" | "AssertionLevel" -> builtin CK_BuiltinClass
 
-  | _ -> BatLog.logf "Error searching for %s\n" first.ident.txt ; raise (NoSuchClass first.ident)
+  | _ ->
+    BatLog.logf "%s\nError searching for %s\n" (where_desc first.ident.loc) first.ident.txt ; raise (NoSuchClass first.ident)
 
 exception ResolutionError of lookup_error_struct
 
@@ -180,8 +181,11 @@ let resolve_ur env self {root;components} =
     end
   | [] -> raise AstInvariant
 
+type opt_exp = exp option [@@deriving show]
+
 let add_idx env idx = 
-  let mk_env = fun {variable={txt};range} m -> StrMap.add txt range env in
+  let mk_env = fun {variable={txt};range} m ->
+    StrMap.add txt range m in
   List.fold_right mk_env idx env
 
 
@@ -245,17 +249,17 @@ let rec merge_mod exp mod_component nested_component mods =
 
 let rec norm_annotation history =
   let known_annotation = function
-      "__amsun" | "experiment" -> true | _ -> false
+      "__amsun" | "__ModelicaAssociation" | "experiment" -> true | _ -> false
   in
+  
   function
     [] -> StrMap.empty
-    (* Only deal with known annotations for now *)
+    (* Only normalize known annotations for now *)
   | {commented={mod_name=[ident];
                 mod_value=Some (Nested {modifications})}}::ms when known_annotation ident.txt ->
 
     let rec norm_nested field_mods = function
         {commented={mod_name=[l2]; mod_value=Some(Rebind e)}} :: mods ->
-        Printf.printf "AMSUN annotation: %s\n" l2.txt ;
         (* Resolve all unquoted expressions *)
         let r = resolution_mapper StrMap.empty history in
         let map_unquote self {fun_; args; named_args} =
@@ -273,16 +277,45 @@ let rec norm_annotation history =
                                                 }
                                 } in
         let e' = annotation_mapper.map_exp annotation_mapper e in
-        let field_mods' =
-          merge_mod e'
-            {kind=CK_BuiltinClass; component={ident; subscripts=[]}}
-            (DQ.singleton {kind=CK_BuiltinAttr; component={ident=l2; subscripts=[]}})
-            field_mods
+        let field_mods' = StrMap.add l2.txt             
+            {mod_kind=CK_BuiltinClass;
+             mod_default = Some e';
+             mod_nested = StrMap.empty;
+            }
+            field_mods 
         in
         norm_nested field_mods' mods
+
+      | {commented={mod_name=[l2]; mod_value=Some (Nested {modifications})}}::mods ->
+        Printf.printf "Nested known Modification: %s\n" l2.txt;
+        let mod_nested = norm_nested StrMap.empty modifications in
+        
+        let rec merge_mods k {mod_kind; mod_nested;mod_default} mods =
+          if StrMap.mem k mods then
+            let mod2 = StrMap.find k mods in
+            let mod_nested = StrMap.fold merge_mods mod_nested mod2.mod_nested in
+            let mod_default =
+            match mod_default with
+              None -> mod2.mod_default
+            | Some e ->
+              begin match mod2.mod_default with None -> Some e
+                                              | _ -> raise (DoubleModification l2)
+              end
+            in
+            StrMap.add k {mod2 with mod_nested; mod_default} mods
+          else
+            StrMap.add k {mod_kind;mod_nested;mod_default} mods
+        in
+
+        norm_nested (merge_mods l2.txt {mod_kind=CK_BuiltinClass; mod_nested; mod_default=None} field_mods) mods          
+      | _ :: mods ->
+        (* Cannot handle the unknown shape *)
+        norm_nested field_mods mods
       | [] -> field_mods
     in
-    norm_nested (norm_annotation history ms) modifications
+    StrMap.add ident.txt {mod_kind = CK_BuiltinClass; mod_default=None; mod_nested=norm_nested (norm_annotation history ms) modifications}
+      (norm_annotation history ms)
+      
   | _::ms -> norm_annotation history ms
     
     
@@ -397,7 +430,7 @@ let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts}
                 None -> None
               | Some m ->
                 let mod_nested = norm_annotation history m.modifications in
-                if mod_nested = StrMap.empty then (Printf.printf "No AMSUN annotations\n" ; None) else Some {mod_nested; mod_default=None; mod_kind=CK_BuiltinClass}
+                if mod_nested = StrMap.empty then None else Some {mod_nested; mod_default=None; mod_kind=CK_BuiltinClass}
             in
             let {annotated_elem; annotation} = PathMap.find os.source_path payload in
             (resolve_behavior current_class annotated_elem, resolve_annotation current_class annotation)
