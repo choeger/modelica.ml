@@ -55,7 +55,7 @@ val parse_root : scanned pkg_root -> parsed pkg_root option
 val parse_package : scanned package -> parsed package option
 (** Attempt to parse all source files in a package *)
                                                                   
-val scan : string list -> string -> scanned package option
+val scan : (string -> bool) -> string list -> string -> scanned package option
 (** Try to parse the diven directory as a Modelica package 
     Does not parse any files.
 *)

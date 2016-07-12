@@ -73,7 +73,7 @@ let is_source_file file = String.ends_with (Filename.basename file) ".mo"
 
 let is_package_mo file = (Filename.basename file) = "package.mo" 
 
-let rec scan prefix dir =
+let rec scan ignored prefix dir =
   if is_directory dir then
     let pkg_name = (Filename.basename dir)::prefix in
     let contents = (Array.to_list (Array.map (Filename.concat dir) (Sys.readdir dir))) in
@@ -82,26 +82,52 @@ let rec scan prefix dir =
     if List.exists is_package_mo contents then 
 
       let package_unit = List.find is_package_mo contents in
-      let collect_sub_pkg pkgs file = match scan pkg_name file with None -> pkgs | Some pkg -> pkg::pkgs in
-      let collect_source_files files file = if (is_source_file file) && not (is_package_mo file) then file::files else files in
 
-      let sub_packages = List.fold_left collect_sub_pkg [] contents in
-      let external_units = List.fold_left collect_source_files [] contents in      
+      let sub_packages = List.fold_left (collect_sub_pkg ignored dir) [] contents in
+      let external_units = List.fold_left (collect_source_files ignored) [] contents in      
       Some { package_unit ; pkg_name ; sub_packages ; external_units }
     else None
 
   else None
 
-let scan_root dir =
+and collect_sub_pkg ignored dir pkgs file = match scan ignored [dir] file with None -> pkgs | Some pkg -> pkg::pkgs
+
+and collect_source_files ignored files file = if (is_source_file file) && not (is_package_mo file) && not (ignored file) then file::files else files
+
+let scan_root dir =  
   if is_directory dir then
-    let contents = Array.to_list (Array.map (Filename.concat dir) (Sys.readdir dir)) in
+    let ignore_file = Filename.concat dir "package.ignore" in
+    let no_comment s =
+      let s' = String.strip s in
+      String.length s' > 0 && s'.[0] <> '#'
+    in
+    let build_glob g =
+      let rec b =
+      function
+        [] ->  [Re.eos]
+      | [g] -> [Re_glob.glob g; Re.eos]
+      | g :: gs -> (Re_glob.glob g) :: (Re.rep Re.any) :: b gs
+      in
+      Re.compile (Re.seq (Re.bos :: (b (String.nsplit (Filename.concat dir g) ~by:"**/" ))))
+    in
+    let filter = if Sys.file_exists ignore_file then
+        List.of_enum (Enum.map build_glob 
+                        (Enum.filter no_comment (File.lines_of ignore_file)))
+      else
+        []
+    in
+    let ignored f = List.exists (fun glob -> Re.execp glob f) filter in
 
-    let collect_sub_pkg pkgs file = match scan [dir] file with None -> pkgs | Some pkg -> pkg::pkgs in
-    let collect_source_files files file = if (is_source_file file) && not (is_package_mo file) then file::files else files in
-
-    let root_packages = List.fold_left collect_sub_pkg [] contents in
-    let root_units = List.fold_left collect_source_files [] contents in
-    {root_units; root_packages}
+    match scan ignored [] dir with
+    (* If the root is itself a package, just parse it *)
+    | Some pkg -> {root_units=[]; root_packages=[pkg]}                  
+    | None ->
+      (* Otherwise parse all available root-packages *)
+      let contents = Array.to_list (Array.map (Filename.concat dir) (Sys.readdir dir)) in      
+ 
+      let root_packages = List.fold_left (collect_sub_pkg ignored dir) [] contents in
+      let root_units = List.fold_left (collect_source_files ignored) [] contents in
+      {root_units; root_packages}
   else if (is_source_file dir) && not (is_package_mo dir) then
     (* Toplevel class *)
     {root_units = [dir]; root_packages = []}
