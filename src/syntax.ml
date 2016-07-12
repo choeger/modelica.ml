@@ -346,3 +346,7 @@ let ck_of_var =
   let open Flags in
   function None -> CK_Continuous | Some Constant -> CK_Constant | Some Parameter -> CK_Parameter | Some Discrete -> CK_Discrete
 
+let where_desc { loc_start = {pos_fname; pos_lnum; pos_cnum; pos_bol} } =
+  Printf.sprintf "File %s: Line %d, Column %d" pos_fname pos_lnum (pos_cnum - pos_bol)
+
+
