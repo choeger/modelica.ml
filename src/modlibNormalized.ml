@@ -378,10 +378,12 @@ let rec tf_of_e e =
     | None -> return limit
   in
   match e with
-    ComponentReference (UnknownRef _ | KnownRef {known_type=None})->
+    ComponentReference (UnknownRef _ | KnownRef {known_type=None} | RootRef {known_type=None})->
     Bad {type_error = "Unknown reference"; error_src=e}
 
-  | ComponentReference (KnownRef {known_components; known_type=Some t}) ->
+  | ComponentReference (KnownRef {known_components; known_type=Some t} |
+                        RootRef {known_components; known_type=Some t}
+                       ) ->
     do_ ;
     v <-- variability known_components ; 
     return (t, v)
@@ -409,5 +411,5 @@ let rec tf_of_e e =
   | String _ -> return (FTString, None)
   | Bool _ -> return (FTBool, None)
 
-  | _ -> Bad {error_src=e; type_error="Type not yet implemented"}
+  | _ -> Bad {error_src=e; type_error="Type not yet implemented: " ^ (show_exp e)}
 
