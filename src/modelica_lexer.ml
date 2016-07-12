@@ -138,7 +138,7 @@ let letter = [%sedlex.regexp? 'a'..'z'|'A'..'Z']
 let white_space = [%sedlex.regexp? 
                                    0x09 | 0x0b | 0x0c | 0x20 | 0x85 | 0xa0 | 0x1680 |
                                  0x2000 .. 0x200a | 0x2028 .. 0x2029 | 0x202f.. 0x202f | 0x205f.. 0x205f |
-                                 0x3000.. 0x3000]
+                                 0x3000.. 0x3000 | 0xfeff]
 
 let state_from_utf8_string src input = {
   buf = Utf8.from_string input ;
@@ -298,7 +298,11 @@ let next_token ( { src ; buf ; m_cursor ;  s_cursor  } ) =
     | "/*" -> terminate_comment ()
 
     | (id_start | '_'), Star ( id_continue ) -> ident_or_kw () 
-    | any -> failwith (Printf.sprintf "Unexpected character '%s' (%d)" (Sedlexing.Utf8.lexeme buf) (Sedlexing.lexeme_char buf 0)) 
+    | any ->
+      failwith (Printf.sprintf "Lexical error in %s: Unexpected character '%s' (%d) at line %d column %d"
+                  src
+                  (Sedlexing.Utf8.lexeme buf) (Sedlexing.lexeme_char buf 0)
+                  m_cursor.m_line m_cursor.m_bol)
     | _ -> failwith "no match on 'any'. This cannot happen"
 
   and terminate_comment () = 
