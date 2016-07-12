@@ -91,6 +91,7 @@ module DepGraph = Graph.Persistent.Digraph.Concrete(GInt)
 module Scc = Graph.Components.Make(DepGraph)
 
 exception NoClose
+exception NormalizationError
 exception IllegalRecursion of string
 
 let topological_order w r a =
@@ -141,10 +142,16 @@ let topological_order w r a =
 
     | (false, {source_name})::srcs ->
       (* BatLog.logf "Searching writer of %s\n" (Name.show source_name) ; *)
-      let ws = NameMap.find source_name w in
-      (* BatLog.logf "%s can depend on superclasses of %s\n" (show_class_stmt a.(src)) (Name.show source_name) ; *)   
-      (* no refinement found in that scope, just depend on the superclasses *)
-      add_local_deps src (add_lookup_dependencies src g (find_super_classes ws)) srcs
+      try 
+        let ws = NameMap.find source_name w in
+        (* BatLog.logf "%s can depend on superclasses of %s\n" (show_class_stmt a.(src)) (Name.show source_name) ; *)   
+        (* no refinement found in that scope, just depend on the superclasses *)
+        add_local_deps src (add_lookup_dependencies src g (find_super_classes ws)) srcs
+      with
+        Not_found ->
+        (BatLog.logf "Could not find definition of %s under %d entries\n" (Name.show source_name) (NameMap.cardinal w);
+         NameMap.iter (fun k _ -> if Name.size k = Name.size source_name then BatLog.logf "  Candidate: %s\n" (Name.show k)) w ;
+         raise NormalizationError)
   in
 
   let add_dep i g d =
@@ -172,8 +179,12 @@ let topological_order w r a =
       | [j] -> begin match DQ.rear lhs with Some(xs,x) -> add_empty_creator g i xs | None -> g end 
 
       (* In case of multiple writers there needs to be a Empty statement *)
-      | js -> 
-        let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
+      | (fst::_) as js ->
+        try 
+          let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
+        with
+          Not_found as e -> BatLog.logf "No empty rhs for %s\n" (show_class_ptr a.(fst).lhs) ; raise NormalizationError
+                         
     else (BatLog.logf "Could not add %s to open-statement, no such statement found.\n" (Name.show lhs) ; g)
   in
 
