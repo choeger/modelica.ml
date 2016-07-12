@@ -214,7 +214,7 @@ let next_anon state = (nl (`ClassMember ("anon" ^ (string_of_int state.anons))),
 
 let down_class {loc;txt} = down {loc; txt=`ClassMember txt}
 
-let rec mtranslate_typedef td =
+let rec mtranslate_typedef td =  
   match td.commented with
   | Short tds -> do_ ;
     (* new path is the definition *)
