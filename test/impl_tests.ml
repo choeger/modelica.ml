@@ -257,7 +257,7 @@ let test_cases = [
   (* Test for iteration variables *)
   (
     let range = (Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1})) in
-    let assign = Assignment {target = Single (knownref ~typ:FTReal [cfld "x"]) ; source = ComponentReference (knownref ~typ:FTInteger [cvar "i"])} in
+    let assign = Assignment {target = Single (knownref ~typ:FTReal [cfld "x"]) ; source = ComponentReference (knownref (*~typ:FTInteger*) [cvar "i"])} in
     let stmt = ForStmt {idx = [{variable=nl "i";range}]; body = [uncommented assign]} in
   test_norm
     "Lookup an iteration variable"
@@ -265,10 +265,31 @@ let test_cases = [
     [cm "A"; cm "B"] (Has.behavior **> Has.algorithms **> The.first **> The.first **> Is.statement (uncommented stmt))
   ) ;
 
+  (
+    let range = None in
+    let assign = Assignment {target = Single (knownref ~typ:FTReal [cfld "x"]) ; source = ComponentReference (knownref [cvar "i"])} in
+    let stmt = ForStmt {idx = [{variable=nl "i";range}]; body = [uncommented assign]} in
+  test_norm
+    "Lookup an implicit iteration variable"
+    "package A class B Real x; algorithm for i loop x := i; end for; end B; end A"
+    [cm "A"; cm "B"] (Has.behavior **> Has.algorithms **> The.first **> The.first **> Is.statement (uncommented stmt))
+  ) ;
+
+  (
+    let range = None in
+    let assign = Assignment {target = Single (knownref ~typ:FTReal [cfld "x"]) ; source = ComponentReference (knownref [cvar "j"])} in
+    let stmt = ForStmt {idx = [{variable=nl "i";range}]; body = [uncommented assign]} in
+  test_norm
+    "Lookup multiple implicit iteration variables"
+    "package A class B Real x; algorithm for i, j loop x := j; end for; end B; end A"
+    [cm "A"; cm "B"] (Has.behavior **> Has.algorithms **> The.first **> The.first **> Is.statement (uncommented stmt))
+  ) ;
+
+  
   (* Test for iteration variables in equations *)
   (
     let range = (Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1})) in
-    let eq = SimpleEquation {left = ComponentReference (knownref ~typ:FTReal [cfld "x"]) ; right = ComponentReference (knownref ~typ:FTInteger [cvar "i"])} in
+    let eq = SimpleEquation {left = ComponentReference (knownref ~typ:FTReal [cfld "x"]) ; right = ComponentReference (knownref (*~typ:FTInteger*) [cvar "i"])} in
     let loop = ForEquation {idx = [{variable=nl "i";range}]; body = [uncommented eq]} in
   test_norm
 
