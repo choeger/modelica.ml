@@ -83,7 +83,7 @@ let test_cases = [
 
 
   (let app = {named_args=[]; fun_=UnknownRef {root=false;components=[{ident=nl "unquote"; subscripts=[]}]};
-              args=[cre (knownref ~typ:FTReal [cconstfld "x"])]} in
+              args=[cre (knownref 0 [cconstfld ~known_type:FTReal "x"])]} in
   test_norm "Normalize Vendor specific Annotation"
     "class A constant Real x = 42.; annotation (__amsun(step = {unquote(x)})); end A"
     [`ClassMember "A"] (Has.annotation "__amsun" (Is.nested (Has.element "step" (Is.modified_to (Array [App app]))))) ) ;
@@ -94,20 +94,20 @@ let test_cases = [
 
   test_norm "Normalize Simple Outer-Scope Binding"
     "class A class B constant Real x = c; end B; constant Real c = 42.; end A"
-    [cm "A"; cm "B"] (Has.field public "x" (Is.bound_to (cre (rootref ~typ:FTReal [cclass "A"; cconstfld "c"])))) ;
+    [cm "A"; cm "B"] (Has.field public "x" (Is.bound_to (cre (knownref 1 [cconstfld ~known_type:FTReal "c"])))) ;
 
   test_norm "Normalize Binding to Builtin Attributes"
     "class A constant Real x = y.start; Real y; end A"
-    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (cre (knownref ~typ:FTReal [cfld "y"; cattr "start"])))) ;  
+    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (cre (knownref 0 [cfld ~known_type:FTReal "y"; cattr ~known_type:FTReal "start"])))) ;  
 
   test_norm "Normalize Binding to Builtin Attributes, changing type"
     "class A constant Boolean x = y.fixed; Real y; end A"
-    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (cre (knownref ~typ:FTBool [cfld "y"; cattr "fixed"])))) ;  
+    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (cre (knownref 0 [cfld ~known_type:FTReal "y"; cattr ~known_type:FTBool "fixed"])))) ;  
   
   test_norm "Normalize Builtin 'size'"
     "class A constant Integer x = size(y); Real y; end A"
     [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app {fun_= rootref [cbuiltinfun "size"] ;
-                                                            args=[cre (knownref ~typ:FTReal [cfld "y"])];
+                                                            args=[cre (knownref 0 [cfld ~known_type:FTReal "y"])];
                                                             named_args=[]}))) ;
 
   test_norm "Normalize Builtin 'stateSelect'"
@@ -171,26 +171,26 @@ let test_cases = [
   
   test_norm "Self Name Resolution Inside Binding"
     "class A class B constant Real x = x; end B; protected constant Real x = 42.; end A"
-    [`ClassMember "A"; `ClassMember "B"] (Has.field public "x" (Is.bound_to (ComponentReference (knownref ~typ:FTReal [cconstfld "x"]))));
+    [`ClassMember "A"; `ClassMember "B"] (Has.field public "x" (Is.bound_to (ComponentReference (knownref 0 [cconstfld ~known_type:FTReal "x"]))));
 
   test_norm "Name Resolution Inside Binding"
     "class A constant Real y = x; constant Real x = 42.; end A"
-    [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref ~typ:FTReal [cconstfld "x"])))) ;
+    [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref 0 [cconstfld ~known_type:FTReal "x"])))) ;
 
   test_norm "Protected Name Resolution Inside Binding"
     "class A constant Real y = x; protected constant Real x = 42.; end A"
-    [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref  ~typ:FTReal [cconstfld "x"])))) ;
+    [`ClassMember "A"] (Has.field public "y" (Is.bound_to (ComponentReference (knownref  0 [cconstfld ~known_type:FTReal "x"])))) ;
 
   test_norm "Inherited Name Resolution Inside Binding"
     "class A class E end E; class B constant Real x = 42.; end B; class C extends E; extends B; protected constant Real y = x; end C; end A"
     [`ClassMember "A"; `ClassMember "C"]
     (Has.field protected "y"
-       (Is.bound_to (ComponentReference (knownref ~typ:FTReal [cconstfld "x"]))))  ;
+       (Is.bound_to (ComponentReference (knownref 0 [cconstfld ~known_type:FTReal "x"]))))  ;
 
   test_norm "Indirect Inherited Name Resolution"
     "class A class B Real a; end B; class C extends B; end C; class D C c; Real x = c.a; end D; end A"
     [`ClassMember "A"; `ClassMember "D"]
-    (Has.field public "x" **> Is.bound_to (cre (knownref  ~typ:FTReal [cfld "c"; cfld "a"]))) ;
+    (Has.field public "x" **> Is.bound_to (cre (knownref 0 [cfld "c"; cfld ~known_type:FTReal "a"]))) ;
     
   test_norm
     "Lookup a modified constant in a simple Modelica class using extensions" 
@@ -214,11 +214,12 @@ let test_cases = [
   test_norm
     "Lookup imported names"
     "package A package B constant Real x = 42.; end B; package C import A.B.x; constant Real y = x; end C; end A"
-    [cm "A"; cm "C"] (Has.field public "y" **> Is.bound_to (ComponentReference (rootref ~typ:FTReal [cclass "A"; cclass "B"; cconstfld "x"])));
+    [cm "A"; cm "C"] (Has.field public "y" **> Is.bound_to (ComponentReference (rootref [cclass "A"; cclass "B"; cconstfld ~known_type:FTReal "x"])));
 
 
-  (let then_ = ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]) in
-   let yref = ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"]) in
+  (let known_type = Some (FTEnum (StrSet.of_list ["X";"Y"])) in
+   let then_ = ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr ?known_type "X"]) in
+   let yref = ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr ?known_type "Y"]) in
    let else_if = [{ guard = Bool true ; elsethen = yref }] in
    let else_ = then_ in   
    test_norm
@@ -232,12 +233,13 @@ let test_cases = [
      [cm "A"; cm "C"] (Has.field public "s" **> Is.bound_to (If {condition=Bool true;then_;else_;else_if})));  
 
 
-  (* Test for imported names in behavior section *)
-  (let condition = Eq{
-       left=ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr "X"]);
-       right=ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr "Y"])};
+  (* Test for imported names in behavior section *)  
+  (let known_type = Some (FTEnum (StrSet.of_list ["X";"Y"])) in
+   let condition = Eq{
+       left=ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr  ?known_type "X"]);
+       right=ComponentReference (rootref [cclass "A"; cclass "B"; cclass "S"; cattr  ?known_type "Y"])};
    in 
-   let eq = {left=ComponentReference (knownref  ~typ:FTReal[cfld "x"]); right=ComponentReference (rootref [time])} in   
+   let eq = {left=ComponentReference (knownref 0 [cfld ~known_type:FTReal "x"]); right=ComponentReference (rootref [time])} in   
    let else_ = [uncommented (SimpleEquation {left=eq.right; right=eq.left})] in
    let then_ = [uncommented (SimpleEquation eq)] in
    let else_if = [] in
@@ -257,7 +259,7 @@ let test_cases = [
   (* Test for iteration variables *)
   (
     let range = (Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1})) in
-    let assign = Assignment {target = Single (knownref ~typ:FTReal [cfld "x"]) ; source = ComponentReference (knownref (*~typ:FTInteger*) [cvar "i"])} in
+    let assign = Assignment {target = Single (knownref 0 [cfld ~known_type:FTReal "x"]) ; source = ComponentReference (knownref 0 (*~typ:FTInteger*) [cvar "i"])} in
     let stmt = ForStmt {idx = [{variable=nl "i";range}]; body = [uncommented assign]} in
   test_norm
     "Lookup an iteration variable"
@@ -267,7 +269,7 @@ let test_cases = [
 
   (
     let range = None in
-    let assign = Assignment {target = Single (knownref ~typ:FTReal [cfld "x"]) ; source = ComponentReference (knownref [cvar "i"])} in
+    let assign = Assignment {target = Single (knownref 0 [cfld ~known_type:FTReal "x"]) ; source = ComponentReference (knownref 0 [cvar "i"])} in
     let stmt = ForStmt {idx = [{variable=nl "i";range}]; body = [uncommented assign]} in
   test_norm
     "Lookup an implicit iteration variable"
@@ -277,8 +279,8 @@ let test_cases = [
 
   (
     let range = None in
-    let assign = Assignment {target = Single (knownref ~typ:FTReal [cfld "x"]) ; source = ComponentReference (knownref [cvar "j"])} in
-    let stmt = ForStmt {idx = [{variable=nl "i";range}]; body = [uncommented assign]} in
+    let assign = Assignment {target = Single (knownref 0 [cfld ~known_type:FTReal "x"]) ; source = ComponentReference (knownref 0 [cvar "j"])} in
+    let stmt = ForStmt {idx = [{variable=nl "i";range}; {variable=nl "j";range}]; body = [uncommented assign]} in
   test_norm
     "Lookup multiple implicit iteration variables"
     "package A class B Real x; algorithm for i, j loop x := j; end for; end B; end A"
@@ -289,7 +291,7 @@ let test_cases = [
   (* Test for iteration variables in equations *)
   (
     let range = (Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1})) in
-    let eq = SimpleEquation {left = ComponentReference (knownref ~typ:FTReal [cfld "x"]) ; right = ComponentReference (knownref (*~typ:FTInteger*) [cvar "i"])} in
+    let eq = SimpleEquation {left = ComponentReference (knownref 0 [cfld ~known_type:FTReal "x"]) ; right = ComponentReference (knownref 0 (*~typ:FTInteger*) [cvar "i"])} in
     let loop = ForEquation {idx = [{variable=nl "i";range}]; body = [uncommented eq]} in
   test_norm
 
@@ -302,8 +304,8 @@ let test_cases = [
 
   (* Test for iteration variables in comprehensions *)
   ( let range = Some (Range {start=Int 1; step = Some (Int 1); end_=Int 1}) in
-    let right = Syntax.Array [Compr {exp=ComponentReference (knownref [cvar "i"]); idxs = [{variable = nl "i"; range}]}] in
-    let eq = SimpleEquation {left = ComponentReference (knownref ~typ:FTReal [cfld "x"]); right} in
+    let right = Syntax.Array [Compr {exp=ComponentReference (knownref 0 [cvar "i"]); idxs = [{variable = nl "i"; range}]}] in
+    let eq = SimpleEquation {left = ComponentReference (knownref 0 [cfld ~known_type:FTReal "x"]); right} in
     test_norm
 
       "Lookup a variable bound by a comprehension"
@@ -314,7 +316,7 @@ let test_cases = [
   );
   
   (
-  let expected_ref = knownref ~typ:FTReal [cfld "x"] in 
+  let expected_ref = knownref 0 [cfld ~known_type:FTReal "x"] in 
   test_norm
     "Lookup an unknown in an equation"
     "model A Real x; equation x = 0.0; end A"
@@ -348,7 +350,7 @@ let test_cases = [
        model D extends C; redeclare model extends B end B; end D;
        model E extends D; redeclare model extends B end B; B b; Real y = b.x; end E;           
      end A13"
-    [cm "A13"; cm "E";] (Has.field public "y" **> Is.bound_to **> (cre (knownref ~typ:FTReal [cfld "b"; cfld "x"]))) ;
+    [cm "A13"; cm "E";] (Has.field public "y" **> Is.bound_to **> (cre (knownref 0 [cfld "b"; cfld ~known_type:FTReal "x"]))) ;
   
   
   test_norm
@@ -359,7 +361,7 @@ let test_cases = [
              end M2;
      end P"
     [cm "P"; cm "M2"; cm "N2"]
-    (Has.field public "y" **> Is.bound_to (cre (knownref ~typ:FTReal [cfld "a"; cconstfld "x"])));
+    (Has.field public "y" **> Is.bound_to (cre (knownref 0 [cfld "a"; cconstfld ~known_type:FTReal "x"])));
 
   test_norm
     "Recursive records"
@@ -369,7 +371,7 @@ let test_cases = [
     [cm "P"; cm "A"; cm "'*'"; cm "multiply"] (Has.field public "a" **> Is.bound_to
                                                  (App {fun_=rootref [cclass "P"; cclass "A"]; named_args=[];
                                                        args=[
-                                                         Mul {left=(cre (knownref ~typ:FTReal [cfld "a1"; cfld "a"])); right=cre (knownref ~typ:FTReal [cfld "a2"; cfld "a"])}
+                                                         Mul {left=(cre (knownref 0 [cfld "a1"; cfld ~known_type:FTReal "a"])); right=cre (knownref 0 [cfld "a2"; cfld ~known_type:FTReal "a"])}
                                                        ]})) ;
 ]
 

@@ -150,12 +150,12 @@ let rec shapeof lhs = function
     | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
       raise (Failure ("Error determining shape: " ^ (Path.show (target lhs)) ^ " - " ^ (Syntax.show_components todo) ^ " == " ^ (show_class_value cv))) (* TODO: log/report error *)
 
-let dynref_found {lookup_success_state={current_ref;current_scope}} =
+let dynref_found {lookup_success_state={current_ref}} =
   let downref = DQ.map (fun {Syntax.component} -> component.ident.txt) current_ref.known_components in
-  if downref = DQ.empty && current_scope = 0 then
+  if downref = DQ.empty && current_ref.scope = 0 then
     raise (Failure "Did not expect this-reference!") ;
   
-  DynamicReference {upref=current_scope; base=false; downref}
+  DynamicReference {upref=current_ref.scope; base=false; downref}
 
 let rec norm_recursive lhs {lookup_recursion_term = rec_term;
                             lookup_recursion_state;

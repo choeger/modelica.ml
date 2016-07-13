@@ -60,6 +60,10 @@ let parser_test_case parser lprinter sprinter prep input expected =
   ]
 
 let erase_location = { identity_mapper with map_loc_t = (fun _ _ -> Location.none) ;
+                                            dispatch_component_reference =
+                                              {identity_mapper.dispatch_component_reference with
+                                               map_RootRef = (fun s kcs -> RootRef (DQ.map (s.map_known_component s) kcs)) ;
+                                              } ;
                                             map_known_ref = (fun s r -> {r with known_components=DQ.map (s.map_known_component s) r.known_components}) ;
                      }
 

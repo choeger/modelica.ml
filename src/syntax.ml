@@ -71,9 +71,15 @@ type loc_t = Location.t = {
     loc_ghost: bool;
   } [@@deriving show,eq,yojson,mapper,folder,sexp]
 
+and type_error = {type_error : string;
+                  error_src : exp}
+
+and special_rule = SRActualStream | SRInStream 
+
 and flat_type = FTReal | FTString | FTBool | FTInteger
               | FTEnum of StrSet.t
-              | FTFunction of flat_type StrMap.t * flat_type list
+              | FTSpecial of special_rule
+              | FTFunction of (string * flat_type) list * flat_type list
               | FTObject of flat_type StrMap.t
               | FTArray of flat_type * int
 
@@ -284,13 +290,15 @@ and flat_type = FTReal | FTString | FTBool | FTInteger
                  | ComponentReference of component_reference
                  | OutputExpression of exp option list
                      
-  and component_reference = Der | Assert | Initial | UnknownRef of unknown_ref | KnownRef of known_ref | RootRef of known_ref
+  and component_reference = Der | Assert | Initial | UnknownRef of unknown_ref | KnownRef of known_ref | RootRef of known_components
+
+and known_components = known_component DQ.t
 
   and components = component list
 
   and unknown_ref = { root : bool ; components : components }
 
-  and known_ref = {known_components : known_component DQ.t; known_type : flat_type option}
+  and known_ref = {known_components : known_components; scope : int}
 
   and component_kind = CK_Constant | CK_Continuous | CK_Parameter | CK_Discrete (* components of given variability *)
                      | CK_Class (* class or type *)
@@ -302,7 +310,7 @@ and flat_type = FTReal | FTString | FTBool | FTInteger
                      | CK_LocalVar (* Variable bound by a loop *)
                      | CK_VarAttr (* Attribute of a local variable *)
                        
-  and known_component = { kind : component_kind ; component : component }
+  and known_component = { kind : component_kind ; component : component; known_type : flat_type option }
 
   and component = { ident : str ; subscripts : exp list [@default []] }
 

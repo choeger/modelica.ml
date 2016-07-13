@@ -332,11 +332,11 @@ let rec ft_of_cv = function
     let mkarg (inputs,outputs) (x, {field_class}) =
       let {flat_attr;flat_val} = flat field_class in
       match flat_attr.fa_cau with
-        Some Input -> (StrMap.add x (ft_of_cv flat_val) inputs, outputs)
+        Some Input -> ((x, (ft_of_cv flat_val)) :: inputs, outputs)
       | Some Output -> (inputs, (ft_of_cv flat_val)::outputs)
       | _ -> (inputs, outputs)
     in
-    let (inputs, outputs) = List.fold_left mkarg (StrMap.empty, []) (StrMap.bindings fields) in
+    let (inputs, outputs) = List.fold_left mkarg ([], []) (StrMap.bindings fields) in
     FTFunction (inputs, outputs)
   | Class {public={fields}} ->
     let ft_of_field {field_class} = ft_of_cv field_class in
@@ -346,9 +346,6 @@ let rec ft_of_cv = function
 
 let ft_of_cv_safe cv = try Some (ft_of_cv cv) with | NotFlat -> None
 
-type type_error = {type_error : string;
-                   error_src : exp}
-
 let max_var a b = match (a,b) with (None,_) -> None
                                  | (_,None) -> None
                                  | (Some _, Some Discrete) -> Some Discrete
@@ -356,7 +353,10 @@ let max_var a b = match (a,b) with (None,_) -> None
                                  | (Some (Parameter | Constant), Some Parameter) -> Some Parameter
                                  | (Some Parameter, Some Constant) -> Some Parameter
                                  | (Some Constant, Some Constant) -> Some Constant
-                                                                       
+
+let ft_of_kcs kcs = match DQ.rear kcs with Some(_, {known_type}) -> known_type
+                                         | None -> None
+
 let rec tf_of_e e =
   let open Result.Monad in
   let rec variability ?limit cs = match DQ.front cs with    
@@ -378,15 +378,17 @@ let rec tf_of_e e =
     | None -> return limit
   in
   match e with
-    ComponentReference (UnknownRef _ | KnownRef {known_type=None} | RootRef {known_type=None})->
+    ComponentReference (UnknownRef _)->
     Bad {type_error = "Unknown reference"; error_src=e}
-
-  | ComponentReference (KnownRef {known_components; known_type=Some t} |
-                        RootRef {known_components; known_type=Some t}
-                       ) ->
-    do_ ;
-    v <-- variability known_components ; 
-    return (t, v)
+  | ComponentReference (KnownRef {known_components=kcs} | RootRef kcs) ->
+    begin match ft_of_kcs kcs with
+        None ->
+        Bad {type_error = "Unknown reference"; error_src=e}    
+      | Some t ->
+        do_ ;
+        v <-- variability kcs ; 
+        return (t, v)
+    end
       
   | And {left; right} -> do_ ;
     (lt, lv) <-- tf_of_e left ;

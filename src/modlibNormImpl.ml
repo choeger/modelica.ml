@@ -74,8 +74,7 @@ and extends_builtin_el lib {super} = IntMap.cardinal super = 1 && extends_builti
 (** Attempt to resolve $first.$rest as a builtin *)
 let resolve_builtin first rest =
   let builtin ?known_type kind =
-    {known_components=DQ.cons {kind; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) rest));
-     known_type}
+    RootRef (DQ.cons {kind; component=first; known_type} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; known_type=None; component}) rest)))
   in
   match first.ident.txt with
   (* Free variable *)
@@ -102,8 +101,11 @@ let resolve_builtin first rest =
     -> builtin CK_BuiltinFunction
 
   (* Special, see 3.7.2 *)
+  | "inStream" -> builtin ~known_type:(FTSpecial SRInStream) CK_BuiltinFunction
+  | "actualStream" -> builtin ~known_type:(FTSpecial SRActualStream) CK_BuiltinFunction
+                    
   | "delay" | "cardinality" | "homotopy" | "semiLinear" 
-  | "inStream" | "actualStream" | "spatialDistribution"
+  | "spatialDistribution"
   | "getInstanceName"
     -> builtin CK_BuiltinFunction
 
@@ -130,38 +132,18 @@ exception ResolutionError of lookup_error_struct
 
 let rec resolve_env env self first rest =
   if StrMap.mem first.ident.txt env then
-    (false, {
-        known_type = None;
-        known_components =
-          DQ.cons {kind=CK_LocalVar; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component}) rest))
-      })
+    KnownRef {
+      scope = 0;
+      known_components =
+        DQ.cons {kind=CK_LocalVar; known_type = None; component=first} (DQ.of_list (List.map (fun component -> {kind=CK_VarAttr; component; known_type=None}) rest))
+    }
   else
     let state = state_of_self self in
     match lookup_lexical_in state first rest with
-      Success {lookup_success_state={current_ref;current_scope=0}} -> (false, current_ref)
-    | Success {lookup_success_state={current_ref;current_scope=up}} ->
-      (* At this point, our lookup history is purely lexical, we can directly drop the surrounding classes *)
-      (* TODO: encode this assertion as an OCaml type *)
-      let rec class_name_of_path name p = match DQ.rear p with
-        | None -> name 
-        | Some(xs, `ClassMember txt) ->
-          let known_components = DQ.cons {kind=CK_Class; component={ident={txt;loc=Location.none}; subscripts=[]}} name.known_components in
-          class_name_of_path {name with known_components} xs
-        | Some(xs, `Protected) -> class_name_of_path name xs
-        | _ -> raise (Failure "History not lexical?")
-      in
-        
-      let rec upwards self up =
-        match self.up with None -> if up = 0 then {known_components=DQ.empty;known_type=None} else raise HierarchyError
-                         | Some self' ->
-                           if (up = 0) then class_name_of_path current_ref self.tip.clbdy.source_path
-                           else upwards self' (up-1)
-      in
-        
-      (true, upwards self up)
+      Success {lookup_success_state={current_ref}} -> KnownRef current_ref
 
     | Error {lookup_error_state={self={up=None}}} ->
-      (true, resolve_builtin first rest)
+      resolve_builtin first rest
 
     | Error {lookup_error_todo=x::_} ->
       BatLog.logf "No field %s in %s.\n" x.ident.txt (show_object_struct self.tip.clbdy) ;
@@ -171,14 +153,13 @@ let rec resolve_env env self first rest =
 let resolve_ur env self {root;components} =
   match components with
     cmp :: components ->
-    if root then
-      let (_, cs) = resolve_env StrMap.empty {tip=root_class_of self;up=None} cmp components in
-      RootRef cs
-    else begin
-      match resolve_env env self cmp components with
-        (false,cs) -> KnownRef cs
-      | (true,cs) -> RootRef cs
-    end
+    if root then      
+      match  resolve_env StrMap.empty {tip=root_class_of self;up=None} cmp components with
+        RootRef kcs -> RootRef kcs
+      | KnownRef {known_components; scope=0} -> RootRef known_components
+      | _ -> raise (Failure "Lookup went out of scope")               
+    else
+      resolve_env env self cmp components
   | [] -> raise AstInvariant
 
 type opt_exp = exp option [@@deriving show]
@@ -409,7 +390,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
 
 
 let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts} =
-  let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some {kind=CK_Class;component={ident={txt=x;loc=Location.none};subscripts=[]}} | _ -> None) (DQ.enum path)) in
+  let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some {kind=CK_Class;known_type=None;component={ident={txt=x;loc=Location.none};subscripts=[]}} | _ -> None) (DQ.enum path)) in
   
   { ModlibNormalized.identity_mapper with
     

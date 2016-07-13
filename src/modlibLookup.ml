@@ -64,14 +64,13 @@ type lookup_state = {
   current_path : Path.t ; (** The path to the current class value *)
   current_attr : flat_attributes ;
   current_ref : Syntax.known_ref; (** The search request as a resolved component *)
-  current_scope : int; (** Relative current scope *)
 } [@@deriving show,yojson]
 
 let rec root_class_of self = match self.up with None -> self.tip | Some self -> root_class_of self
 
 let empty_lookup_state = {trace=DQ.empty; self={up=None;tip={clup=None; clbdy=empty_object_struct}};
                           current_path=Path.empty;
-                          current_attr=no_attributes; current_ref={known_components=DQ.empty; known_type=None}; current_scope=0}
+                          current_attr=no_attributes; current_ref={known_components=DQ.empty; scope=0}}
 
 let dump_lookup_state {current_path} = Printf.sprintf "Last class: %s\n" (Path.show current_path)
 
@@ -96,9 +95,8 @@ type lookup_result = Success of lookup_success_struct
 (** wrap a scope of visited classes into a new lookup state *)
 let state_of_self self = {self;
                           trace = DQ.empty ;
-                          current_ref = {known_components=DQ.empty; known_type=None};
+                          current_ref = {known_components=DQ.empty; scope=0};
                           current_attr = no_attributes;
-                          current_scope = 0;
                           current_path = self.tip.clbdy.source_path}
 
 let undefined x {Normalized.class_members; super; fields} =
@@ -108,15 +106,17 @@ let undefined x {Normalized.class_members; super; fields} =
 let rec get_class_element_in state {Normalized.class_members; super; fields} x xs =  
   if StrMap.mem x.ident.txt class_members then begin
     let current_ref = {state.current_ref with known_components =
-                                                DQ.snoc state.current_ref.known_components {kind = CK_Class; component=x}} in
+                                                DQ.snoc state.current_ref.known_components {kind = CK_Class; known_type=None; component=x}} in
     let cv = (StrMap.find x.ident.txt class_members).class_ in
     get_class_element {state with current_ref} (`ClassMember x.ident.txt) cv xs
   end
   else if StrMap.mem x.ident.txt fields then begin
-    let known_components = DQ.snoc state.current_ref.known_components {Syntax.kind = CK_Continuous; component=x} in
-    let known_type = ft_of_cv_safe (StrMap.find x.ident.txt fields).field_class in
-    let current_ref = {known_components; known_type} in
-    get_class_element {state with current_ref} (`FieldType x.ident.txt) (StrMap.find x.ident.txt fields).field_class xs
+    let fa = flat (StrMap.find x.ident.txt fields).field_class in
+    let known_type = ft_of_cv_safe fa.flat_val in
+    let kind = ck_of_var fa.flat_attr.fa_var in
+    let known_components = DQ.snoc state.current_ref.known_components {Syntax.kind; component=x; known_type} in
+    let current_ref = {state.current_ref with known_components} in
+    get_class_element {state with current_ref} (`FieldType x.ident.txt) (unflat fa) xs
   end
   else begin
     (pickfirst_class state x xs (IntMap.bindings super) )
@@ -139,7 +139,7 @@ and pickfirst_class state x xs = function
       | Primitive ->
         let current_ref = {state.current_ref with known_components =
                                                     DQ.append state.current_ref.known_components
-                                                      (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr;component}) (x::xs)))
+                                                      (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr;component;known_type=None}) (x::xs)))
                           } in
         Success {lookup_success_state={state with current_ref}; lookup_success_value=LPrimitive Unit}
       | Shape shape when StrMap.mem x.ident.txt shape ->
@@ -170,18 +170,7 @@ and get_class_element state k e p =
   let current_path = Path.snoc state.current_path k in
   let state = {state with current_path} in
   
-  let finish_component state = match DQ.rear state.current_ref.known_components with    
-    (* update last component reference with collected flat attribute *)
-      None
-    | Some (_,{kind=CK_Class}) -> state
-    | Some(xs, x) -> {state with current_ref =
-                                   {state.current_ref with
-                                    known_components = (DQ.snoc xs {x with kind=ck_of_var state.current_attr.fa_var})}}
-  in
-
-  let project state v =
-    let state = {(finish_component state) with current_path} in
-    function
+  let project state v = function
       [] ->
       let lookup_success_value = map_lv (fun sval ->
           let {flat_attr; flat_val} = extract_attributes state.current_attr sval in
@@ -194,30 +183,55 @@ and get_class_element state k e p =
           get_class_element_os {state with current_attr = no_attributes} clbdy x xs                              
         | LPrimitive cv ->
           let {flat_val; flat_attr} as flat = extract_attributes state.current_attr cv in
+
+          let is_attr = function
+              {ident={txt="start" | "min" | "max" | "fixed" | "quantity" | "stateSelect" | "nominal" | "unit" | "displayUnit"}} -> true
+            | _ -> false
+          in
+
+          let cv_of_attr p = function
+              {ident={txt="start" | "min" | "max" | "nominal"}} -> p
+            | {ident={txt="quantity" | "unit" | "displayUnit"}} -> Normalized.String
+            | {ident={txt="stateSelect"}} -> Enumeration (StrSet.of_list ["never";"avoid";"default";"prefer";"always"])
+            | {ident={txt="fixed"}} -> Bool
+            | {ident={txt}} -> raise (Failure (txt ^ " is not a valid attribute"))
+          in
+          
           begin match flat_val with
             | Int | Real | String | Bool ->
-              let rest = DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; component}) (x::xs)) in
-              let lookup_success_state =
-                {state with current_ref =
-                              {state.current_ref with known_components =
-                                                        DQ.append state.current_ref.known_components rest}} in
-              Success {lookup_success_state;
-                       lookup_success_value=LPrimitive (unflat flat)} 
+              begin match xs with
+                  [] when is_attr x ->
+                  let attr_cv = cv_of_attr flat_val x in
+                  let known_type = ft_of_cv_safe attr_cv in
+                  let attr = {kind=CK_BuiltinAttr; component=x; known_type} in
+                  let lookup_success_state =
+                    {state with current_ref =
+                                  {state.current_ref with known_components =
+                                                            DQ.snoc state.current_ref.known_components attr}} in
+                  Success {lookup_success_state;
+                           lookup_success_value=LPrimitive attr_cv}
+                | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
+              end
             | Enumeration flds ->
-              begin match x with                  
-                | {ident={txt="start" | "min" | "max" | "fixed" | "quantity"}} as x when xs = [] ->
+              begin match xs with                         
+                | [] when is_attr x ->
+                  let attr_cv = cv_of_attr flat_val x in
+                  let known_type = ft_of_cv_safe attr_cv in
+                  let attr = {kind=CK_BuiltinAttr; component=x; known_type} in
                   let lookup_success_state =
-                    let known_components = DQ.snoc state.current_ref.known_components {kind=CK_BuiltinAttr; component=x} in
+                    {state with current_ref = {state.current_ref with known_components =
+                                                                        DQ.snoc state.current_ref.known_components attr}} in
+                  Success {lookup_success_state;
+                           lookup_success_value=LPrimitive attr_cv} 
+                
+                | [] when StrSet.mem x.ident.txt flds ->
+                  let lookup_success_state =
+                    let known_type = ft_of_cv_safe flat_val in
+                    let known_components = DQ.snoc state.current_ref.known_components {kind=CK_BuiltinAttr; component=x; known_type} in
                     {state with current_ref = {state.current_ref with known_components}} in
                   Success {lookup_success_state;
-                           lookup_success_value=LPrimitive (unflat flat)} 
-        
-                | x when StrSet.mem x.ident.txt flds && xs = [] ->
-                  let lookup_success_state =
-                    let known_components = DQ.snoc state.current_ref.known_components {kind=CK_BuiltinAttr; component=x} in
-                    {state with current_ref = {state.current_ref with known_components}} in
-                  Success {lookup_success_state;
-                           lookup_success_value=LPrimitive (unflat flat)} 
+                           lookup_success_value=LPrimitive (unflat flat)}
+
                 | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
               end
             | v -> raise (Failure ("Such builtins should not occur here (" ^ x.ident.txt ^ ": " ^ (show_class_value v) ^ ")") )
@@ -378,7 +392,7 @@ let rec lookup_lexical_in state x xs =
     begin
       match state.self.up with
         None -> Error {lookup_error_state=state; lookup_error_todo=x::xs}
-      | Some self -> lookup_lexical_in {state with self;current_scope=state.current_scope+1} x xs
+      | Some self -> lookup_lexical_in {state with self;current_ref={state.current_ref with scope = state.current_ref.scope +1} } x xs
     end
   else begin
     get_class_element_os state state.self.tip.clbdy x xs
@@ -387,9 +401,8 @@ let rec lookup_lexical_in state x xs =
 let state_of_lib lib =
   {self={tip={clup=None; clbdy={empty_object_struct with public=lib}};up=None};
    trace = DQ.empty ;
-   current_ref = {known_components=DQ.empty; known_type=None} ;
+   current_ref = {known_components=DQ.empty; scope=0} ;
    current_attr = no_attributes;
-   current_scope = 0;
    current_path = DQ.empty}
 
 let lookup o p =

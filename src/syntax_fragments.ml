@@ -128,24 +128,24 @@ let type_name xs = TName (List.map Location.mknoloc xs)
 
 let root_type xs = TRootName (List.map Location.mknoloc xs)
 
-let known_component kind x = {kind;component={ident=nl x; subscripts=[]}}
+let known_component ?known_type kind x = {known_type; kind;component={ident=nl x; subscripts=[]}}
 
 let cclass = known_component CK_Class
 
-let cvar = known_component CK_LocalVar
+let cvar ?known_type = known_component ?known_type CK_LocalVar
 
-let cattr = known_component CK_BuiltinAttr
+let cattr ?known_type = known_component ?known_type CK_BuiltinAttr
 
-let cconstfld = known_component CK_Constant 
+let cconstfld ?known_type = known_component ?known_type CK_Constant 
 
-let time = known_component CK_Time "time"
+let time = known_component ~known_type:FTReal CK_Time "time"
 
-let cfld = known_component CK_Continuous
+let cfld ?known_type = known_component ?known_type CK_Continuous
 
-let cbuiltinfun = known_component CK_BuiltinFunction
+let cbuiltinfun ?known_type = known_component ?known_type CK_BuiltinFunction
 
-let cbuiltinclass = known_component CK_BuiltinClass
+let cbuiltinclass ?known_type = known_component ?known_type CK_BuiltinClass
     
-let knownref ?typ cks = KnownRef {known_components=DQ.of_list cks; known_type=typ}
+let knownref scope cks = KnownRef {known_components=DQ.of_list cks; scope}
 
-let rootref ?typ cks = RootRef {known_components=DQ.of_list cks; known_type=typ}
+let rootref cks = RootRef (DQ.of_list cks)
