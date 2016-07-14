@@ -304,7 +304,7 @@ let topological_order w r a =
   and self_stmts prog = function [] -> prog
                                  | i::scc when is_super a.(i) -> raise (IllegalRecursion (show_class_ptr (a.(i).lhs)))
                                  | i::scc when is_closer a.(i).rhs -> self_stmts (a.(i)::prog) scc
-                                 | i::scc -> self_stmts ({lhs=a.(i).lhs; rhs=KnownPtr a.(i).lhs}::prog) scc
+                                 | i::scc -> self_stmts ({lhs=a.(i).lhs; rhs=PEnumeration StrSet.empty}::prog) scc
 
   and reorder_sccs prog = function
     | [] -> prog 

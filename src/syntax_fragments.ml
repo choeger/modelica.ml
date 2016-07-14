@@ -102,6 +102,28 @@ let any x = {ident = nl x;subscripts=[]}
 
 let empty_app f = { fun_ = f ; args = [] ; named_args = [] }
 
+let empty_or =
+  { or_tag=""; 
+    or_fields = StrMap.empty;  
+    or_zero = [];
+    or_not = [];
+    or_constructor = [];
+    or_string = [];
+    or_plus = [];
+    or_minus = [];
+    or_mult = [];
+    or_div = [];
+    or_pow = [];
+    or_eq = [];
+    or_neq = [];
+    or_gt = [];
+    or_lt = [];
+    or_geq = [];
+    or_leq = [];
+    or_and = [];
+    or_or = [];
+  }
+
 let named x argument = {argument_name = Location.mknoloc x ; argument }
 
 let no_comment = { annotated_elem = None ; annotation = None }

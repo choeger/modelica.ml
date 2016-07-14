@@ -268,7 +268,6 @@ let rec norm_annotation history =
         norm_nested field_mods' mods
 
       | {commented={mod_name=[l2]; mod_value=Some (Nested {modifications})}}::mods ->
-        Printf.printf "Nested known Modification: %s\n" l2.txt;
         let mod_nested = norm_nested StrMap.empty modifications in
         
         let rec merge_mods k {mod_kind; mod_nested;mod_default} mods =
@@ -312,7 +311,7 @@ let rec normalize_classmod_stmts self kind {class_; class_mod} =
     (* normalize the modified component *)
     let field_name = match get_class_element (state_of_self self) kind class_  field_name with
         Success {lookup_success_state={current_ref}} -> current_ref.known_components
-      | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
+      | Error {lookup_error_todo=todo} ->
         BatLog.logf "Could not find: %s\n" (show_components todo) ;
         raise (ModificationTargetNotFound todo)
     in
@@ -384,7 +383,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
               normalize_stmts self {es with super = IntMap.add n {sc with super_mod} super} stmts
           end
       end
-    | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
+    | Error {lookup_error_todo=todo} ->
       let () = BatLog.logf "Error looking up modification target %s\n" (show_components todo) in
       raise (ModificationTargetNotFound todo)
 

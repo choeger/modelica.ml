@@ -52,7 +52,7 @@ exception Stratification of Path.t * string
    A stratification result holds the last valid context of the existing prefix and the non existing suffix of the stratified path 
 *)
 type stratification_result = { lookup_result : lookup_state; protected : bool ; new_element : Path.elem_t } [@@deriving show]
-
+     
 (** The target of a stratified path *)
 let target { lookup_result; protected; new_element} =
   let parent =
@@ -146,7 +146,7 @@ let rec shapeof lhs = function
       Success {lookup_success_value} ->
       let shape = shapeof lhs (class_value_of_lookup lookup_success_value) in
       shape
-    | Error {lookup_error_todo=todo} | Recursion {lookup_recursion_todo=todo} ->
+    | Error {lookup_error_todo=todo} ->
       raise (Failure ("Error determining shape: " ^ (Path.show (target lhs)) ^ " - " ^ (Syntax.show_components todo) ^ " == " ^ (show_class_value cv))) (* TODO: log/report error *)
 
 let dynref_found {lookup_success_state={current_ref}} =
@@ -156,34 +156,9 @@ let dynref_found {lookup_success_state={current_ref}} =
   
   DynamicReference {upref=current_ref.scope; base=false; downref}
 
-let rec norm_recursive lhs {lookup_recursion_term = rec_term;
-                            lookup_recursion_state;
-                            lookup_recursion_todo} =  
-  (* BatLog.logf "Recursively unfolding %s\n" (show_class_term rec_term.rec_rhs) ; *)
-  match Path.rear rec_term.rec_lhs with
-    Some (xs, (`ClassMember _ | `FieldType _ | `SuperClass _ as k)) ->
-    Report.do_ ;                                                  
-    (* Unfold the recursive value one level *)
-    o <-- output ;
-    let lookup_result = forward_state (state_of_lib o) xs in
-    let protected = match Path.rear xs with Some(_, `Protected) -> true | _ -> false in
-    n <-- norm {lookup_result; protected; new_element=k} rec_term.rec_rhs ;
-    set_output (update rec_term.rec_lhs (set_value n) o) ;
-
-    begin match lookup_recursion_todo with
-        [] -> return n
-      | p ->
-        (* Lookup in the result of the unfolding *)
-        begin match get_class_element lookup_recursion_state k n p with
-            Success succ -> return (dynref_found succ)
-          | Error result -> fail_lookup result
-          | Recursion r -> norm_recursive lhs r
-        end
-    end
-  | None -> fail
-
-and norm lhs =
+let rec norm lhs =
   let open Normalized in
+
   function
     Empty {class_sort; class_name} -> (if DQ.is_empty class_name then BatLog.logf "Empty class name for %s!\n" (Path.show (target lhs)) else ()) ;
     Report.do_ ;
@@ -222,10 +197,6 @@ and norm lhs =
           match get_class_element_os state base_only {ident={txt=x; loc=Location.none};subscripts=[]} [] with
             Success succ -> return (DynamicReference {upref=1; base=true; downref=Name.of_list [x]})
                                                     
-          | Recursion _ -> Report.do_ ;
-            log{where=none;level=Error;what="Trying to extend from recursive element."};
-            fail
-
           | Error result ->
             Report.do_ ;
             log{where=none;level=Error;
@@ -243,14 +214,11 @@ and norm lhs =
     begin match la with
         Success {lookup_success_state={current_path}} ->
         return (GlobalReference current_path)
-      | Recursion {lookup_recursion_state={current_path}; lookup_recursion_todo = []} ->
-        return (GlobalReference current_path)
-      | Recursion r ->
-        norm_recursive lhs r
       | Error err -> fail_lookup err 
     end
 
-  | KnownPtr p -> Report.do_ ;
+  | KnownPtr p ->
+    Report.do_ ;    
     strat <-- stratify_ptr p ;
     let dr = DynamicReference (relative lhs.lookup_result.current_path (target strat)) in
     return (dr)
@@ -263,7 +231,6 @@ and norm lhs =
             Success succ -> return (dynref_found succ)
           | Error err ->            
             fail_lookup err
-        | Recursion r -> norm_recursive lhs r
       end
     | [] -> raise EmptyName
     end
@@ -327,39 +294,6 @@ let rec link_package linkage {sub_packages; external_units; package_unit} =
 let link_root {root_units; root_packages} =
   List.fold_left link_package (List.fold_left link_unit [] root_units) root_packages
 
-type open_term = { open_lhs : Path.t ;
-                   open_rhs : rec_term }
-
-let rec collect_recursive_terms p rts = function
-    Class os -> let rts' =
-                  elements_collect_recursive_terms p rts os.public in
-    elements_collect_recursive_terms (DQ.snoc p `Protected) rts' os.protected
-
-  | Constr {arg} -> collect_recursive_terms p rts arg
-  | Replaceable v -> collect_recursive_terms p rts v
-  | v -> rts
-
-and elements_collect_recursive_terms p rts {class_members; fields;} =
-  let rts' = StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`ClassMember k)) rts v.class_) class_members rts in
-  StrMap.fold (fun k v rts -> collect_recursive_terms (DQ.snoc p (`FieldType k)) rts v.field_class) fields rts'               
-
-let rec close_terms i p =
-  Report.do_ ;
-  o <-- output;
-  if i >= Array.length p then return o
-  else
-    let {open_lhs;open_rhs} = p.(i) in
-    Report.do_ ;
-    (* let () = BatLog.logf "Close [%d / %d] %s := %s\n" i (Array.length p) (show_class_path open_lhs) (show_class_term open_rhs.rec_rhs) in *)
-    lhs <-- stratify_ptr (open_lhs :> class_ptr) ;
-    (* Continue normalization *)
-    let r = {lookup_recursion_state = lhs.lookup_result ;
-             lookup_recursion_todo = [] ;
-             lookup_recursion_term = open_rhs } in    
-    closed <-- norm_recursive lhs r ;
-    set_output (update open_lhs (set_value closed) o) ;
-    close_terms (i+1) p
-
 let norm_pkg_root root =
   let linkage = link_root root in
   let cc = preprocess linkage in
@@ -368,10 +302,7 @@ let norm_pkg_root root =
   o <-- norm_prog 0 cc ;
   (* compress the result *)
   let c = compress_elements o in
-  (* close recursive terms *)
-  let ct = Array.of_list (elements_collect_recursive_terms DQ.empty [] c) in
-  o <-- close_terms 0 ct ;
-  return o
+  return c
 
 
 

@@ -149,3 +149,6 @@ val type_name : string list -> texp
 val root_type : string list -> texp
 (** Create a root-type-name from the list of its elements 
 *)
+
+(** Empty operator record description *)
+val empty_or : operator_record

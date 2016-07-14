@@ -364,15 +364,42 @@ let test_cases = [
     (Has.field public "y" **> Is.bound_to (cre (knownref 0 [cfld "a"; cconstfld ~known_type:FTReal "x"])));
 
   test_norm
+    "Recursive records - implemented via dynamic references"
+    "package P 
+     operator record A replaceable Real a; operator '*' function multiply input A a1; input A a2; output A r = A(a1.a * a2.a); end multiply; end '*'; end A;
+     end P"
+    [cm "P"; cm "A"; cm "'*'"; cm "multiply"]
+    (Has.field public "r" **> Has.field_type (Is.class_value
+                                                (Constr {arg=(DynamicReference {upref=3;base=false;downref=Name.of_list ["A"]}); constr=Cau Output}))) ;
+                                                 
+  test_norm
     "Recursive records"
     "package P 
-     operator record A replaceable Real a; operator '*' function multiply import P.A; input A a1; input A a2; output A a = A(a1.a * a2.a); end multiply; end '*'; end A;
+     operator record A 
+       replaceable Real a; 
+       operator '*' 
+         function multiply import P.A; 
+           input A a1; 
+           input A a2 = A(a = 1.0); 
+           output A r = A(a1.a * a2.a); 
+         end multiply; 
+       end '*'; 
+     end A;
      end P"
-    [cm "P"; cm "A"; cm "'*'"; cm "multiply"] (Has.field public "a" **> Is.bound_to
-                                                 (App {fun_=rootref [cclass "P"; cclass "A"]; named_args=[];
-                                                       args=[
-                                                         Mul {left=(cre (knownref 0 [cfld "a1"; cfld ~known_type:FTReal "a"])); right=cre (knownref 0 [cfld "a2"; cfld ~known_type:FTReal "a"])}
-                                                       ]})) ;
+    [cm "P"; cm "A"; cm "'*'"; cm "multiply"]
+    (let known_type = Some (
+         FTOperatorRecord {empty_or with
+                           or_tag = ".P.A";
+                           or_fields = StrMap.of_list ["a", FTReal] ;
+                           or_mult = [{opname="multiply";
+                                       opargs=[{ftarg_name="a1";ftarg_type=FTOperatorRecordSelf ".P.A"; ftarg_opt=false};
+                                               {ftarg_name="a2";ftarg_type=FTOperatorRecordSelf ".P.A"; ftarg_opt=true}]}]})
+     in
+     (Has.field public "r" **> Is.bound_to
+        (App {fun_=rootref [cclass "P"; cclass ?known_type "A"]; named_args=[];
+              args=[
+                Mul {left=(cre (knownref 0 [cfld "a1"; cfld ~known_type:FTReal "a"])); right=cre (knownref 0 [cfld "a2"; cfld ~known_type:FTReal "a"])}
+              ]}))) ;
 
   test_norm
     "Functions"
@@ -380,7 +407,8 @@ let test_cases = [
        function F input Real x; output Real y = x; end F;
        constant Real a = F(1.0);
      end P"
-    [cm "P"] (Has.field public "a" **> Is.bound_to (app (knownref 0 [cfunc ~known_type:(FTFunction (["x", FTReal], [FTReal]))"F"]) ["", S.real 1.0])) ;
+    [cm "P"] (Has.field public "a" **> Is.bound_to
+                (app (knownref 0 [cfunc ~known_type:(FTFunction ([{ftarg_name="x"; ftarg_type=FTReal; ftarg_opt=false}], [FTReal]))"F"]) ["", S.real 1.0])) ;
 
   test_norm
     "Type of Records"
@@ -399,7 +427,8 @@ let test_cases = [
        function F A x; B y = x; end F;
        constant Real a = F(1.0);
      end P"
-    [cm "P"] (Has.field public "a" **> Is.bound_to (app (knownref 0 [cfunc ~known_type:(FTFunction (["x", FTReal], [FTReal]))"F"]) ["", S.real 1.0])) ;
+    [cm "P"] (Has.field public "a" **> Is.bound_to
+                (app (knownref 0 [cfunc ~known_type:(FTFunction ([{ftarg_name="x"; ftarg_type=FTReal; ftarg_opt=false}], [FTReal]))"F"]) ["", S.real 1.0])) ;
 ]
 
 let suite = "Implementation Normalization" >::: test_cases

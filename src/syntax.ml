@@ -65,6 +65,7 @@ type lexing_position = Lexing.position = {
   pos_cnum : int;
 } [@@deriving show,eq,yojson,sexp]
 
+
 type loc_t = Location.t = {
     loc_start: lexing_position;
     loc_end: lexing_position;
@@ -76,13 +77,49 @@ and type_error = {type_error : string;
 
 and special_rule = SRActualStream | SRInStream 
 
+and ftarg = {
+  ftarg_name : string;
+  ftarg_type : flat_type;
+  ftarg_opt : bool;
+}
+
 and flat_type = FTReal | FTString | FTBool | FTInteger
               | FTEnum of StrSet.t
               | FTSpecial of special_rule
-              | FTFunction of (string * flat_type) list * flat_type list
+              | FTFunction of ftarg list * flat_type list
               | FTObject of flat_type StrMap.t
               | FTArray of flat_type * int
 
+              | FTOperatorRecordSelf of string
+              | FTOperatorRecord of operator_record
+
+and operator_def = { opargs : ftarg list ;
+                     opname : string }
+
+and operator = operator_def list
+
+and operator_record = {
+  or_tag : string;
+  or_fields : flat_type StrMap.t;
+  
+  or_zero : operator;
+  or_not : operator;
+  or_constructor : operator;
+  or_string : operator;
+  or_plus : operator;
+  or_minus : operator;
+  or_mult : operator;
+  or_div : operator;
+  or_pow : operator;
+  or_eq : operator;
+  or_neq : operator;
+  or_gt : operator;
+  or_lt : operator;
+  or_geq : operator;
+  or_leq : operator;
+  or_and : operator;
+  or_or : operator;
+}
   and 'a located = 'a Location.loc = {txt : 'a; loc : loc_t [@default Location.none] [@sexp_drop_default] [@opaque]}
 
   and str = string located

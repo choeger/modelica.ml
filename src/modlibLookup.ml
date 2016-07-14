@@ -61,6 +61,7 @@ let map_lv f = function LClass {clup; clbdy} -> LClass {clup; clbdy}
 type lookup_state = {
   self : lnode ;
   trace : trace_t; (** The found references *)
+  current_ft : StrSet.t ; (** Currently constructed possibly recursive flat types *)
   current_path : Path.t ; (** The path to the current class value *)
   current_attr : flat_attributes ;
   current_ref : Syntax.known_ref; (** The search request as a resolved component *)
@@ -71,6 +72,7 @@ let rec root_class_of self = match self.up with None -> self.tip | Some self -> 
 
 let empty_lookup_state = {trace=DQ.empty; self={up=None;tip={clup=None; clbdy=empty_object_struct}};
                           current_path=Path.empty;
+                          current_ft = StrSet.empty;
                           current_attr=no_attributes; current_ref={known_components=DQ.empty; scope=0}}
 
 let dump_lookup_state {current_path} = Printf.sprintf "Last class: %s\n" (Path.show current_path)
@@ -83,21 +85,14 @@ type lookup_error_struct = { lookup_error_state : lookup_state ;
                              lookup_error_todo : component list }
                            [@@deriving show,yojson]
 
-type lookup_recursion_struct = { lookup_recursion_term : rec_term ;
-                                 lookup_recursion_state : lookup_state ;
-                                 lookup_recursion_todo : component list } [@@deriving show,yojson]
-
 type lookup_result = Success of lookup_success_struct 
-                   | Recursion of lookup_recursion_struct
                    | Error of lookup_error_struct
   [@@deriving show,yojson]
 
 
 (** wrap a scope of visited classes into a new lookup state *)
-let state_of_self self = {self;
-                          trace = DQ.empty ;
-                          current_ref = {known_components=DQ.empty; scope=0};
-                          current_attr = no_attributes;
+let state_of_self self = {empty_lookup_state with
+                          self;
                           current_path = self.tip.clbdy.source_path}
 
 let undefined x {Normalized.class_members; super; fields} =
@@ -117,7 +112,7 @@ let rec get_class_element_in state {Normalized.class_members; super; fields} x x
     let kind = ck_of_var fa.flat_attr.fa_var in
     let known_components = DQ.snoc state.current_ref.known_components {Syntax.kind; component=x; known_type} in
     let current_ref = {state.current_ref with known_components} in
-    get_class_element {state with current_ref} (`FieldType x.ident.txt) (unflat fa) xs
+    get_class_element {state with current_ref; current_attr=fa.flat_attr} (`FieldType x.ident.txt) fa.flat_val xs
   end
   else begin
     (pickfirst_class state x xs (IntMap.bindings super) )
@@ -155,7 +150,7 @@ and pickfirst_class state x xs = function
             
         | Success {lookup_success_state; lookup_success_value} ->
             raise (Failure ("Lookup of " ^ x.ident.txt ^ "in a non-structured type"))
-        | (Error _ | Recursion _) as e -> e
+        | (Error _ ) as e -> e
         end
       | Shape s ->
         pickfirst_class state x xs vs
@@ -185,8 +180,12 @@ and get_class_element state k e p =
               (* We cannot patch what is not there (i.e. a superclass function) *)
               state.current_ref
                 
-            | Some(xs, x) ->              
+            | Some(xs, x) ->
               let known_type = ft_of_cv_safe state (Class os) in
+
+              let () = match known_type with Some t -> Printf.printf "patching %s with %s\n" x.component.ident.txt  (show_flat_type t) 
+                                           | None -> Printf.printf "No known type for %s\n" x.component.ident.txt 
+              in
               let kind = match os.object_sort with Function|OperatorFunction -> CK_Function | _ -> x.kind in
               let known_components = DQ.snoc xs {x with kind; known_type} in
               {state.current_ref with known_components}
@@ -317,7 +316,6 @@ and get_class_element state k e p =
               | Success {lookup_success_state; lookup_success_value} ->
                 raise (Failure ("Lookup of " ^ y ^ "in a non-structured type"))
 
-              | Recursion _ -> raise (Failure ("Error when looking for redeclare-extends base class")) (* TODO *)
               | Error e -> Error e
             end
           | e -> e
@@ -369,6 +367,99 @@ and lookup_continue_or_yield state = function
     Success {lookup_success_state=state; lookup_success_value=LClass state.self.tip}
     | x::xs -> lookup_continue state x xs
 
+and fun_of_cv state fields =
+  let mkarg (inputs,outputs) (x, {field_class;field_mod=m}) =
+    let {flat_attr;flat_val} =
+      match lookup_continue state {ident=nl x; subscripts=[]} [] with
+        Success {lookup_success_value=lv; lookup_success_state={current_attr}} ->
+        let v = class_value_of_lookup lv in
+        extract_attributes current_attr v
+      | _ ->
+        BatLog.logf "Could not resolve function component %s\n" x ;
+        raise NotFlat
+    in       
+    match flat_attr.fa_cau with
+      Some Input -> ({ftarg_name=x; ftarg_type=ft_of_cv state flat_val; ftarg_opt=m.mod_default <> None} :: inputs, outputs)
+    | Some Output -> (inputs, (ft_of_cv state flat_val)::outputs)
+    | _ -> (inputs, outputs)
+  in
+  let (inputs, outputs) = List.fold_left mkarg ([], []) (StrMap.bindings fields) in
+  FTFunction (inputs, outputs)
+
+and ft_of_field state {field_class} =
+  ft_of_cv state field_class
+
+and or_of_cv state or_tag {fields;class_members;super} =
+  let operator sym =
+    match get_class_element_in state {fields; class_members; super} {ident=nl sym; subscripts=[]} [] with
+      Success {lookup_success_value=lv; lookup_success_state=op_state} ->
+      let {flat_attr;flat_val} = flat (class_value_of_lookup lv) in
+      begin match flat_attr.fa_sort with
+          Some Operator ->
+          (* In case of an operator, collect all functions in this operator *)
+          begin match flat_val with
+              Class os ->
+              (* TODO: protected?? *)
+              let keys = StrMap.keys os.public.class_members in
+              let add_operator ops opname = match get_class_element_in op_state os.public {ident=nl opname;subscripts=[]} [] with
+                  Success {lookup_success_state={current_ref}} ->
+                  begin 
+                    match ft_of_kcs current_ref.known_components with
+                      Some FTFunction (opargs, _) -> {opargs; opname}::ops
+                    | _ -> ops
+                  end
+                | _ -> ops
+              in
+              Enum.fold add_operator [] keys 
+            | _ -> []
+          end
+        | Some OperatorFunction ->
+          begin match ft_of_kcs op_state.current_ref.known_components with
+              Some FTFunction (opargs, _) -> [{opargs; opname="default"}]
+            | _ -> []
+          end
+        | _ -> []
+      end
+    | _ -> []
+  in
+  let or_fields = StrMap.map (ft_of_field state) fields in
+  let or_zero = operator "'0'" in
+  let or_constructor = operator "'constructor'" in
+  let or_string  = operator "'String'" in
+  let or_plus  = operator "'+'" in
+  let or_minus  = operator "'-'" in
+  let or_mult  = operator "'*'" in
+  let or_div  = operator "'/'" in
+  let or_pow  = operator "'^'" in
+  let or_eq  = operator "'=='" in
+  let or_neq  = operator "'<>'" in
+  let or_gt  = operator "'>'" in
+  let or_lt  = operator "'<'" in
+  let or_geq  = operator "'>='" in
+  let or_leq  = operator "'<='" in
+  let or_and  = operator "'and'" in
+  let or_or = operator "'or'" in
+  let or_not = operator "'not'" in
+
+  {or_tag; or_fields;
+   or_constructor;
+   or_zero;
+   or_string;
+   or_plus ;
+   or_minus ;
+   or_mult ;
+   or_div ;
+   or_pow ;
+   or_eq ;
+   or_neq ;
+   or_gt ;
+   or_lt ;
+   or_geq ;
+   or_leq ;
+   or_and ;
+   or_not ;
+   or_or }
+  
 and ft_of_cv state = function
     Int ->  FTInteger
   | Real -> FTReal
@@ -380,28 +471,22 @@ and ft_of_cv state = function
   | Constr {arg} -> ft_of_cv state arg
   | Replaceable cv -> ft_of_cv state cv
   | Class {object_sort=Function; public={fields}} ->    
-    let mkarg (inputs,outputs) (x, {field_class}) =
-      let v =
-        match get_class_element state (`FieldType x) field_class [] with
-          Success {lookup_success_value=lv} -> class_value_of_lookup lv
-        | _ ->
-          BatLog.logf "Could not resolve function component %s\n" x ;
-          raise NotFlat
-      in
-      let {flat_attr;flat_val} = flat v in
-      match flat_attr.fa_cau with
-        Some Input -> ((x, (ft_of_cv state flat_val)) :: inputs, outputs)
-      | Some Output -> (inputs, (ft_of_cv state flat_val)::outputs)
-      | _ -> (inputs, outputs)
-    in
-    let (inputs, outputs) = List.fold_left mkarg ([], []) (StrMap.bindings fields) in
-    FTFunction (inputs, outputs)
+    fun_of_cv state fields
+  | Class {source_path; object_sort = OperatorRecord; public} ->
+    let or_tag = Pprint_modelica.expr2str (cre (UnknownRef {root=true; components=List.map any (Name.to_list (Name.of_ptr source_path))})) in    
+    if StrSet.mem or_tag state.current_ft then
+      FTOperatorRecordSelf or_tag
+    else begin
+      let state = {state with current_ft = StrSet.add or_tag state.current_ft} in
+      FTOperatorRecord (or_of_cv state or_tag public)
+    end
+
   | Class {public={fields}} ->
-    let ft_of_field {field_class} = ft_of_cv state field_class in
-    FTObject (StrMap.map ft_of_field fields)
+    FTObject (StrMap.map (ft_of_field state) fields)
       
-  | GlobalReference _ | DynamicReference _ -> raise NotFlat
-                                                              
+  | (GlobalReference _ | DynamicReference _) ->
+    raise NotFlat
+      
 and ft_of_cv_safe state cv = try Some (ft_of_cv state cv) with | NotFlat -> None
 
 
@@ -463,11 +548,8 @@ let rec lookup_lexical_in state x xs =
   end
 (** Create a lookup state from a normalized signature (i.e. root class) *)
 let state_of_lib lib =
-  {self={tip={clup=None; clbdy={empty_object_struct with public=lib}};up=None};
-   trace = DQ.empty ;
-   current_ref = {known_components=DQ.empty; scope=0} ;
-   current_attr = no_attributes;
-   current_path = DQ.empty}
+  {empty_lookup_state with
+    self={tip={clup=None; clbdy={empty_object_struct with public=lib}};up=None}}
 
 let lookup o p =
   let open Normalized in
