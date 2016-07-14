@@ -267,15 +267,15 @@ let test_cases = [
   texpr ".x" (root_type ["x"]);
   texpr ".x.y" (root_type ["x";"y"]);
   texpr "Modelica.Icons.interfacesPackage" (type_name ["Modelica";"Icons";"interfacesPackage"]);
-  texpr "input Real" (TCau {flag = Input ; flagged = type_name ["Real"] });
-  texpr "constant Real" (TVar {flag = Constant ; flagged = type_name ["Real"] });
-  texpr "flow Real" (TCon {flag = Flow ; flagged = type_name ["Real"] });
-  texpr "output parameter discrete stream Real" (TCau { flag = Output ; flagged = TVar { flag = Parameter ;
-                                                                                         flagged =
-                                                                                           TVar { flag = Discrete ;
-                                                                                                  flagged =
-                                                                                                    TCon { flag = Stream ;
-                                                                                                           flagged = type_name ["Real"] } } } } ) ;
+  texpr "input Real" (TCau {flag = Flags.Input ; flagged = type_name ["Real"] });
+  texpr "constant Real" (TVar {flag = Flags.Constant ; flagged = type_name ["Real"] });
+  texpr "flow Real" (TCon {flag = Flags.Flow ; flagged = type_name ["Real"] });
+  texpr "output parameter discrete stream Real" (TCau { flag = Flags.Output ; flagged = TVar { flag = Flags.Parameter ;
+                                                                                               flagged =
+                                                                                                 TVar { flag = Flags.Discrete ;
+                                                                                                        flagged =
+                                                                                                          TCon { flag = Flags.Stream ;
+                                                                                                                 flagged = type_name ["Real"] } } } } ) ;
   texpr "Real[2,3]" (TArray {base_type = type_name ["Real"]; dims = [int 2 ; int 3]} ) ;
   texpr "T()" (TMod { mod_type = type_name ["T"] ; modification = no_modification } ) ;
 
@@ -300,7 +300,7 @@ let test_cases = [
 
 
   defs "parameter FluidHeatFlow.Media.Medium medium" [uncommented { empty_def with def_name = "medium" ;
-                                                                                   def_type = TVar { flag = Parameter ;
+                                                                                   def_type = TVar { flag = Flags.Parameter ;
                                                                                                      flagged =
                                                                                                        type_name ["FluidHeatFlow";
                                                                                                                   "Media";
@@ -343,7 +343,7 @@ let test_cases = [
                                                                                type_exp = {empty_composition with public = {
                                                                                    empty_elements with
                                                                                    defs = [def] } };
-                                                                               sort = Class ;
+                                                                               sort = Flags.Class ;
                                                           } )));
 
   (let def = uncommented { empty_def with def_name = "x" ; def_type = type_name ["S"] } in
@@ -352,29 +352,29 @@ let test_cases = [
                                                                                              empty_composition with
                                                                                              public = { empty_elements with
                                                                                                         defs = [def] }};
-                                                                                           sort = Class ;
+                                                                                           sort = Flags.Class ;
                                                                       } ;
                                               comment = unannotated ( Some (nl "comment") ) ;
                                             } );
 
-  typedef "record A end A" (uncommented (Composition {empty_typedef with td_name =nl"A" ; sort=Record; type_exp = empty_composition})) ;
+  typedef "record A end A" (uncommented (Composition {empty_typedef with td_name =nl"A" ; sort=Flags.Record; type_exp = empty_composition})) ;
   
   typedef "partial model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                  type_exp = empty_composition;
-                                                                                 sort = Model ;
+                                                                                 sort = Flags.Model ;
                                                                                  type_options = { no_type_options with partial = true };
                                                             } ));
 
   typedef "replaceable model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                      type_exp = empty_composition;
-                                                                                     sort = Model ;
+                                                                                     sort = Flags.Model ;
                                                                                      type_options = {
                                                                                        no_type_options with type_replaceable = true };
                                                                 } ));
 
   typedef "replaceable package A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                        type_exp = empty_composition;
-                                                                                       sort = Package ;
+                                                                                       sort = Flags.Package ;
                                                                                        type_options = {
                                                                                          no_type_options with type_replaceable = true };
                                                                   } ));
@@ -382,7 +382,7 @@ let test_cases = [
 
   typedef "encapsulated model A end A" (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                                                       type_exp = empty_composition;
-                                                                                      sort = Model ;
+                                                                                      sort = Flags.Model ;
                                                                                       type_options = {
                                                                                         no_type_options with encapsulated = true };
                                                                  } ));
@@ -390,7 +390,7 @@ let test_cases = [
   typedef "replaceable encapsulated partial model A end A"
     (uncommented (Composition { empty_typedef with td_name = nl"A" ;
                                                    type_exp = empty_composition;
-                                                   sort = Model ;
+                                                   sort = Flags.Model ;
                                                    type_options = {
                                                      no_type_options with encapsulated = true ;
                                                                           partial = true ;
@@ -411,7 +411,7 @@ let test_cases = [
                                                                                      }
                                                                              )] } 
                                                               } ;
-                                                   sort = Model ;
+                                                   sort = Flags.Model ;
                               } ));
 
   typedef "model X replaceable package T = S; end X"
@@ -421,7 +421,7 @@ let test_cases = [
                                                                            typedefs = [ uncommented (
                                                                                Short { empty_typedef with td_name = nl"T" ;
                                                                                                           type_exp = type_name ["S"] ;
-                                                                                                          sort = Package ;
+                                                                                                          sort = Flags.Package ;
                                                                                                           type_options = {
                                                                                                             no_type_options with
                                                                                                             type_replaceable =
@@ -429,7 +429,7 @@ let test_cases = [
                                                                                                           }
                                                                                      })]} ;
                                                               } ;
-                                                   sort = Model ;
+                                                   sort = Flags.Model ;
                               } ));
 
   typedef "model X equation 1 = 1; end X"
@@ -443,13 +443,13 @@ let test_cases = [
                                                                             )]
                                                                         } ;
                                                               } ;
-                                                   sort = Model ;
+                                                   sort = Flags.Model ;
                               } ));
 
   typedef "model X annotation ();  end X"
     ({commented = (Composition { empty_typedef with td_name = nl"X" ;
                                                     type_exp = empty_composition ;
-                                                    sort = Model ;
+                                                    sort = Flags.Model ;
                                }) ;
       comment = {annotated_elem = None; annotation = Some no_modification }
      });
@@ -472,7 +472,7 @@ let test_cases = [
                                                               } )) ;
   typedef "class extends X Real p; end X"
     (uncommented (Extension {empty_typedef with td_name = nl"X" ;
-                                                sort = Class ;
+                                                sort = Flags.Class ;
                                                 type_exp = ({ empty_composition with
                                                               public = { empty_elements with 
                                                                          defs = [uncommented
@@ -499,7 +499,7 @@ let test_cases = [
                                                      )
                                                  } ;
                                        } ;
-                            sort = Function } ));
+                            sort = Flags.Function } ));
 
   typedef "function f external \"C\" x = f(); end f"
     (uncommented (Composition { empty_typedef with td_name = nl"f" ;
@@ -515,7 +515,7 @@ let test_cases = [
                                                                             )
                                                                         } ;
                                                               } ;
-                                                   sort = Function } ));
+                                                   sort = Flags.Function } ));
 
   typedef "type A = B(redeclare type C = D)"
     (uncommented (Short { empty_typedef with
@@ -598,9 +598,11 @@ let test_cases = [
                                                                           pnamed_args = [] } ) ]];
                                                               } ;
                                                     } ;
-                                         sort = Function } ));
+                                         sort = Flags.Function } ));
 
-  unit_ "package Test end Test;" {within = None; toplevel_defs = [(uncommented (Composition {empty_typedef with td_name =nl"Test" ; sort=Package; type_exp = empty_composition}))]} ;
+  unit_ "package Test end Test;" {within = None; toplevel_defs = [(uncommented (Composition {empty_typedef with td_name =nl"Test" ;
+                                                                                                                sort=Flags.Package;
+                                                                                                                type_exp = empty_composition}))]} ;
 
   (let line = {
       no_modification
