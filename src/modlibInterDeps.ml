@@ -269,7 +269,7 @@ let topological_order w r a =
                  |         |
                  |         |__yes_ : Do nothing, just copy, all other statements won't unfold anything yet
                  |         |
-                 |         |__no__ : Create Delay() statement
+                 |         |__no__ : Create Self() and Unfold() statement
                  |
                  |__yes_ : * Remove incoming edges to (hierachically) highest superclass process subgraph
   *)                           
@@ -277,7 +277,7 @@ let topological_order w r a =
     let superclasses = List.sort (fun i j -> Int.compare (DQ.size a.(i).lhs) (DQ.size a.(j).lhs)) (List.filter (fun i -> is_super a.(i)) scc) in
 
     match superclasses with
-      [] -> process_scc2 prog scc
+      [] -> (self_stmts (unfold_stmts prog scc) scc)
     | fst::_ -> begin
         let vs = IntSet.of_list scc in
         (*      BatLog.logf "Breaking SCC with %d vertices.\n" (IntSet.cardinal vs);
@@ -296,10 +296,15 @@ let topological_order w r a =
         reorder_sccs prog sccs'          
       end		  
 
-  and process_scc2 prog = function [] -> prog
+  and unfold_stmts prog = function [] -> prog
                                  | i::scc when is_super a.(i) -> raise (IllegalRecursion (show_class_ptr (a.(i).lhs)))
-                                 | i::scc when is_closer a.(i).rhs -> process_scc2 (a.(i)::prog) scc
-                                 | i::scc -> process_scc2 ({lhs=a.(i).lhs; rhs=Delay a.(i).rhs}::prog) scc
+                                 | i::scc when is_closer a.(i).rhs -> unfold_stmts (a.(i)::prog) scc
+                                 | i::scc -> unfold_stmts ({lhs=a.(i).lhs; rhs=a.(i).rhs}::prog) scc
+                                               
+  and self_stmts prog = function [] -> prog
+                                 | i::scc when is_super a.(i) -> raise (IllegalRecursion (show_class_ptr (a.(i).lhs)))
+                                 | i::scc when is_closer a.(i).rhs -> self_stmts (a.(i)::prog) scc
+                                 | i::scc -> self_stmts ({lhs=a.(i).lhs; rhs=KnownPtr a.(i).lhs}::prog) scc
 
   and reorder_sccs prog = function
     | [] -> prog 
