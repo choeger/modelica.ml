@@ -168,11 +168,11 @@ let pp_scope fmt = function
   | InnerOuter ->  pp_print_string fmt "inner outer "
   | Local -> ()
 
-let pp_def_options fmt { final ; scope ; replaceable } =
+let pp_def_options fmt { final ; def_scope ; replaceable } =
   fprintf fmt "@[%s%s%a@]"
     (if final then "final " else "")
     (if replaceable then "replaceable " else "")
-    pp_scope scope
+    pp_scope def_scope
 
 let def_sep fmt () =
   fprintf fmt ";@ "

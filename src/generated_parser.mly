@@ -378,9 +378,9 @@ modification : EQ e=expr | COLONEQ e=expr { Rebind e }
 modification_arguments_tail : COMMA m = modification_arguments { m }
                             | { { types = [] ; components = [] ; modifications = [] } }
 
-mod_component_clause : scope=scope def_type = type_expression component=declaration
+mod_component_clause : def_scope=scope def_type = type_expression component=declaration
                        def_constraint=option(constraining_clause)
-                       { declaration_to_def def_type {no_def_options with scope} def_constraint component }
+                       { declaration_to_def def_type {no_def_options with def_scope} def_constraint component }
 
 import : IMPORT DOT name=separated_nonempty_list(DOT, ident) comment = comment { { commented = Unnamed name ; comment } }
        | IMPORT name=separated_nonempty_list(DOT, ident) comment = comment { { commented = Unnamed name ; comment } }
@@ -398,8 +398,8 @@ scope : INNER { Inner }
       | INNER OUTER { InnerOuter }
       | { Local }
           
-type_prefix : final = flag(FINAL) scope=scope  replaceable = flag(REPLACEABLE)                 
-                { { final ; scope ; replaceable } }
+type_prefix : final = flag(FINAL) def_scope=scope  replaceable = flag(REPLACEABLE)                 
+                { { final ; def_scope ; replaceable } }
 
 array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
 
