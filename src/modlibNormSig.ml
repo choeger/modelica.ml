@@ -190,9 +190,6 @@ and norm lhs =
     Report.do_ ;
     return (Class {empty_object_struct with object_sort = class_sort ; source_path = target lhs})
 
-  | Delay rec_rhs ->
-    return (Recursive {rec_lhs=target lhs;rec_rhs})
-
   | Close ->
     Report.do_ ; o <-- output ;
     begin match lookup_path_direct o (target lhs) with

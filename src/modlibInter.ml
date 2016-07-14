@@ -90,7 +90,6 @@ type class_term = Reference of DS.name
                 | PInt | PReal | PString | PBool | PExternalObject
                 | PEnumeration of StrSet.t
                 | Constr of class_constr
-                | Delay of class_term
                     [@@deriving eq,yojson,show]
 
 and open_class = { class_sort : sort ; class_name : Name.t }
