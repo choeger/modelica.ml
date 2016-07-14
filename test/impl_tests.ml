@@ -370,7 +370,8 @@ let test_cases = [
      end P"
     [cm "P"; cm "A"; cm "'*'"; cm "multiply"]
     (Has.field public "r" **> Has.field_type (Is.class_value
-                                                (Constr {arg=(DynamicReference {upref=3;base=false;downref=Name.of_list ["A"]}); constr=Cau Output}))) ;
+                                                (Constr {arg=(DynamicReference {upref=3;base=false;downref=Name.of_list ["A"]});
+                                                         constr=Cau Flags.Output}))) ;
                                                  
   test_norm
     "Recursive records"

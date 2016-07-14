@@ -60,7 +60,7 @@ let m_body source_path = {empty_object_struct with source_path; public = {empty_
 
 let class_M source_path = Class (m_body source_path)
 
-let record_M source_path = Class {(m_body source_path) with object_sort = Record}
+let record_M source_path = Class {(m_body source_path) with object_sort = Flags.Record}
 
 let class_with_public_M source_path = Class {empty_object_struct with source_path ; public = {
     empty_elements with class_members = StrMap.singleton "M" {empty_modified_class with class_ = class_M (DQ.snoc source_path (cm "M"))}}}
@@ -83,7 +83,7 @@ let test_cases = [
   
   class_ "class A protected class M Real x; end M; end A" "A" (fun p -> Is.class_value (class_with_protected_M p)) ;
 
-  class_ "record A end A" "A" (fun p -> Is.class_value (empty Record p)) ;
+  class_ "record A end A" "A" (fun p -> Is.class_value (empty Flags.Record p)) ;
 
   signature
     "Normalization of replaceables"

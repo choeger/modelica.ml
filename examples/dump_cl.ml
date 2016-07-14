@@ -50,7 +50,7 @@ let _ =
                               let js = Lookup.lookup_result_to_yojson t in
                               Printf.printf "%s\n" (Yojson.Safe.pretty_to_string js) ;
                               begin match t with
-                                  Success _ -> 0
+                                  Lookup.Success _ -> 0
                                 | _ -> 1
                               end
                   | _ -> 0

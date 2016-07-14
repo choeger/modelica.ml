@@ -113,6 +113,6 @@ let walk_directory_tree dir suffix =
   
 let () =
   let results = walk_directory_tree (Sys.getcwd ()) ".mo" in
-  List.map parse results;
+  ignore (List.map parse results);
   Gc.print_stat IO.stdout
 ;;

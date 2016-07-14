@@ -31,6 +31,8 @@
 open Batteries
 open Utils
 open Modlib
+open Report
+open FileSystem
 open Compress
 open Deps
     
@@ -85,7 +87,7 @@ let load global dep =
   in
   BatLog.logf "Loading %s\n" dep ;
   let js = find_class dep class_paths in
-  let o = Report.run (Compress.load_from_json js)
+  let o = run (Compress.load_from_json js)
       {messages=[]; output=global}
   in
   List.iteri print_message o.final_messages ;
@@ -152,7 +154,7 @@ let run_compile global root =
         Printf.printf "\n" ;
         List.iteri print_message o.final_messages ;
         match o.final_result with
-          Ok {signature;implementation} -> BatLog.logf "Normalization Ok.\n%!" ;                
+          Ok {NormLib.signature;implementation} -> BatLog.logf "Normalization Ok.\n%!" ;                
           let c = Compress.compress_elements signature in
           BatLog.logf "Compression Ok.\n%!" ;
           let c' = clean global c in

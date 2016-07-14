@@ -326,9 +326,10 @@ module P = struct
   end
 
   module The = struct
+    open ModlibLookup
     let first k = function [] -> assert_failure "Expected non-empty list" | x :: _ -> k x
 
-    let lookup_result k {ModlibLookup.lookup_success_value; lookup_success_state={current_attr}} =
+    let lookup_result k {lookup_success_value; lookup_success_state={current_attr}} =
       let cv = unflat (extract_attributes current_attr (Lookup.class_value_of_lookup lookup_success_value)) in
       k cv
 
@@ -338,6 +339,7 @@ module P = struct
   end
   
   module Is = struct
+    open ModlibLookup
     let path expected p =
       assert_equal ~cmp:Path.equal ~printer:Path.show expected p
 
@@ -352,16 +354,15 @@ module P = struct
         end
 
     let successful k = function
-        ModlibLookup.Success s -> k s
+        Success s -> k s
       | Error err -> assert_failure ("Lookup Error: " ^ (show_components err.lookup_error_todo))
-      | _ -> assert_failure ("Lookup failed") 
     
     let ok k = function
         Failed -> assert_failure "Result was not OK."
       | Ok a -> k a
 
     let constant k = function
-        Constr {arg; constr=Var Constant} -> k arg
+        Constr {arg; constr=Var Flags.Constant} -> k arg
       | got -> assert_failure ("Expected a constant type, got: " ^ (show_class_value got))
     
     let replaceable k = function
@@ -381,9 +382,7 @@ module P = struct
     let bound_to e =
       Has.binding (exp e)
 
-    let nested k = function
-        {mod_nested} -> k mod_nested
-      | _ -> assert_failure "Expected a nested modification."
+    let nested k {mod_nested} = k mod_nested
 
     let modified_to expected = function
         {mod_default=Some e} -> exp expected e
@@ -401,11 +400,14 @@ module P = struct
   end
 
   module Compute = struct
-
+    open FileSystem
+        
     let signature (k : elements_struct -> unit) td = 
       let parsed = {within = Some []; toplevel_defs = [td] } in
       let report =
-        (Modlib.Report.run (NormSig.norm_pkg_root (Trans.translate_pkg_root {root_units=[{FileSystem.scanned="testcase"; parsed}];root_packages=[]} )) {messages=[]; output=empty_elements})
+        (Modlib.Report.run (NormSig.norm_pkg_root
+                              (Trans.translate_pkg_root {root_units=[{scanned="testcase"; parsed}];root_packages=[]} ))
+           {messages=[]; output=empty_elements})
       in
       (Ensure.Report.has_no_messages **> Ensure.Report.result **> Is.ok **> k) report
 
