@@ -41,7 +41,6 @@ val bool : bool -> Syntax.exp
 val string : string -> Syntax.exp
 val colon : Syntax.exp
 val end_ : Syntax.exp
-val app : Syntax.application -> Syntax.exp
 val pow : Syntax.binary_exp -> Syntax.exp
 val dpow : Syntax.binary_exp -> Syntax.exp
 val mul : Syntax.binary_exp -> Syntax.exp
@@ -79,13 +78,16 @@ val initial : Syntax.exp
 val assert_ : Syntax.exp
 val any : string -> Syntax.component
 
+val app : component_reference -> (string * exp) list -> exp
+
 val known_component :
   ?known_type:flat_type -> Syntax.component_kind -> string -> Syntax.known_component
-val cclass : string -> Syntax.known_component
+val cclass : ?known_type:flat_type -> string -> Syntax.known_component
 val cvar : ?known_type:flat_type -> string -> Syntax.known_component
 val cattr : ?known_type:flat_type -> string -> Syntax.known_component
 val cconstfld : ?known_type:flat_type -> string -> Syntax.known_component
 val cfld : ?known_type:flat_type -> string -> Syntax.known_component
+val cfunc : ?known_type:flat_type -> string -> Syntax.known_component
 val cbuiltinfun : ?known_type:flat_type -> string -> Syntax.known_component
 val cbuiltinclass : ?known_type:flat_type -> string -> Syntax.known_component
 val knownref : int -> Syntax.known_component list -> Syntax.component_reference

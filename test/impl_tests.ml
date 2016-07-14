@@ -106,9 +106,9 @@ let test_cases = [
   
   test_norm "Normalize Builtin 'size'"
     "class A constant Integer x = size(y); Real y; end A"
-    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app {fun_= rootref [cbuiltinfun "size"] ;
-                                                            args=[cre (knownref 0 [cfld ~known_type:FTReal "y"])];
-                                                            named_args=[]}))) ;
+    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app (rootref [cbuiltinfun "size"]) 
+                                                             ["", cre (knownref 0 [cfld ~known_type:FTReal "y"])])));
+                                                            
 
   test_norm "Normalize Builtin 'stateSelect'"
     "class A Real y(stateSelect=StateSelect.never); end A"
@@ -130,9 +130,9 @@ let test_cases = [
   
   test_norm "Normalize Builtin 'String'"
     "class A constant Integer x = String(1); end A"
-    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app {fun_= rootref [cbuiltinclass "String"] ;
-                                                                args=[S.int 1];
-                                                                named_args=[]}))) ;
+    [`ClassMember "A"] (Has.field public "x" (Is.bound_to (app (rootref [cbuiltinclass "String"]) 
+                                                           ["", S.int 1])
+                                             )) ;
   
   test_norm "Normalize Simple Modification"
     "class A constant Real x(start = 42.); end A"
@@ -373,6 +373,33 @@ let test_cases = [
                                                        args=[
                                                          Mul {left=(cre (knownref 0 [cfld "a1"; cfld ~known_type:FTReal "a"])); right=cre (knownref 0 [cfld "a2"; cfld ~known_type:FTReal "a"])}
                                                        ]})) ;
+
+  test_norm
+    "Functions"
+    "package P
+       function F input Real x; output Real y = x; end F;
+       constant Real a = F(1.0);
+     end P"
+    [cm "P"] (Has.field public "a" **> Is.bound_to (app (knownref 0 [cfunc ~known_type:(FTFunction (["x", FTReal], [FTReal]))"F"]) ["", S.real 1.0])) ;
+
+  test_norm
+    "Type of Records"
+    "package P
+       record R Real x; end R;
+       constant R a = R(x=1.0);
+     end P"
+    [cm "P"] (Has.field public "a" **> Is.bound_to
+                (app (knownref 0 [cclass ~known_type:(FTObject (StrMap.of_list ["x", FTReal])) "R"]) ["x", S.real 1.0])) ;
+  
+  test_norm
+    "Functions with indirect input/output distinction"
+    "package P
+       type A = input Real;
+       type B = output Real;
+       function F A x; B y = x; end F;
+       constant Real a = F(1.0);
+     end P"
+    [cm "P"] (Has.field public "a" **> Is.bound_to (app (knownref 0 [cfunc ~known_type:(FTFunction (["x", FTReal], [FTReal]))"F"]) ["", S.real 1.0])) ;
 ]
 
 let suite = "Implementation Normalization" >::: test_cases

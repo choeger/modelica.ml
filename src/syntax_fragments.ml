@@ -54,7 +54,6 @@ let bool x =  (Bool x)
 let string x =  (String x)
 let colon =  Colon
 let end_ =  End
-let app x =  (App x)
 let pow x =  (Pow x)
 let dpow x =  (DPow x)
 let mul x =  (Mul x)
@@ -86,6 +85,12 @@ let marray x =  (MArray x)
 let explicitclosure x =  (ExplicitClosure x)
 let outputexpression x =  (OutputExpression x)
 
+let app fun_ argl =
+  let sep app (name, arg) = if name = "" then {app with args=arg::app.args} else
+      {app with named_args = {argument_name=nl name; argument=arg}::app.named_args}
+  in
+  App (List.fold_left sep {fun_; args=[]; named_args=[]} argl)
+                                                                                              
 let cr components = UnknownRef {root=false; components}
 let cre cr =  (ComponentReference cr)
 
@@ -130,7 +135,7 @@ let root_type xs = TRootName (List.map Location.mknoloc xs)
 
 let known_component ?known_type kind x = {known_type; kind;component={ident=nl x; subscripts=[]}}
 
-let cclass = known_component CK_Class
+let cclass ?known_type = known_component ?known_type CK_Class
 
 let cvar ?known_type = known_component ?known_type CK_LocalVar
 
@@ -141,6 +146,8 @@ let cconstfld ?known_type = known_component ?known_type CK_Constant
 let time = known_component ~known_type:FTReal CK_Time "time"
 
 let cfld ?known_type = known_component ?known_type CK_Continuous
+
+let cfunc ?known_type = known_component ?known_type CK_Function
 
 let cbuiltinfun ?known_type = known_component ?known_type CK_BuiltinFunction
 

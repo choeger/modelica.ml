@@ -160,10 +160,10 @@ let test_cases = [
   expr ".x.y" ( (cre (UnknownRef {root = true; components = [any "x"; any "y"]}))) ;
 
   (* functions *)
-  expr "f()" (app {fun_= (cr [any "f"]); args=[]; named_args=[] });
-  expr "f(1.0)" (app {fun_=cr [any "f"]; args=[real 1.]; named_args=[] }) ;
-  expr "f(x=1.0)" (app {fun_= (cr [any "f"]); args=[]; named_args=[named "x" (real 1.0)]});
-  expr "f(1.0, x=1.0)" (app {fun_= (cr [any "f"]); args=[real 1.]; named_args=[named "x" (real 1.0)]});
+  expr "f()" (app (cr [any "f"]) []);
+  expr "f(1.0)" (app (cr [any "f"]) ["", real 1.]) ;
+  expr "f(x=1.0)" (app (cr [any "f"]) ["x", (real 1.0)]);
+  expr "f(1.0, x=1.0)" (app (cr [any "f"]) ["", real 1.0; "x", (real 1.0)]);
   expr "function x" (explicitclosure (ide "x"));
 
   (* precedences *)
@@ -234,9 +234,8 @@ let test_cases = [
                                                               })) ;
 
   eq "if c(a[i]) then a[i].p.r = {0,0,0}; end if;"  (uncommented (IfEquation {
-      condition=app { fun_=cr [any "c"] ;
-                      args= [cre (cr [{(any "a") with subscripts = [ide "i"]}])];
-                      named_args=[] };
+      condition=app (cr [any "c"])
+          ["", cre (cr [{(any "a") with subscripts = [ide "i"]}])] ;
       then_ = [
         uncommented (
           SimpleEquation {
@@ -311,7 +310,7 @@ let test_cases = [
 
   defs "Medium medium := Medium()" [uncommented { empty_def with def_name = "medium" ;
                                                                  def_type = type_name ["Medium"] ;
-                                                                 def_rhs = Some ( app ( empty_app (cr [any "Medium"]) ) ) ;
+                                                                 def_rhs = Some ( app (cr [any "Medium"]) [] ) ;
                                                 }] ;
 
 
