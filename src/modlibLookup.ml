@@ -66,6 +66,7 @@ type lookup_state = {
   current_ref : Syntax.known_ref; (** The search request as a resolved component *)
 } [@@deriving show,yojson]
 
+
 let rec root_class_of self = match self.up with None -> self.tip | Some self -> root_class_of self
 
 let empty_lookup_state = {trace=DQ.empty; self={up=None;tip={clup=None; clbdy=empty_object_struct}};
@@ -105,14 +106,14 @@ let undefined x {Normalized.class_members; super; fields} =
 
 let rec get_class_element_in state {Normalized.class_members; super; fields} x xs =  
   if StrMap.mem x.ident.txt class_members then begin
+    let fa = flat (StrMap.find x.ident.txt class_members).class_ in
     let current_ref = {state.current_ref with known_components =
-                                                DQ.snoc state.current_ref.known_components {kind = CK_Class; known_type=None; component=x}} in
-    let cv = (StrMap.find x.ident.txt class_members).class_ in
-    get_class_element {state with current_ref} (`ClassMember x.ident.txt) cv xs
+                                                DQ.snoc state.current_ref.known_components {kind=CK_Class; known_type=None; component=x}} in
+    get_class_element {state with current_ref} (`ClassMember x.ident.txt) (unflat fa) xs
   end
   else if StrMap.mem x.ident.txt fields then begin
     let fa = flat (StrMap.find x.ident.txt fields).field_class in
-    let known_type = ft_of_cv_safe fa.flat_val in
+    let known_type = ft_of_cv_safe state fa.flat_val in
     let kind = ck_of_var fa.flat_attr.fa_var in
     let known_components = DQ.snoc state.current_ref.known_components {Syntax.kind; component=x; known_type} in
     let current_ref = {state.current_ref with known_components} in
@@ -172,11 +173,33 @@ and get_class_element state k e p =
   
   let project state v = function
       [] ->
-      let lookup_success_value = map_lv (fun sval ->
-          let {flat_attr; flat_val} = extract_attributes state.current_attr sval in
-          unflat {flat_val;flat_attr}) v       
-      in
-      Success {lookup_success_state=state;lookup_success_value}
+      begin match v with
+          LClass {clbdy={object_sort=Record|OperatorRecord|Function|OperatorFunction} as os} ->
+          (* patch correct type and kind for records and functions 
+             This is necessary here, since we need to be "inside" the function/record
+             (from a lookup state perspective) to resolve the declarations of
+             all public components.
+          *)
+          let current_ref = match DQ.rear state.current_ref.known_components with
+              None ->
+              (* We cannot patch what is not there (i.e. a superclass function) *)
+              state.current_ref
+                
+            | Some(xs, x) ->              
+              let known_type = ft_of_cv_safe state (Class os) in
+              let kind = match os.object_sort with Function|OperatorFunction -> CK_Function | _ -> x.kind in
+              let known_components = DQ.snoc xs {x with kind; known_type} in
+              {state.current_ref with known_components}
+          in
+          let state = {state with current_ref} in
+          Success {lookup_success_state=state;lookup_success_value=v}
+        | _ ->
+          let lookup_success_value = map_lv (fun sval ->
+              let {flat_attr; flat_val} = extract_attributes state.current_attr sval in
+              unflat {flat_val;flat_attr}) v       
+          in
+          Success {lookup_success_state=state;lookup_success_value}
+      end
     | x::xs ->      
       begin match v with
           LClass {clbdy} ->
@@ -202,7 +225,7 @@ and get_class_element state k e p =
               begin match xs with
                   [] when is_attr x ->
                   let attr_cv = cv_of_attr flat_val x in
-                  let known_type = ft_of_cv_safe attr_cv in
+                  let known_type = ft_of_cv_safe state attr_cv in
                   let attr = {kind=CK_BuiltinAttr; component=x; known_type} in
                   let lookup_success_state =
                     {state with current_ref =
@@ -216,7 +239,7 @@ and get_class_element state k e p =
               begin match xs with                         
                 | [] when is_attr x ->
                   let attr_cv = cv_of_attr flat_val x in
-                  let known_type = ft_of_cv_safe attr_cv in
+                  let known_type = ft_of_cv_safe state attr_cv in
                   let attr = {kind=CK_BuiltinAttr; component=x; known_type} in
                   let lookup_success_state =
                     {state with current_ref = {state.current_ref with known_components =
@@ -226,7 +249,7 @@ and get_class_element state k e p =
                 
                 | [] when StrSet.mem x.ident.txt flds ->
                   let lookup_success_state =
-                    let known_type = ft_of_cv_safe flat_val in
+                    let known_type = ft_of_cv_safe state flat_val in
                     let known_components = DQ.snoc state.current_ref.known_components {kind=CK_BuiltinAttr; component=x; known_type} in
                     {state with current_ref = {state.current_ref with known_components}} in
                   Success {lookup_success_state;
@@ -289,9 +312,19 @@ and get_class_element state k e p =
           | Success success ->
             (* Continue search *)
             let  {self; current_attr} = success.lookup_success_state in
-            project {state with self; current_attr} success.lookup_success_value [any y]
-              
-          | Success _ -> raise (Failure ("Error when looking for redeclare-extends base class")) (* TODO *)
+            begin match project {state with self; current_attr} success.lookup_success_value [any y] with
+              | Success {lookup_success_state; lookup_success_value=LClass {clup;clbdy}} ->
+                let super_state = {state with self={state.self with up=clup};
+                                              current_path = DQ.snoc state.current_path (`SuperClass k);
+                                  } in
+                project super_state (LClass {clup;clbdy}) p
+            
+              | Success {lookup_success_state; lookup_success_value} ->
+                raise (Failure ("Lookup of " ^ y ^ "in a non-structured type"))
+
+              | Recursion _ -> raise (Failure ("Error when looking for redeclare-extends base class")) (* TODO *)
+              | Error e -> Error e
+            end
           | e -> e
         end
       | Some (y,ys) ->
@@ -340,6 +373,42 @@ and lookup_continue_or_yield state = function
     [] ->
     Success {lookup_success_state=state; lookup_success_value=LClass state.self.tip}
     | x::xs -> lookup_continue state x xs
+
+and ft_of_cv state = function
+    Int ->  FTInteger
+  | Real -> FTReal
+  | String -> FTString    
+  | Bool -> FTBool
+  | Unit | ProtoExternalObject -> FTObject StrMap.empty
+  | Enumeration s -> FTEnum s
+  | Constr {arg; constr=Array n} -> FTArray (ft_of_cv state arg, n)
+  | Constr {arg} -> ft_of_cv state arg
+  | Replaceable cv -> ft_of_cv state cv
+  | Class {object_sort=Function; public={fields}} ->    
+    let mkarg (inputs,outputs) (x, {field_class}) =
+      let v =
+        match get_class_element state (`FieldType x) field_class [] with
+          Success {lookup_success_value=lv} -> class_value_of_lookup lv
+        | _ ->
+          BatLog.logf "Could not resolve function component %s\n" x ;
+          raise NotFlat
+      in
+      let {flat_attr;flat_val} = flat v in
+      match flat_attr.fa_cau with
+        Some Input -> ((x, (ft_of_cv state flat_val)) :: inputs, outputs)
+      | Some Output -> (inputs, (ft_of_cv state flat_val)::outputs)
+      | _ -> (inputs, outputs)
+    in
+    let (inputs, outputs) = List.fold_left mkarg ([], []) (StrMap.bindings fields) in
+    FTFunction (inputs, outputs)
+  | Class {public={fields}} ->
+    let ft_of_field {field_class} = ft_of_cv state field_class in
+    FTObject (StrMap.map ft_of_field fields)
+      
+  | GlobalReference _ | Recursive _ | DynamicReference _ -> raise NotFlat
+                                                              
+and ft_of_cv_safe state cv = try Some (ft_of_cv state cv) with | NotFlat -> None
+
 
 let rec forward state k c (todo:Path.t) =
   let current_path = DQ.snoc state.current_path (k :> Path.elem_t) in

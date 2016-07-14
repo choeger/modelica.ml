@@ -162,13 +162,14 @@ let rec extract_attributes fa =
   | Constr {arg; constr = Sort s} when fa.fa_sort = None -> flat_ {fa with fa_sort = Some s} arg
   | Constr {arg; constr} -> flat_ fa arg
   | Replaceable cv -> flat_ {fa with fa_replaceable = true} cv
+  | Class os when fa.fa_sort = None -> {flat_val=Class os; flat_attr = {fa with fa_sort = Some os.object_sort}}  
   | flat_val -> {flat_val; flat_attr = fa}  
 
 let flat = extract_attributes no_attributes
 
 let rec unflat = function
   | {flat_val; flat_attr={fa_sort;fa_var;fa_cau;fa_con;fa_replaceable}} ->
-    let unflat_sort s cv = match s with None -> cv | Some s -> Constr {arg=cv; constr=Sort s} in
+    let unflat_sort s cv = match s with None -> cv | Some s -> begin match cv with Class os -> Class os | _ -> Constr {arg=cv; constr=Sort s} end in
     let unflat_cau c cv = match c with None -> cv | Some c -> Constr {arg=cv; constr=Cau c} in
     let unflat_con c cv = match c with None -> cv | Some c -> Constr {arg=cv; constr=Con c} in
     let unflat_var v cv = match v with None -> cv | Some v -> Constr {arg=cv; constr=Var v} in
@@ -318,33 +319,6 @@ let lookup_path_direct global p = match DQ.front p with
 
 exception NotFlat
 
-let rec ft_of_cv = function
-    Int ->  FTInteger
-  | Real -> FTReal
-  | String -> FTString    
-  | Bool -> FTBool
-  | Unit | ProtoExternalObject -> FTObject StrMap.empty
-  | Enumeration s -> FTEnum s
-  | Constr {arg; constr=Array n} -> FTArray (ft_of_cv arg, n)
-  | Constr {arg} -> ft_of_cv arg
-  | Replaceable cv -> ft_of_cv cv
-  | Class {object_sort=Function; public={fields}} ->    
-    let mkarg (inputs,outputs) (x, {field_class}) =
-      let {flat_attr;flat_val} = flat field_class in
-      match flat_attr.fa_cau with
-        Some Input -> ((x, (ft_of_cv flat_val)) :: inputs, outputs)
-      | Some Output -> (inputs, (ft_of_cv flat_val)::outputs)
-      | _ -> (inputs, outputs)
-    in
-    let (inputs, outputs) = List.fold_left mkarg ([], []) (StrMap.bindings fields) in
-    FTFunction (inputs, outputs)
-  | Class {public={fields}} ->
-    let ft_of_field {field_class} = ft_of_cv field_class in
-    FTObject (StrMap.map ft_of_field fields)
-      
-  | GlobalReference _ | Recursive _ | DynamicReference _ -> raise NotFlat
-
-let ft_of_cv_safe cv = try Some (ft_of_cv cv) with | NotFlat -> None
 
 let max_var a b = match (a,b) with (None,_) -> None
                                  | (_,None) -> None
