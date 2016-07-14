@@ -139,7 +139,6 @@ let rec shapeof lhs = function
     let pub_shape = IntMap.fold (fun k v s -> match v.super_shape with Shape s' -> StrMap.union s' s | Primitive -> s) os.public.super prot_flds in
     let prot_shape = IntMap.fold (fun k v s -> match v.super_shape with Shape s' -> StrMap.union s' s | Primitive -> s) os.protected.super pub_shape in
     Shape prot_shape
-  | Recursive _ -> raise (Failure "Recursive base class")
   | Constr {arg} -> shapeof lhs arg
   | Replaceable arg -> shapeof lhs arg
   | cv ->
@@ -338,7 +337,6 @@ let rec collect_recursive_terms p rts = function
 
   | Constr {arg} -> collect_recursive_terms p rts arg
   | Replaceable v -> collect_recursive_terms p rts v
-  | Recursive open_rhs -> {open_lhs = p; open_rhs}::rts
   | v -> rts
 
 and elements_collect_recursive_terms p rts {class_members; fields;} =

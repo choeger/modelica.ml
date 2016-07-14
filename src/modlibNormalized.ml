@@ -60,7 +60,6 @@ type class_value = Int | Real | String | Bool | Unit | ProtoExternalObject
                  | Class of object_struct
                  | Replaceable of class_value
                  | GlobalReference of Path.t
-                 | Recursive of rec_term
                  | DynamicReference of reference_struct
   [@@deriving eq,show,yojson,folder,mapper]
 
@@ -245,7 +244,7 @@ and update_class_value lhs rhs = function
     begin match (update_class_value lhs rhs cv) with
         (Replaceable cv' | cv') -> Replaceable cv'
     end
-  | (Recursive _ | Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _ | DynamicReference _) as v ->
+  | (Int | Real | String | Bool | Unit | ProtoExternalObject | Enumeration _ | GlobalReference _ | DynamicReference _) as v ->
     begin match DQ.front lhs with
         None -> rhs.map_class_value rhs v
       | Some (x,xs) -> raise (CannotUpdate(Path.show_elem_t x, show_class_path xs, show_class_value v))

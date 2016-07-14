@@ -270,11 +270,6 @@ and get_class_element state k e p =
     let lv = LClass tip in    
     project {state with self} lv p
 
-  (* we might encounter recursive elements *)
-  | Recursive lookup_recursion_term -> Recursion {lookup_recursion_term;
-                                                  lookup_recursion_state=state;
-                                                  lookup_recursion_todo=p}
-
     (* follow dynamic references through self to implement redeclarations *)
   | DynamicReference {upref; base; downref} ->
     let rec upwards self = function
@@ -405,7 +400,7 @@ and ft_of_cv state = function
     let ft_of_field {field_class} = ft_of_cv state field_class in
     FTObject (StrMap.map ft_of_field fields)
       
-  | GlobalReference _ | Recursive _ | DynamicReference _ -> raise NotFlat
+  | GlobalReference _ | DynamicReference _ -> raise NotFlat
                                                               
 and ft_of_cv_safe state cv = try Some (ft_of_cv state cv) with | NotFlat -> None
 
