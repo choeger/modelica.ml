@@ -361,7 +361,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
           end
         | `FieldType x ->
           begin match Path.front current_ref.known_components with
-            | Some({kind=CK_Class},_) -> raise (Failure "Expected to modify a component")
+            | Some({kind=CK_Class},_) -> raise (Failure ("Expected to modify a component when modifying " ^ x))
 
             | Some({kind = mod_kind; component}, cr) ->
               (* Modified a field *)
