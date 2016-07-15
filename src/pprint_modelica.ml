@@ -127,7 +127,8 @@ and pp_known_component fmt {component} = pp_component fmt component
 and pp_cr fmt = function
   | UnknownRef {root=true ; components} -> fprintf fmt "@[.%a@]" (pp_list ~sep:"." pp_component) components
   | UnknownRef {root=false ; components} -> fprintf fmt "@[%a@]" (pp_list ~sep:"." pp_component) components
-  | KnownRef kcs -> fprintf fmt "@[.%a@]" (pp_dq ~sep:"." pp_known_component) kcs.known_components
+  | KnownRef kcs -> fprintf fmt "@[/*upwards %d*/%a@]" kcs.scope (pp_dq ~sep:"." pp_known_component) kcs.known_components
+  | RootRef kcs -> fprintf fmt "@[.%a@]" (pp_dq ~sep:"." pp_known_component) kcs
   | Assert -> fprintf fmt "assert"
   | Der -> fprintf fmt "der"
   | Initial -> fprintf fmt "initial"         

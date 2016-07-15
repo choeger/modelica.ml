@@ -134,7 +134,7 @@ let uncommented a = { commented = a ; comment = no_comment }
 
 let no_modification = { types = [] ; components = [] ; modifications = [] }
 
-let no_def_options = { final = false ; replaceable = false ; def_scope = Local }
+let no_def_options = { final = false ; replaceable = false ; def_scope = Flags.Local }
 
 let empty_def  = { def_name ="" ; def_type = TName []; def_options = no_def_options ; def_constraint = None ; def_rhs = None ; def_if = None }
 

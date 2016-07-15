@@ -40,6 +40,7 @@ module Compress = ModlibCompress
 module Trans = ModlibTrans
 module Deps = ModlibInterDeps
 open Inter
+open Syntax
 open Normalized
 open Lookup
 open Compress

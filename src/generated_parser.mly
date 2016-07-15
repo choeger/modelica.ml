@@ -35,20 +35,17 @@
 %token DOTPOWER POWER PLUS MINUS TIMES DIV DOTPLUS DOTMINUS DOTTIMES DOTDIV 
 %token EOF
 
-%token ALGORITHM DISCRETE FALSE LOOP PURE AND EACH FINAL MODEL RECORD ANNOTATION ELSE
+%token ALGORITHM DISCRETE FALSE LOOP AND EACH FINAL MODEL RECORD ANNOTATION ELSE
 %token FLOW NOT REDECLARE ASSERT ELSEIF FOR OPERATOR REPLACEABLE BLOCK ELSEWHEN FUNCTION OR RETURN
-%token BREAK ENCAPSULATED IF OUTER STREAM CLASS END IMPORT OUTPUT THEN ENUMERATION IMPURE
+%token BREAK ENCAPSULATED IF OUTER STREAM CLASS END IMPORT OUTPUT THEN ENUMERATION /*IMPURE PURE*/
 %token PACKAGE TRUE CONNECT CONNECTOR EQUATION IN PARAMETER TYPE CONSTANT EXPANDABLE INITIAL PARTIAL WHEN
 %token CONSTRAINEDBY EXTENDS INNER PROTECTED WHILE DER EXTERNAL INPUT PUBLIC WITHIN
 %token ENDWHEN ENDIF ENDFOR ENDWHILE INITIAL_EQUATION INITIAL_ALGORITHM
 %token <string> END_IDENT
 
-%right lowest /* lowest precedence */
-%nonassoc IDENT INT FLOAT STRING LPAREN RPAREN RBRACKET LBRACE RBRACE 
+/*%right lowest */
+%nonassoc LPAREN
 
-%left COMMA 
-%left SEMICOLON 
-%left COLON
 %right Not
 %left AND OR
 %left GT LT NEQ GEQ LEQ EQEQ 
@@ -57,17 +54,14 @@
 %right FUNCTION
 %left TIMES DIV DOTTIMES DOTDIV
 %left POWER DOTPOWER
-%nonassoc below_app
-%left app_prec     
+/*%nonassoc below_app
+  %left app_prec     */
 
-%left type_mod
 %left type_var
 %left type_conn
 %left type_caus
-%left type_array
-%left type_proj
 
-%left DOT LBRACKET /* highest precedence */
+%left LBRACKET /* highest precedence */
 
 %{
     open Syntax
@@ -165,7 +159,7 @@ simple_expr:
         { (MArray els) }
   | FUNCTION e = simple_expr
         { (ExplicitClosure e) }           
-  | END { (End) } %prec END
+  | END { (End) }
   | COLON { (Colon) }
 
   | cr = component_reference { (ComponentReference cr) }
@@ -317,53 +311,53 @@ type_expression :
                 | flag=variability flagged=type_expression { TVar { flag ; flagged } } %prec type_var
                 | flag=causality flagged=type_expression { TCau { flag ; flagged } } %prec type_caus
                 | flag=connectivity flagged=type_expression { TCon { flag ; flagged } } %prec type_conn
-                | base_type = type_expression dims = array_subscripts { TArray { base_type ; dims } } %prec type_array
-                | mod_type = type_expression modification = class_modification { TMod { mod_type ; modification } } %prec type_mod
+                | base_type = type_expression dims = array_subscripts { TArray { base_type ; dims } }
+                | mod_type = type_expression modification = class_modification { TMod { mod_type ; modification } } 
 
 class_modification : LPAREN m=modification_arguments_head RPAREN { m }
 
 modification_arguments_head : m = modification_arguments { m }
-                            | { { types = [] ; components = [] ; modifications = [] } }
+                            | { { redeclared_types = [] ; redeclared_components = [] ; modifications = [] } }
 
 modification_arguments : REDECLARE redecl_each=flag(EACH) type_final=flag(FINAL) type_replaceable=flag(REPLACEABLE)
                          partial=flag(PARTIAL) sort = type_sort 
                          td_name=ident EQ type_exp = type_expression comment=comment cns = option(constraining_clause) 
                          rest=modification_arguments_tail
-                         { { rest with types = { 
+                         { { rest with redeclared_types = { 
                                     redecl_each ;
                                     redecl_type = { commented = { td_name ; sort ; 
                                                                   type_options = { no_type_options with partial ; 
                                                                                    type_final; type_replaceable } ; 
                                                                   type_exp ; cns} ;
                                                     comment } 
-                                    } :: rest.types } }
+                                    } :: rest.redeclared_types } }
                        | redecl_each=flag(EACH) type_final=flag(FINAL) REPLACEABLE partial=flag(PARTIAL) sort = type_sort 
                          td_name=ident EQ type_exp = type_expression comment=comment cns = option(constraining_clause) 
                          rest=modification_arguments_tail
-                         { { rest with types = { 
+                         { { rest with redeclared_types = { 
                                     redecl_each ;
                                     redecl_type = { commented = { td_name ; sort ; 
                                                                   type_options = { no_type_options with partial ; 
                                                                                    type_final; type_replaceable=true } ; 
                                                                   type_exp ; cns} ;
                                                     comment } 
-                                    } :: rest.types } }
+                                    } :: rest.redeclared_types } }
                        | REDECLARE each=flag(EACH) final=flag(FINAL) replaceable=flag(REPLACEABLE) def=mod_component_clause 
                          rest=modification_arguments_tail
-                         { {rest with components = 
+                         { {rest with redeclared_components = 
                              { each ; def = { def with commented = 
                                                        { def.commented with def_options = 
                                                                             {def.commented.def_options with final; replaceable} };
                                             }
-                         }::rest.components} } 
+                         }::rest.redeclared_components} } 
                        | each=flag(EACH) final=flag(FINAL) REPLACEABLE def=mod_component_clause 
                          rest=modification_arguments_tail
-                         { {rest with components = 
+                         { {rest with redeclared_components = 
                              { each ; def = { def with commented = 
                                                        { def.commented with def_options = 
                                                                             {def.commented.def_options with final; replaceable=true} };
                                             }
-                         }::rest.components} } 
+                         }::rest.redeclared_components} } 
                        | mod_each=flag(EACH) mod_final=flag(FINAL) mod_name = separated_nonempty_list(DOT, ident) 
                          mod_value=option(modification) comment=comment 
                          rest=modification_arguments_tail
@@ -376,7 +370,7 @@ modification : EQ e=expr | COLONEQ e=expr { Rebind e }
              | nested=class_modification EQ new_value=expr { NestedRebind {nested;new_value} }
 
 modification_arguments_tail : COMMA m = modification_arguments { m }
-                            | { { types = [] ; components = [] ; modifications = [] } }
+                            | { { redeclared_types = [] ; redeclared_components = [] ; modifications = [] } }
 
 mod_component_clause : def_scope=scope def_type = type_expression component=declaration
                        def_constraint=option(constraining_clause)
@@ -507,7 +501,7 @@ public_composition_elements :
             | typedef = type_definition SEMICOLON rest = public_composition_elements 
                 { {rest with public = { rest.public with typedefs=typedef::rest.public.typedefs} } }
             | REDECLARE typedef = type_definition SEMICOLON rest = public_composition_elements 
-                { {rest with public = { rest.public with redeclared_types=typedef::rest.public.redeclared_types} } }
+              { {rest with public = { rest.public with redeclared_typedefs=typedef::rest.public.redeclared_typedefs} } }
             | rest = cargo_sections { rest }
             | PROTECTED rest = protected_composition_elements { rest }
             | PUBLIC rest = public_composition_elements { rest }
@@ -524,7 +518,7 @@ protected_composition_elements :
             | typedef = type_definition SEMICOLON rest = protected_composition_elements 
                 { {rest with protected = { rest.protected with typedefs=typedef::rest.protected.typedefs} } }
             | REDECLARE typedef = type_definition SEMICOLON rest = protected_composition_elements 
-                { {rest with protected = { rest.protected with redeclared_types=typedef::rest.protected.redeclared_types} } }
+                { {rest with protected = { rest.protected with redeclared_typedefs=typedef::rest.protected.redeclared_typedefs} } }
             | rest = cargo_sections { rest }
             | PROTECTED rest = protected_composition_elements { rest }
             | PUBLIC rest = public_composition_elements { rest }

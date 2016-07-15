@@ -186,7 +186,7 @@ and operator_record = {
 
   and elements = {
     typedefs : typedef list ;
-    redeclared_types : typedef list ;
+    redeclared_typedefs : typedef list ;
     extensions : extend list ;
     defs : definition list ;
     redeclared_defs : definition list ;
@@ -384,8 +384,8 @@ and known_components = known_component DQ.t
 
   and component_modification = component_modification_struct commented 
 
-  and modification = { types : type_redeclaration list ;
-                       components : component_redeclaration list ;
+  and modification = { redeclared_types : type_redeclaration list ;
+                       redeclared_components : component_redeclaration list ;
                        modifications : component_modification list ; } 
 let ck_of_var = 
   let open Flags in
