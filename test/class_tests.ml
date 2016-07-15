@@ -56,7 +56,9 @@ let signature desc input pred =
 
 (* Fixtures *)
 open ClassValueFragments
-let m_body source_path = {empty_object_struct with source_path; public = {empty_elements with fields = StrMap.singleton "x" {field_class=Real;field_mod=no_modification}}}
+let m_body source_path = {empty_object_struct with source_path;
+                                                   public = {empty_elements with fields = StrMap.singleton "x"
+                                                                                     {field_pos=0; field_class=Real;field_mod=no_modification}}}
 
 let class_M source_path = Class (m_body source_path)
 

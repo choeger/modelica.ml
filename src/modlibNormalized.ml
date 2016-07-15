@@ -89,6 +89,7 @@ and field_modification = { mod_kind : component_kind ;
                            mod_default : exp option [@default None]}
 
 and class_field = { field_class : class_value ;
+                    field_pos : int;
                     field_mod : field_modification [@default {mod_kind=CK_Class; mod_nested = StrMap.empty; mod_default=None}]}
 
 and modified_class = { class_ : class_value ;
@@ -125,10 +126,10 @@ let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () =
        let class_mod = StrMap.map (self.map_field_modification self) class_mod in
        {class_; class_mod});
 
-   map_class_field = (fun self {field_class; field_mod} ->
+   map_class_field = (fun self {field_class; field_pos; field_mod} ->
        let field_class = self.map_class_value self field_class in
        let field_mod = self.map_field_modification self field_mod in
-       {field_class; field_mod});
+       {field_class; field_pos; field_mod});
                       
    map_elements_struct = (fun self {class_members; super; fields} ->
        let class_members = StrMap.map (self.map_modified_class self) class_members in
@@ -225,7 +226,7 @@ and update_map lhs rhs x m =
   StrMap.modify_def empty_modified_class x (update_modified_class lhs rhs) m
 
 and update_field_map lhs rhs x m =  
-  StrMap.modify_def {field_class=empty_class;field_mod=no_modification}
+  StrMap.modify_def {field_class=empty_class; field_pos=0; field_mod=no_modification}
     x (update_field_class_value lhs rhs) m
 
 and update_field_class_value lhs rhs f = {f with field_class = update_class_value lhs rhs f.field_class}
