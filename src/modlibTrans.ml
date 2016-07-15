@@ -45,6 +45,10 @@ exception InconsistentHierarchy
 
 type import_env = DS.name StrMap.t
 
+let order_defs {defs; redeclared_defs} = []
+
+let order_modified_defs m = []
+
 let add_import env import = match import.commented with
   | NamedImport {global=[]; _} | Unnamed [] -> (* cannot happen, make ocamlc happy *) env                                                                    
   (* in the case of a renaming import, pick up the substitution *)
@@ -163,11 +167,11 @@ let bind_value rhs state =
   let field = List.of_enum (Enum.map (fun ident -> {subscripts=[]; ident}) (DQ.enum (state.current_field))) in
   ((), {state with value_code = {lhs = {scope; field}; rhs} :: state.value_code})
 
-let open_class sort post state = ((), {state with class_code =
-                                                    {lhs = txt_only state.current_path ;
-                                                     rhs = Close } ::
-                                                    {lhs = txt_only state.current_path;
-                                                     rhs = (post (Empty {class_sort = sort; class_name = (Name.of_ptr (txt_only state.current_path))}))} :: state.class_code})
+let open_class sort elements post state = ((), {state with class_code =
+                                                             {lhs = txt_only state.current_path ;
+                                                              rhs = Close elements } ::
+                                                             {lhs = txt_only state.current_path;
+                                                              rhs = (post (Empty {class_sort = sort; class_name = (Name.of_ptr (txt_only state.current_path))}))} :: state.class_code})
 
 let in_context m state =
   let (x, s') = m {state with anons = (Hashtbl.hash state.current_path)} in
@@ -234,7 +238,7 @@ let rec mtranslate_typedef td =
       (* Class name *)
       down_class tds.td_name ;
       (* Class skeleton *)
-      open_class tds.sort (repl tds.type_options) ;
+      open_class tds.sort (order_defs tds.type_exp.public) (repl tds.type_options) ;
       (* Payload *)
       payload {annotated_elem=tds.type_exp.cargo; annotation=td.comment.annotation} ;
       (* Public elements *)
@@ -269,7 +273,7 @@ let rec mtranslate_typedef td =
       add_imports cmp.imports ;
       shadow_imports cmp.public cmp.protected ;
       down_class tds.td_name ;
-      open_class tds.sort (repl tds.type_options) ;
+      open_class tds.sort (order_defs cmp.public) (repl tds.type_options) ;
       mtranslate_elements cmp.public ;
       down (nl (`SuperClass (List.length cmp.public.extensions))) ;
       define RedeclareExtends ; up ;
@@ -335,7 +339,7 @@ and mtranslate_mod_class src name {mod_type; modification} =
   *)    
   do_ ;
   (* context is [..; 'model Pipe'] *)
-  open_class Class (fun x -> x) ;
+  open_class Class (order_modified_defs modification) (fun x -> x) ;
   down (nl (`SuperClass 0)) ;
   mtranslate_texp (fun x -> x) mod_type ;
   up ;     
@@ -355,7 +359,7 @@ and mtranslate_mod_field src {mod_type; modification} =
   define (KnownPtr (txt_only pullout)) ;
   up ;
   down a ;
-  open_class Class (fun x -> x) ;
+  open_class Class (order_modified_defs modification) (fun x -> x) ;
   down (nl (`SuperClass 0)) ;
   mtranslate_texp (fun x -> x) mod_type ;
   up ;     
@@ -430,7 +434,7 @@ and mtranslate_nested_modification src = function
     do_ ;
     state <-- get ;
     down {loc=x.loc; txt=(`Any x.txt)} ;
-    open_class Class (fun x -> x) ;
+    open_class Class [] (fun x -> x) ;
     down (nl (`SuperClass 0)) ;
     define RedeclareExtends ;
     up;    

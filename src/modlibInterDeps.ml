@@ -73,7 +73,7 @@ let rec reads r i {lhs; rhs} =
   | PInt | PReal | PString | PBool | PExternalObject | Empty _ -> r
   | PEnumeration _ -> r
   | Constr {arg} ->  reads r i {lhs; rhs=arg}
-  | Close -> r                         
+  | Close _ -> r                         
   | Reference n ->
     let sources = prefixes (Name.of_ptr lhs) in 
     let what = Name.of_list (lunloc n) in
@@ -105,7 +105,7 @@ let topological_order w r a =
     List.filter (fun j -> is_super a.(j)) 
   in
 
-  let is_closer = function Close -> true
+  let is_closer = function Close _ -> true
                          | _ -> false
   in
 
@@ -219,7 +219,7 @@ let topological_order w r a =
       begin match rhs with               
         (* If this is a close statement, add a reverse dependency 
            to the parent's close statement *)
-          Close when NameMap.mem q w -> add_to_closer g'' i q
+          Close _ when NameMap.mem q w -> add_to_closer g'' i q
 
         | t when (opens_scope t) && (NameMap.mem q w) ->
           add_empty_creator g'' i q

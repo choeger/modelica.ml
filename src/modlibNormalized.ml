@@ -198,9 +198,7 @@ type found_struct = { found_path : class_path ;
 
 type search_error = [ `NothingFound | `PrefixFound of prefix_found_struct ] [@@deriving show,yojson]
 
-type found_recursion = { rec_term : rec_term ; search_state : prefix_found_struct } [@@deriving show,yojson]
-
-type search_result = [`Found of found_struct | `Recursion of found_recursion | search_error ] [@@deriving show,yojson]
+type search_result = [`Found of found_struct | search_error ] [@@deriving show,yojson]
 
 exception IllegalPath of string                         
 exception CannotUpdate of string * string * string
@@ -273,14 +271,12 @@ let rec follow_path global found_path found_value path = match DQ.front path wit
               match follow_path_es global DQ.empty global ys y with
               | `Found {found_value} ->
                 follow_path global found_path found_value path
-              | `Recursion _ as r -> r
               | `NothingFound | `PrefixFound _ as result -> result
             end
         end
       (* Replaceable/Constr means to look into it *)
       | Replaceable v -> begin match follow_path global found_path v path with
             `Found fs -> `Found {fs with found_replaceable=true}
-          | `Recursion _ as r -> r
           | `NothingFound | `PrefixFound _ as result -> result
         end
       | Constr {arg} -> follow_path global found_path arg path

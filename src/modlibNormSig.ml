@@ -165,13 +165,10 @@ let rec norm lhs =
     Report.do_ ;
     return (Class {empty_object_struct with object_sort = class_sort ; source_path = target lhs})
 
-  | Close ->
+  | Close _ ->
     Report.do_ ; o <-- output ;
     begin match lookup_path_direct o (target lhs) with
         `Found {found_value} -> return found_value
-      | `Recursion _ ->
-        BatLog.logf "Internal error. Trying to close a recursive element.\n";
-        fail
       | `NothingFound | `PrefixFound _ as result ->
         BatLog.logf "Could not find closed scope\n";
         fail_unresolved {searching=Name.of_ptr lhs.lookup_result.current_path; result}

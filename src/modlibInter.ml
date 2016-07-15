@@ -84,7 +84,7 @@ type class_ptr = class_ptr_elem DQ.t [@@deriving eq,show,yojson]
 type class_term = Reference of DS.name
                 | RedeclareExtends
                 | Empty of open_class
-                | Close
+                | Close of string list
                 | RootReference of DS.name
                 | KnownPtr of class_ptr
                 | PInt | PReal | PString | PBool | PExternalObject
