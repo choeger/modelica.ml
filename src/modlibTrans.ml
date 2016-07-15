@@ -326,7 +326,7 @@ and mtranslate_texp post =
         `SuperClass _ -> do_ ; up; mtranslate_modification_values modification; down ctxt 
       | `FieldType txt -> do_ ; up; down_field {loc=ctxt.loc; txt}; mtranslate_modification_values modification; up_field; down ctxt
       | `ClassMember _ -> mtranslate_modification_values modification
-      | `Protected -> raise InconsistentHierarchy
+      | `Protected | `Any _ -> raise InconsistentHierarchy
     end
     
 and mtranslate_mod_class src name {mod_type; modification} =
@@ -381,12 +381,12 @@ and mtranslate_extends i {ext_type} =
   mtranslate_texp identity ext_type ;
   up
   
-and mtranslate_elements {extensions;typedefs;redeclared_types;defs;redeclared_defs} = 
+and mtranslate_elements {extensions;typedefs;redeclared_typedefs;defs;redeclared_defs} = 
   do_ ;
   mseqi mtranslate_extends extensions ;
   mseq mtranslate_typedef typedefs ;
   mseq mtranslate_def defs ;
-  mseq mtranslate_typedef redeclared_types ;
+  mseq mtranslate_typedef redeclared_typedefs ;
   mseq mtranslate_def redeclared_defs
 
 and mtranslate_def def =
@@ -411,12 +411,12 @@ and mtranslate_type_redeclaration src {redecl_type} =
   define (KnownPtr (txt_only pullout)) ;  
   up 
 
-and mtranslate_modification src {types; components; modifications} =
+and mtranslate_modification src {redeclared_types; redeclared_components; modifications} =
   do_ ;
-  mseq (mtranslate_type_redeclaration src) types ;
-  mseq (mtranslate_def_redeclaration src) components ; 
+  mseq (mtranslate_type_redeclaration src) redeclared_types ;
+  mseq (mtranslate_def_redeclaration src) redeclared_components ; 
   x <-- mfold false (||) (mtranslate_nested_modification src) modifications ;
-  return (x || types != [] || components != [])
+  return (x || redeclared_types != [] || redeclared_components != [])
 
 and mtranslate_nested_modification src = function
   | {commented = {mod_name = []; mod_value = None}} -> return false
@@ -481,14 +481,16 @@ type translated_unit = {
 
 open FileSystem
 
-let mtranslate_unit env {within; toplevel_defs=td::_} =
-  do_ ;
-  set_env env ;
-  within_path within ;
-  mtranslate_typedef td ;
-  s <-- get ;
-  return {class_code=s.class_code; class_name=Name.of_ptr (txt_only s.current_path); impl_code=s.value_code; payload=s.payload_code}
-
+let mtranslate_unit env = function
+    {within; toplevel_defs=td::_} ->
+    do_ ;
+    set_env env ;
+    within_path within ;
+    mtranslate_typedef td ;
+    s <-- get ;
+    return {class_code=s.class_code; class_name=Name.of_ptr (txt_only s.current_path); impl_code=s.value_code; payload=s.payload_code}
+  | _ -> raise InconsistentHierarchy
+           
 let translate_unit env {scanned; parsed} =
   run (mtranslate_unit env parsed)
 

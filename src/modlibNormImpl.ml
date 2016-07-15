@@ -329,6 +329,10 @@ let rec normalize_classmod_stmts self kind {class_; class_mod} =
 let rec normalize_stmts self ({super;fields;class_members} as es)=
   function
   | [] -> es
+  | {field_name=[]}::stmts ->
+    (* Should not happen, but we can ignore it *)
+    normalize_stmts self es stmts
+      
   | {field_name=y::ys;exp}::stmts ->
     (* normalize the modified component *)
     let exp = resolve StrMap.empty self exp in
@@ -381,6 +385,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
               let {super_mod} as sc = IntMap.find n super in
               let super_mod = merge_mod exp y ys super_mod in
               normalize_stmts self {es with super = IntMap.add n {sc with super_mod} super} stmts
+            | None -> raise (Failure "Lookup Result inconsistent")
           end
       end
     | Error {lookup_error_todo=todo} ->
@@ -388,9 +393,7 @@ let rec normalize_stmts self ({super;fields;class_members} as es)=
       raise (ModificationTargetNotFound todo)
 
 
-let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts} =
-  let class_name path = DQ.of_enum (Enum.filter_map (function `ClassMember x -> Some {kind=CK_Class;known_type=None;component={ident={txt=x;loc=Location.none};subscripts=[]}} | _ -> None) (DQ.enum path)) in
-  
+let rec impl_mapper {notify; strat_stmts; payload; current_class; current_stmts} =  
   { ModlibNormalized.identity_mapper with
     
     map_object_struct = (fun self os ->

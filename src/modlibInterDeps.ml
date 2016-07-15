@@ -159,7 +159,7 @@ let topological_order w r a =
     | Precisely n -> let (refined, source) = refine {source_name=DQ.empty; required=n} in
       add_local_deps i g [(refined, source)]
 
-    | FirstOf ({what ; sources } as fo) ->
+    | FirstOf {what ; sources } ->
       let srcs = List.map (fun source_name -> {source_name; required=what}) sources in
       let refined = List.map refine srcs in       
       add_local_deps i g refined
@@ -183,7 +183,7 @@ let topological_order w r a =
         try 
           let j = List.find (fun j -> is_empty a.(j).rhs) js in add_edge g i j
         with
-          Not_found as e -> BatLog.logf "No empty rhs for %s\n" (show_class_ptr a.(fst).lhs) ; raise NormalizationError
+          Not_found -> BatLog.logf "No empty rhs for %s\n" (show_class_ptr a.(fst).lhs) ; raise NormalizationError
                          
     else (BatLog.logf "Could not add %s to open-statement, no such statement found.\n" (Name.show lhs) ; g)
   in

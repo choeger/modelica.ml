@@ -250,13 +250,13 @@ and pp_component_modification fmt { commented = { mod_each ; mod_final ; mod_nam
     pp_comment comment
 
 
-and pp_modification fmt { types ; components ; modifications } =
+and pp_modification fmt { redeclared_types ; redeclared_components ; modifications } =
   let pp_mod_sep fmt () = fprintf fmt ",@ " in
-  pp_print_list ~pp_sep:pp_mod_sep pp_type_redeclaration fmt types ;
-  if types != [] && components != [] then
+  pp_print_list ~pp_sep:pp_mod_sep pp_type_redeclaration fmt redeclared_types ;
+  if redeclared_types != [] && redeclared_components != [] then
     pp_mod_sep fmt ();  
-  pp_print_list ~pp_sep:pp_mod_sep pp_component_redeclaration fmt components ;
-  if modifications != [] && (types != [] || components != []) then
+  pp_print_list ~pp_sep:pp_mod_sep pp_component_redeclaration fmt redeclared_components ;
+  if modifications != [] && (redeclared_types != [] || redeclared_components != []) then
     pp_mod_sep fmt ();  
   pp_print_list ~pp_sep:pp_mod_sep pp_component_modification fmt modifications
 
@@ -348,13 +348,13 @@ and pp_definition fmt { commented ; comment } =
 and pp_enum_literal fmt {commented ; comment} =
   fprintf fmt "@[%s%a@]" commented pp_comment comment                                           
 
-and pp_elements v fmt { typedefs ; redeclared_types ; extensions ; defs ; redeclared_defs ; } =
+and pp_elements v fmt { typedefs ; redeclared_typedefs ; extensions ; defs ; redeclared_defs ; } =
   let pp_redeclared pp fmt x = fprintf fmt "@[redeclare@ %a@]" pp x in
 
   fprintf fmt "%s@ @[<v2>" v;
   pp_print_list (pp_element pp_extend) fmt extensions ;
   pp_print_list (pp_element pp_typedef) fmt typedefs ;
-  pp_print_list (pp_element (pp_redeclared pp_typedef)) fmt redeclared_types ;
+  pp_print_list (pp_element (pp_redeclared pp_typedef)) fmt redeclared_typedefs ;
   pp_print_list (pp_element pp_definition) fmt defs ;
   pp_print_list (pp_element (pp_redeclared pp_definition)) fmt redeclared_defs ;
   fprintf fmt "@]" ; 

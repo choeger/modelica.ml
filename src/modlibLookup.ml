@@ -118,7 +118,7 @@ let rec get_class_element_in state {Normalized.class_members; super; fields} x x
     (pickfirst_class state x xs (IntMap.bindings super) )
   end
   
-and get_class_element_os state ({public;protected} as os) x xs =
+and get_class_element_os state {public;protected} x xs =
   let f = get_class_element_in state public x xs in
   match f with
     Error {lookup_error_state={current_ref}} when undefined x.ident.txt public ->
@@ -168,6 +168,7 @@ and get_class_element state k e p =
   
   let project state v = function
       [] ->
+      let open Flags in
       begin match v with
           LClass {clbdy={object_sort=Record|OperatorRecord|Function|OperatorFunction} as os} ->
           (* patch correct type and kind for records and functions 
@@ -379,8 +380,8 @@ and fun_of_cv state fields =
         raise NotFlat
     in       
     match flat_attr.fa_cau with
-      Some Input -> ({ftarg_name=x; ftarg_type=ft_of_cv state flat_val; ftarg_opt=m.mod_default <> None} :: inputs, outputs)
-    | Some Output -> (inputs, (ft_of_cv state flat_val)::outputs)
+      Some Flags.Input -> ({ftarg_name=x; ftarg_type=ft_of_cv state flat_val; ftarg_opt=m.mod_default <> None} :: inputs, outputs)
+    | Some Flags.Output -> (inputs, (ft_of_cv state flat_val)::outputs)
     | _ -> (inputs, outputs)
   in
   let (inputs, outputs) = List.fold_left mkarg ([], []) (StrMap.bindings fields) in
@@ -395,7 +396,7 @@ and or_of_cv state or_tag {fields;class_members;super} =
       Success {lookup_success_value=lv; lookup_success_state=op_state} ->
       let {flat_attr;flat_val} = flat (class_value_of_lookup lv) in
       begin match flat_attr.fa_sort with
-          Some Operator ->
+          Some Flags.Operator ->
           (* In case of an operator, collect all functions in this operator *)
           begin match flat_val with
               Class os ->
@@ -413,7 +414,7 @@ and or_of_cv state or_tag {fields;class_members;super} =
               Enum.fold add_operator [] keys 
             | _ -> []
           end
-        | Some OperatorFunction ->
+        | Some Flags.OperatorFunction ->
           begin match ft_of_kcs op_state.current_ref.known_components with
               Some FTFunction (opargs, _) -> [{opargs; opname="default"}]
             | _ -> []
@@ -470,9 +471,9 @@ and ft_of_cv state = function
   | Constr {arg; constr=Array n} -> FTArray (ft_of_cv state arg, n)
   | Constr {arg} -> ft_of_cv state arg
   | Replaceable cv -> ft_of_cv state cv
-  | Class {object_sort=Function; public={fields}} ->    
+  | Class {object_sort=Flags.Function; public={fields}} ->    
     fun_of_cv state fields
-  | Class {source_path; object_sort = OperatorRecord; public} ->
+  | Class {source_path; object_sort = Flags.OperatorRecord; public} ->
     let or_tag = Pprint_modelica.expr2str (cre (UnknownRef {root=true; components=List.map any (Name.to_list (Name.of_ptr source_path))})) in    
     if StrSet.mem or_tag state.current_ft then
       FTOperatorRecordSelf or_tag
@@ -500,6 +501,7 @@ let rec forward state k c (todo:Path.t) =
     forward_os {state with self} os todo
   | c -> begin
       match DQ.front todo with
+      | None -> state
       | Some(x,xs) ->
         raise (ExpansionException ("expected a class. got: " ^ (show_class_value c)))
     end
@@ -511,7 +513,7 @@ and forward_os state {public;protected} todo =
                               {state with current_path = Path.snoc state.current_path `Protected} protected xs
   | _ -> forward_elements state public todo
 
-and forward_elements state ({class_members; super; fields} as es) (todo:Path.t) =
+and forward_elements state {class_members; super; fields} (todo:Path.t) =
   match DQ.front todo with
   | None -> raise (ExpansionException "Unexpected end-of-path")
   | Some(`FieldType x, xs) when StrMap.mem x fields ->
@@ -523,11 +525,11 @@ and forward_elements state ({class_members; super; fields} as es) (todo:Path.t) 
   | Some(`SuperClass i, xs) when IntMap.mem i super ->
     raise (ExpansionException ("Cannot forward into a superclass: " ^ (Path.show state.current_path)))
 
+  | Some (`Protected, xs) -> raise (IllegalPath "protected")
+
   | Some (x, _) ->
     BatLog.logf "Fowarding failed. No element %s in %s" (Path.show_elem_t x) (Path.show state.current_path) ;
     raise (ForwardFailure x)
-
-  | Some (`Protected, xs) -> raise (IllegalPath "protected")
 
 (** Forward a lookup state by an (existing) (relative) pointer *)
 let forward_state state todo = 

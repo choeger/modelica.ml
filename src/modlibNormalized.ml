@@ -311,6 +311,7 @@ and follow_path_es global found_path {class_members;super;fields} todo = functio
       (StrMap.find x class_members).class_ todo
 
   | `ClassMember x -> raise (IllegalPath x)
+  | `Protected -> raise (IllegalPath "protected")
 
 let lookup_path_direct global p = match DQ.front p with
     Some(x,xs) -> follow_path_es global DQ.empty global xs x

@@ -293,7 +293,17 @@ let test_cases = [
    extend "extends Modelica.Icons.InterfacesPackage" extend_statement );
 
   defs "Real p" [uncommented {empty_def with def_name = "p" ; def_type = type_name ["Real"] ;}] ;
-  defs "Real p(foo={42})" [uncommented {empty_def with def_name = "p" ; def_type = TMod{mod_type=type_name ["Real"]; modification={types=[]; components=[]; modifications=[{comment=no_comment; commented={mod_each=false; mod_final=false; mod_name = [nl "foo"]; mod_value=Some(Rebind (Array [Int 42]))}}]}} ;}] ;
+  defs "Real p(foo={42})" [uncommented {empty_def with def_name = "p" ;
+                                                       def_type = TMod{mod_type=type_name ["Real"];
+                                                                       modification={no_modification with
+                                                                                     modifications=[{comment=no_comment;
+                                                                                                     commented={mod_each=false;
+                                                                                                                mod_final=false;
+                                                                                                                mod_name = [nl "foo"];
+                                                                                                                mod_value=Some(Rebind (Array [Int 42]))}
+                                                                                                    }]
+                                                                                    }} ;}] ;
+  
   defs "Real p, q" [uncommented {empty_def with def_name = "p" ; def_type = type_name ["Real"] ;} ;
                     uncommented {empty_def with def_name = "q" ; def_type = type_name ["Real"] ;}
                    ] ;  
@@ -404,7 +414,7 @@ let test_cases = [
     (uncommented (Composition { empty_typedef with td_name = nl"X" ;
                                                    type_exp = { empty_composition with
                                                                 public = { empty_elements with
-                                                                           redeclared_types = [
+                                                                           redeclared_typedefs = [
                                                                              uncommented (
                                                                                Short { empty_typedef with td_name = nl"T" ;
                                                                                                           type_exp = type_name ["S"]
@@ -522,14 +532,14 @@ let test_cases = [
                           td_name = nl"A" ;
                           type_exp = TMod { mod_type=type_name ["B"] ;
                                             modification = { no_modification with
-                                                             types = [{ redecl_each = false ;
-                                                                        redecl_type =
-                                                                          uncommented ({
-                                                                              empty_typedef with
-                                                                              td_name = nl"C" ;
-                                                                              type_exp = type_name ["D"]
-                                                                            })
-                                                                      }]}
+                                                             redeclared_types = [{ redecl_each = false ;
+                                                                                   redecl_type =
+                                                                                     uncommented ({
+                                                                                         empty_typedef with
+                                                                                         td_name = nl"C" ;
+                                                                                         type_exp = type_name ["D"]
+                                                                                       })
+                                                                                 }]}
                                           }
                         }));                                                                 
 
@@ -539,17 +549,17 @@ let test_cases = [
                           type_exp = TMod { mod_type=type_name ["B"] ;
                                             modification = {
                                               no_modification with
-                                              types = [{ redecl_each = false ;
-                                                         redecl_type =
-                                                           uncommented { empty_typedef with
-                                                                         td_name = nl"C" ;
-                                                                         type_exp = type_name ["D"] ;
-                                                                         type_options = {
-                                                                           no_type_options with
-                                                                           type_replaceable = true;
-                                                                         }
-                                                                       }
-                                                       }];}
+                                              redeclared_types = [{ redecl_each = false ;
+                                                                    redecl_type =
+                                                                      uncommented { empty_typedef with
+                                                                                    td_name = nl"C" ;
+                                                                                    type_exp = type_name ["D"] ;
+                                                                                    type_options = {
+                                                                                      no_type_options with
+                                                                                      type_replaceable = true;
+                                                                                    }
+                                                                                  }
+                                                                  }];}
                                           }
                         }));             
 
@@ -558,14 +568,14 @@ let test_cases = [
                           td_name = nl"A" ;
                           type_exp = TMod { mod_type=type_name ["B"] ;
                                             modification = { no_modification with
-                                                             components = [{ each = false ;
-                                                                             def = 
-                                                                               uncommented ({
-                                                                                   empty_def with
-                                                                                   def_name = "c" ;
-                                                                                   def_type = type_name ["C"]
-                                                                                 })
-                                                                           }]}
+                                                             redeclared_components = [{ each = false ;
+                                                                                        def = 
+                                                                                          uncommented ({
+                                                                                              empty_def with
+                                                                                              def_name = "c" ;
+                                                                                              def_type = type_name ["C"]
+                                                                                            })
+                                                                                      }]}
                                           }
                         }));                                                                 
 
@@ -574,16 +584,16 @@ let test_cases = [
                           td_name = nl"A" ;
                           type_exp = TMod { mod_type=type_name ["B"] ;
                                             modification = { no_modification with
-                                                             components = [{ each = false ;
-                                                                             def = 
-                                                                               uncommented ({
-                                                                                   empty_def with
-                                                                                   def_name = "c" ;
-                                                                                   def_type = type_name ["C"];
-                                                                                   def_options = { no_def_options with
-                                                                                                   replaceable=true }
-                                                                                 })
-                                                                           }]}
+                                                             redeclared_components = [{ each = false ;
+                                                                                        def = 
+                                                                                          uncommented ({
+                                                                                              empty_def with
+                                                                                              def_name = "c" ;
+                                                                                              def_type = type_name ["C"];
+                                                                                              def_options = { no_def_options with
+                                                                                                              replaceable=true }
+                                                                                            })
+                                                                                      }]}
                                           }
                         }));
 
