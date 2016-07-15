@@ -169,8 +169,9 @@ let pp_scope fmt = function
   | InnerOuter ->  pp_print_string fmt "inner outer "
   | Local -> ()
 
-let pp_def_options fmt { final ; def_scope ; replaceable } =
-  fprintf fmt "@[%s%s%a@]"
+let pp_def_options fmt { redeclare; final ; def_scope ; replaceable } =
+  fprintf fmt "@[%s%s%s%a@]"
+    (if redeclare then "redeclare " else "")
     (if final then "final " else "")
     (if replaceable then "replaceable " else "")
     pp_scope def_scope
@@ -348,7 +349,7 @@ and pp_definition fmt { commented ; comment } =
 and pp_enum_literal fmt {commented ; comment} =
   fprintf fmt "@[%s%a@]" commented pp_comment comment                                           
 
-and pp_elements v fmt { typedefs ; redeclared_typedefs ; extensions ; defs ; redeclared_defs ; } =
+and pp_elements v fmt { typedefs ; redeclared_typedefs ; extensions ; defs ; } =
   let pp_redeclared pp fmt x = fprintf fmt "@[redeclare@ %a@]" pp x in
 
   fprintf fmt "%s@ @[<v2>" v;
@@ -356,7 +357,6 @@ and pp_elements v fmt { typedefs ; redeclared_typedefs ; extensions ; defs ; red
   pp_print_list (pp_element pp_typedef) fmt typedefs ;
   pp_print_list (pp_element (pp_redeclared pp_typedef)) fmt redeclared_typedefs ;
   pp_print_list (pp_element pp_definition) fmt defs ;
-  pp_print_list (pp_element (pp_redeclared pp_definition)) fmt redeclared_defs ;
   fprintf fmt "@]" ; 
 
 and pp_composition fmt { imports ; public; protected; cargo ; } =

@@ -189,7 +189,6 @@ and operator_record = {
     redeclared_typedefs : typedef list ;
     extensions : extend list ;
     defs : definition list ;
-    redeclared_defs : definition list ;
   }
 
   and composition = { imports : import list ;
@@ -210,7 +209,7 @@ and operator_record = {
 
   and extend = { ext_type : texp ; ext_annotation : modification option }
 
-  and definition_options = { final : bool ; def_scope : scope ; replaceable : bool }
+  and definition_options = { redeclare : bool; final : bool ; def_scope : scope ; replaceable : bool }
 
   and definition_structure = { def_name : string ; def_type : texp ; def_constraint : constraint_ option ;
                                def_rhs : exp option ; def_if : exp option ; def_options : definition_options }

@@ -45,7 +45,7 @@ exception InconsistentHierarchy
 
 type import_env = DS.name StrMap.t
 
-let order_defs {defs; redeclared_defs} = []
+let order_defs {defs} = []
 
 let order_modified_defs m = []
 
@@ -385,13 +385,12 @@ and mtranslate_extends i {ext_type} =
   mtranslate_texp identity ext_type ;
   up
   
-and mtranslate_elements {extensions;typedefs;redeclared_typedefs;defs;redeclared_defs} = 
+and mtranslate_elements {extensions;typedefs;redeclared_typedefs;defs} = 
   do_ ;
   mseqi mtranslate_extends extensions ;
   mseq mtranslate_typedef typedefs ;
   mseq mtranslate_def defs ;
-  mseq mtranslate_typedef redeclared_typedefs ;
-  mseq mtranslate_def redeclared_defs
+  mseq mtranslate_typedef redeclared_typedefs
 
 and mtranslate_def def =
   do_ ;

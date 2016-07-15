@@ -392,8 +392,10 @@ scope : INNER { Inner }
       | INNER OUTER { InnerOuter }
       | { Local }
           
-type_prefix : final = flag(FINAL) def_scope=scope  replaceable = flag(REPLACEABLE)                 
-                { { final ; def_scope ; replaceable } }
+type_prefix : REDECLARE final=flag(FINAL) def_scope=scope replaceable = flag(REPLACEABLE)                 
+              { { redeclare = true; final; def_scope ; replaceable } }
+            | final=flag(FINAL) def_scope=scope replaceable = flag(REPLACEABLE)                 
+              { { redeclare = false; final; def_scope ; replaceable } }
 
 array_subscripts : LBRACKET dims = separated_list(COMMA, expr) RBRACKET { dims }
 
@@ -496,8 +498,6 @@ public_composition_elements :
                 { {rest with public = { rest.public with extensions = extend::rest.public.extensions } } }
             | defs = component_clause SEMICOLON rest = public_composition_elements 
                 { {rest with public = { rest.public with defs = defs @ rest.public.defs } } }
-            | REDECLARE defs = component_clause SEMICOLON rest = public_composition_elements
-                { {rest with public = { rest.public with redeclared_defs = defs @ rest.public.redeclared_defs } } }
             | typedef = type_definition SEMICOLON rest = public_composition_elements 
                 { {rest with public = { rest.public with typedefs=typedef::rest.public.typedefs} } }
             | REDECLARE typedef = type_definition SEMICOLON rest = public_composition_elements 
@@ -513,8 +513,6 @@ protected_composition_elements :
                 { {rest with protected = { rest.protected with extensions = extend::rest.protected.extensions } } }
             | defs = component_clause SEMICOLON rest = protected_composition_elements 
                 { {rest with protected = { rest.protected with defs = defs @ rest.protected.defs } } }
-            | REDECLARE defs = component_clause SEMICOLON rest = protected_composition_elements
-                { {rest with protected = { rest.protected with redeclared_defs = defs @ rest.protected.redeclared_defs } } }
             | typedef = type_definition SEMICOLON rest = protected_composition_elements 
                 { {rest with protected = { rest.protected with typedefs=typedef::rest.protected.typedefs} } }
             | REDECLARE typedef = type_definition SEMICOLON rest = protected_composition_elements 

@@ -134,7 +134,7 @@ let uncommented a = { commented = a ; comment = no_comment }
 
 let no_modification = { redeclared_types = [] ; redeclared_components = [] ; modifications = [] }
 
-let no_def_options = { final = false ; replaceable = false ; def_scope = Flags.Local }
+let no_def_options = { redeclare=false; final = false ; replaceable = false ; def_scope = Flags.Local }
 
 let empty_def  = { def_name ="" ; def_type = TName []; def_options = no_def_options ; def_constraint = None ; def_rhs = None ; def_if = None }
 
@@ -145,7 +145,7 @@ let empty_typedef = { td_name = Location.mknoloc "" ; type_exp = () ; type_optio
 
 let empty_behavior = { algorithms = [] ; initial_algorithms = [] ; equations = [] ; initial_equations = [] ; external_ = None }
 
-let empty_elements = { defs = [] ; extensions = [] ; redeclared_defs = [] ;
+let empty_elements = { defs = [] ; extensions = [] ;
                        typedefs = [] ; redeclared_typedefs = [] }
 
 
