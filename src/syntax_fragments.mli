@@ -152,3 +152,6 @@ val root_type : string list -> texp
 
 (** Empty operator record description *)
 val empty_or : operator_record
+
+(** Flat-type argument *)
+val ftarg : string -> ?ftarg_opt:bool -> flat_type -> ftarg  

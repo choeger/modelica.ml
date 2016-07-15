@@ -104,7 +104,7 @@ let empty_app f = { fun_ = f ; args = [] ; named_args = [] }
 
 let empty_or =
   { or_tag=""; 
-    or_fields = StrMap.empty;  
+    or_fields = [];
     or_zero = [];
     or_not = [];
     or_constructor = [];
@@ -123,6 +123,8 @@ let empty_or =
     or_and = [];
     or_or = [];
   }
+
+let ftarg ftarg_name ?(ftarg_opt=false) ftarg_type = {ftarg_name; ftarg_opt; ftarg_type}
 
 let named x argument = {argument_name = Location.mknoloc x ; argument }
 

@@ -139,6 +139,9 @@ let cv_mapper ?(map_behavior = fun x -> x) ?(map_expr = fun x -> x) () =
        {class_members; super; fields}) ;      
 }
 
+let fields_in_order fields =
+  List.fast_sort (fun (_,f1) (_,f2) -> Int.compare f2.field_pos f1.field_pos) (StrMap.bindings fields)
+
 type flat_attributes = {
   fa_sort : sort option [@default None] ;
   fa_var : variability option [@default None];

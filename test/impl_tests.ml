@@ -391,7 +391,7 @@ let test_cases = [
     (let known_type = Some (
          FTOperatorRecord {empty_or with
                            or_tag = ".P.A";
-                           or_fields = StrMap.of_list ["a", FTReal] ;
+                           or_fields = [ftarg "a" FTReal] ;
                            or_mult = [{opname="multiply";
                                        opargs=[{ftarg_name="a1";ftarg_type=FTOperatorRecordSelf ".P.A"; ftarg_opt=false};
                                                {ftarg_name="a2";ftarg_type=FTOperatorRecordSelf ".P.A"; ftarg_opt=true}]}]})
@@ -418,7 +418,7 @@ let test_cases = [
        constant R a = R(x=1.0);
      end P"
     [cm "P"] (Has.field public "a" **> Is.bound_to
-                (app (knownref 0 [cclass ~known_type:(FTObject (StrMap.of_list ["x", FTReal])) "R"]) ["x", S.real 1.0])) ;
+                (app (knownref 0 [cclass ~known_type:(FTObject [ftarg "x" FTReal]) "R"]) ["x", S.real 1.0])) ;
   
   test_norm
     "Functions with indirect input/output distinction"

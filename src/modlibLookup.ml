@@ -368,9 +368,8 @@ and lookup_continue_or_yield state = function
     Success {lookup_success_state=state; lookup_success_value=LClass state.self.tip}
     | x::xs -> lookup_continue state x xs
 
-and fun_of_cv state fields =
-  let mkarg (inputs,outputs) (x, {field_class;field_def}) =
-    let {flat_attr;flat_val} =
+and arg_of_field state (x, {field_class;field_def}) =
+  let {flat_attr;flat_val} =
       match lookup_continue state {ident=nl x; subscripts=[]} [] with
         Success {lookup_success_value=lv; lookup_success_state={current_attr}} ->
         let v = class_value_of_lookup lv in
@@ -379,13 +378,17 @@ and fun_of_cv state fields =
         BatLog.logf "Could not resolve function component %s\n" x ;
         raise NotFlat
     in       
-    match flat_attr.fa_cau with
-      Some Flags.Input -> ({ftarg_name=x; ftarg_type=ft_of_cv state flat_val; ftarg_opt=field_def} :: inputs, outputs)
-    | Some Flags.Output -> (inputs, (ft_of_cv state flat_val)::outputs)
+    (flat_attr, {ftarg_name=x; ftarg_type=ft_of_cv state flat_val; ftarg_opt=field_def})
+    
+and fun_of_cv state fields =
+  let split (inputs,outputs) (x, field) =
+    let ({fa_cau},arg) = arg_of_field state (x,field) in
+    match fa_cau with
+      Some Flags.Input -> (arg :: inputs, outputs)
+    | Some Flags.Output -> (inputs, arg.ftarg_type::outputs)
     | _ -> (inputs, outputs)
   in
-  let flds = List.fast_sort (fun (_,f1) (_,f2) -> Int.compare f2.field_pos f1.field_pos) (StrMap.bindings fields) in 
-  let (inputs, outputs) = List.fold_left mkarg ([], []) flds in
+  let (inputs, outputs) = List.fold_left split ([], []) (fields_in_order fields) in
   FTFunction (inputs, outputs)
 
 and ft_of_field state {field_class} =
@@ -424,7 +427,7 @@ and or_of_cv state or_tag {fields;class_members;super} =
       end
     | _ -> []
   in
-  let or_fields = StrMap.map (ft_of_field state) fields in
+  let or_fields = List.map (fun fld -> snd (arg_of_field state fld)) (fields_in_order fields) in
   let or_zero = operator "'0'" in
   let or_constructor = operator "'constructor'" in
   let or_string  = operator "'String'" in
@@ -467,7 +470,7 @@ and ft_of_cv state = function
   | Real -> FTReal
   | String -> FTString    
   | Bool -> FTBool
-  | Unit | ProtoExternalObject -> FTObject StrMap.empty
+  | Unit | ProtoExternalObject -> FTObject []
   | Enumeration s -> FTEnum s
   | Constr {arg; constr=Array n} -> FTArray (ft_of_cv state arg, n)
   | Constr {arg} -> ft_of_cv state arg
@@ -484,7 +487,7 @@ and ft_of_cv state = function
     end
 
   | Class {public={fields}} ->
-    FTObject (StrMap.map (ft_of_field state) fields)
+    FTObject (List.map (fun fld -> snd (arg_of_field state fld)) (fields_in_order fields))
       
   | (GlobalReference _ | DynamicReference _) ->
     raise NotFlat

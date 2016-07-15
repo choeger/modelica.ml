@@ -87,7 +87,7 @@ and flat_type = FTReal | FTString | FTBool | FTInteger
               | FTEnum of StrSet.t
               | FTSpecial of special_rule
               | FTFunction of ftarg list * flat_type list
-              | FTObject of flat_type StrMap.t
+              | FTObject of ftarg list
               | FTArray of flat_type * int
 
               | FTOperatorRecordSelf of string
@@ -100,7 +100,7 @@ and operator = operator_def list
 
 and operator_record = {
   or_tag : string;
-  or_fields : flat_type StrMap.t;
+  or_fields : ftarg list;
   
   or_zero : operator;
   or_not : operator;
