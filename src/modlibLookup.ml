@@ -369,7 +369,7 @@ and lookup_continue_or_yield state = function
     | x::xs -> lookup_continue state x xs
 
 and fun_of_cv state fields =
-  let mkarg (inputs,outputs) (x, {field_class;field_mod=m}) =
+  let mkarg (inputs,outputs) (x, {field_class;field_def}) =
     let {flat_attr;flat_val} =
       match lookup_continue state {ident=nl x; subscripts=[]} [] with
         Success {lookup_success_value=lv; lookup_success_state={current_attr}} ->
@@ -380,11 +380,12 @@ and fun_of_cv state fields =
         raise NotFlat
     in       
     match flat_attr.fa_cau with
-      Some Flags.Input -> ({ftarg_name=x; ftarg_type=ft_of_cv state flat_val; ftarg_opt=m.mod_default <> None} :: inputs, outputs)
+      Some Flags.Input -> ({ftarg_name=x; ftarg_type=ft_of_cv state flat_val; ftarg_opt=field_def} :: inputs, outputs)
     | Some Flags.Output -> (inputs, (ft_of_cv state flat_val)::outputs)
     | _ -> (inputs, outputs)
   in
-  let (inputs, outputs) = List.fold_left mkarg ([], []) (StrMap.bindings fields) in
+  let flds = List.fast_sort (fun (_,f1) (_,f2) -> Int.compare f2.field_pos f1.field_pos) (StrMap.bindings fields) in 
+  let (inputs, outputs) = List.fold_left mkarg ([], []) flds in
   FTFunction (inputs, outputs)
 
 and ft_of_field state {field_class} =

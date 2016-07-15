@@ -165,10 +165,22 @@ let rec norm lhs =
     Report.do_ ;
     return (Class {empty_object_struct with object_sort = class_sort ; source_path = target lhs})
 
-  | Close _ ->
+  | Close public_defs ->
     Report.do_ ; o <-- output ;
     begin match lookup_path_direct o (target lhs) with
-        `Found {found_value} -> return found_value
+        `Found {found_value} ->
+        let f = flat found_value in
+        begin match f.flat_val with
+          | Class os ->
+            let fields =
+              List.fold_left (fun flds {name;pos;defined} ->
+                  StrMap.modify name (fun f -> {f with field_pos = pos; field_def = defined}) flds)
+                os.public.fields public_defs
+            in
+            let flat_val = Class {os with public = {os.public with fields}} in
+            return (unflat {f with flat_val})
+          | _ -> return (unflat f) 
+        end    
       | `NothingFound | `PrefixFound _ as result ->
         BatLog.logf "Could not find closed scope\n";
         fail_unresolved {searching=Name.of_ptr lhs.lookup_result.current_path; result}
