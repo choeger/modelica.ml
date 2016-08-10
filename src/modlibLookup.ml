@@ -164,9 +164,10 @@ and pickfirst_class state x xs = function
 and get_class_element state k e p =  
   let open Normalized in  
   let current_path = Path.snoc state.current_path k in
-  let state = {state with current_path} in
-  
-  let project state v = function
+  let state = {state with current_path} in  
+  eval state p e
+
+and project state v = function
       [] ->
       let open Flags in
       begin match v with
@@ -183,10 +184,6 @@ and get_class_element state k e p =
                 
             | Some(xs, x) ->
               let known_type = ft_of_cv_safe state (Class os) in
-
-              let () = match known_type with Some t -> Printf.printf "patching %s with %s\n" x.component.ident.txt  (show_flat_type t) 
-                                           | None -> Printf.printf "No known type for %s\n" x.component.ident.txt 
-              in
               let kind = match os.object_sort with Function|OperatorFunction -> CK_Function | _ -> x.kind in
               let known_components = DQ.snoc xs {x with kind; known_type} in
               {state.current_ref with known_components}
@@ -233,7 +230,7 @@ and get_class_element state k e p =
                                                             DQ.snoc state.current_ref.known_components attr}} in
                   Success {lookup_success_state;
                            lookup_success_value=LPrimitive attr_cv}
-                | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
+                | _ -> Error {lookup_error_todo=(x::xs); lookup_error_state=state}
               end
             | Enumeration flds ->
               begin match xs with                         
@@ -255,14 +252,13 @@ and get_class_element state k e p =
                   Success {lookup_success_state;
                            lookup_success_value=LPrimitive (unflat flat)}
 
-                | _ -> Error {lookup_error_todo=p; lookup_error_state=state}
+                | _ -> Error {lookup_error_todo=(x::xs); lookup_error_state=state}
               end
             | v -> raise (Failure ("Such builtins should not occur here (" ^ x.ident.txt ^ ": " ^ (show_class_value v) ^ ")") )
           end
       end
-  in
-  
-  let rec helper state = function
+
+and eval state p = function
   | Class os ->
     assert (not (Path.equal os.source_path state.self.tip.clbdy.source_path)) ;
     let tip = {clup = Some state.self; clbdy = os} in
@@ -349,15 +345,18 @@ and get_class_element state k e p =
     end
     
   (* Replaceable/Constr means to look into it *)
-  | Replaceable v -> helper {state with current_attr = {state.current_attr with fa_replaceable=true}} v
-  | Constr {constr=Cau c; arg} -> helper {state with current_attr = {state.current_attr with fa_cau = Some c}} arg
-  | Constr {constr=Con c; arg} -> helper {state with current_attr = {state.current_attr with fa_con = Some c}} arg
-  | Constr {constr=Var v; arg} -> helper {state with current_attr = {state.current_attr with fa_var = Some v}} arg
-  | Constr {constr=Sort s; arg} -> helper {state with current_attr = {state.current_attr with fa_sort = Some s}} arg
+  | Replaceable v ->
+    eval {state with current_attr = {state.current_attr with fa_replaceable=true}} p v
+  | Constr {constr=Cau c; arg} ->
+    eval {state with current_attr = {state.current_attr with fa_cau = Some c}} p arg
+  | Constr {constr=Con c; arg} ->
+    eval {state with current_attr = {state.current_attr with fa_con = Some c}} p arg
+  | Constr {constr=Var v; arg} ->
+    eval {state with current_attr = {state.current_attr with fa_var = Some v}} p arg
+  | Constr {constr=Sort s; arg} ->
+    eval {state with current_attr = {state.current_attr with fa_sort = Some s}} p arg
                                      
   | v -> project state (LPrimitive v) p
-  in
-  helper state e
 
 (** Start lookup with the given state *)
 and lookup_continue state x xs =
@@ -369,16 +368,18 @@ and lookup_continue_or_yield state = function
     | x::xs -> lookup_continue state x xs
 
 and arg_of_field state (x, {field_class;field_def}) =
-  let {flat_attr;flat_val} =
+  let ({flat_attr;flat_val}, ftarg_type) =
       match lookup_continue state {ident=nl x; subscripts=[]} [] with
-        Success {lookup_success_value=lv; lookup_success_state={current_attr}} ->
+        Success {lookup_success_value=lv; lookup_success_state=state'} ->
         let v = class_value_of_lookup lv in
-        extract_attributes current_attr v
+        let ft = extract_attributes state'.current_attr v in
+        let ftarg_type=ft_of_cv state' ft.flat_val in
+        (ft, ftarg_type)        
       | _ ->
         BatLog.logf "Could not resolve function component %s\n" x ;
         raise NotFlat
-    in       
-    (flat_attr, {ftarg_name=x; ftarg_type=ft_of_cv state flat_val; ftarg_opt=field_def})
+  in  
+  (flat_attr, {ftarg_name=x; ftarg_type; ftarg_opt=field_def})
     
 and fun_of_cv state fields =
   let split (inputs,outputs) (x, field) =
@@ -475,8 +476,9 @@ and ft_of_cv state = function
   | Constr {arg; constr=Array n} -> FTArray (ft_of_cv state arg, n)
   | Constr {arg} -> ft_of_cv state arg
   | Replaceable cv -> ft_of_cv state cv
-  | Class {object_sort=Flags.Function; public={fields}} ->    
+  | Class {object_sort=Flags.Function; public={fields}; source_path} ->
     fun_of_cv state fields
+      
   | Class {source_path; object_sort = Flags.OperatorRecord; public} ->
     let or_tag = Pprint_modelica.expr2str (cre (UnknownRef {root=true; components=List.map any (Name.to_list (Name.of_ptr source_path))})) in    
     if StrSet.mem or_tag state.current_ft then
@@ -489,10 +491,17 @@ and ft_of_cv state = function
   | Class {public={fields}} ->
     FTObject (List.map (fun fld -> snd (arg_of_field state fld)) (fields_in_order fields))
       
-  | (GlobalReference _ | DynamicReference _) ->
-    raise NotFlat
+  | e ->
+    begin match eval state [] e with
+        Success ls ->
+        ft_of_cv ls.lookup_success_state
+          (class_value_of_lookup ls.lookup_success_value)        
+      | _ -> raise NotFlat
+    end
       
-and ft_of_cv_safe state cv = try Some (ft_of_cv state cv) with | NotFlat -> None
+and ft_of_cv_safe state cv =
+  try Some (ft_of_cv state cv) with
+  | NotFlat -> None
 
 
 let rec forward state k c (todo:Path.t) =

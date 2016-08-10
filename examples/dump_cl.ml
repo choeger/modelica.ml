@@ -32,6 +32,7 @@ open Sys
 open FileSystem
 open Report
 open Modlib
+open Lookup
     
 let print_message i msg = BatLog.logf "%d: %s\n" i (show_message msg)
 
@@ -46,14 +47,18 @@ let _ =
     Ok o -> BatLog.logf "Decompression Ok.\n" ;
             let name = String.nsplit argv.(2) "." in
             begin match name with
-                    hd::tl -> let t = Lookup.lookup o (List.map (fun txt -> {Syntax.ident={txt;loc=Location.none};subscripts=[]}) name) in
-                              let js = Lookup.lookup_result_to_yojson t in
-                              Printf.printf "%s\n" (Yojson.Safe.pretty_to_string js) ;
-                              begin match t with
-                                  Lookup.Success _ -> 0
-                                | _ -> 1
-                              end
-                  | _ -> 0
+                hd::tl -> let t = lookup o
+                              (List.map (fun txt -> {Syntax.ident={txt;loc=Location.none};subscripts=[]}) name) in
+                begin match t with
+                    Success ls ->
+                    let js =
+                      Normalized.class_value_to_yojson
+                        (class_value_of_lookup ls.lookup_success_value) in
+                    Printf.printf "%s\n" (Yojson.Safe.pretty_to_string js) ;
+                    0
+                  | _ -> 1
+                end                
+              | _ -> 0
             end
 
   | Failed -> BatLog.logf "Decompression Error\n" ; 1 

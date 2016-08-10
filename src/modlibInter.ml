@@ -80,7 +80,7 @@ type class_ptr_elem = [Path.elem_t | `Any of string] [@@deriving eq,show,yojson]
 (** Path to a element in the global class hierarchy (including possibly unknown elements) *)
 type class_ptr = class_ptr_elem DQ.t [@@deriving eq,show,yojson]
 
-type field_property = { name : string; pos : int; defined : bool } [@@deriving eq,yojson,show]
+type field_property = { fld_name : string; fld_pos : int; fld_defined : bool } [@@deriving eq,yojson,show]
 
 (** Intermediate language to describe classes/types *)
 type class_term = Reference of DS.name

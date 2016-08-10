@@ -47,13 +47,14 @@ type import_env = DS.name StrMap.t
 
 let order_defs {defs} = List.mapi
     (fun i d ->
-       {name = d.commented.def_name; pos = i; defined = d.commented.def_rhs <> None} 
+       {fld_name = d.commented.def_name; fld_pos = i;
+        fld_defined = d.commented.def_rhs <> None} 
     ) defs
 
 let order_modified_defs m =
   List.mapi 
-    (fun i c -> {name = c.def.commented.def_name ;
-                 pos = i; defined = c.def.commented.def_rhs <> None})
+    (fun i c -> {fld_name = c.def.commented.def_name ;
+                 fld_pos = i; fld_defined = c.def.commented.def_rhs <> None})
     m.redeclared_components
 
 let add_import env import = match import.commented with

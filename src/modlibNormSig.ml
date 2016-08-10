@@ -173,8 +173,8 @@ let rec norm lhs =
         begin match f.flat_val with
           | Class os ->
             let fields =
-              List.fold_left (fun flds {name;pos;defined} ->
-                  StrMap.modify name (fun f -> {f with field_pos = pos; field_def = defined}) flds)
+              List.fold_left (fun flds {fld_name;fld_pos;fld_defined} ->
+                  StrMap.modify fld_name (fun f -> {f with field_pos = fld_pos; field_def = fld_defined}) flds)
                 os.public.fields public_defs
             in
             let flat_val = Class {os with public = {os.public with fields}} in

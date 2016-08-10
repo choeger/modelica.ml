@@ -70,27 +70,41 @@ and extends_builtin_os lib {object_sort; public; protected} =
   
 and extends_builtin_el lib {super} = IntMap.cardinal super = 1 && extends_builtin lib (IntMap.find 0 super).class_
 *)
-    
+
 (** Attempt to resolve $first.$rest as a builtin *)
 let resolve_builtin first rest =
+  let ft_of_attr p = function
+      {ident={txt="start" | "min" | "max" | "nominal"}} -> p
+    | {ident={txt="quantity" | "unit" | "displayUnit"}} -> Some FTString
+    | {ident={txt="stateSelect"}} ->
+      Some (FTEnum (StrSet.of_list ["never";"avoid";"default";"prefer";"always"]))
+    | {ident={txt="fixed"}} -> Some FTBool
+    | {ident={txt}} ->
+      begin match p with
+          Some (FTEnum xs) when StrSet.mem txt xs -> p
+        | _ -> raise (Failure (txt ^ " is not a valid attribute"))
+      end
+  in
+
   let builtin ?known_type kind =
-    RootRef (DQ.cons {kind; component=first; known_type} (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; known_type=None; component}) rest)))
+    RootRef (DQ.cons {kind; component=first; known_type}
+               (DQ.of_list (List.map (fun component -> {kind=CK_BuiltinAttr; known_type=ft_of_attr known_type component; component}) rest)))
   in
   match first.ident.txt with
   (* Free variable *)
   | "time" -> builtin ~known_type:FTReal CK_Time
                 
   (* Numeric Functions and Conversion Functions, see 3.7.1 *)
-  | "abs" | "sign" | "sqrt" | "div" 
+  | "sign" | "sqrt" | "div" 
   | "mod" | "rem" | "ceil" | "floor" 
   | "integer"
   (* 3.7.1.2 *)
-  | "sin" | "cos" | "tan"
+  | "abs" | "sin" | "cos" | "tan"
   | "asin" | "acos" | "atan"
   | "atan2" 
   | "sinh" | "cosh" | "tanh"
   | "exp" | "log" | "log10"
-    -> builtin CK_BuiltinFunction
+    -> builtin ~known_type:(FTFunction ([{ftarg_name="x"; ftarg_type=FTReal; ftarg_opt=false}], [FTReal])) CK_BuiltinFunction
 
   (* Reductions, see 10.3.4 *)
   | "min" | "max" | "sum" | "product"
@@ -123,7 +137,9 @@ let resolve_builtin first rest =
   | "array" | "cat" | "zeros" | "fill" | "ones" | "identity" | "diagonal" | "linspace" -> builtin CK_BuiltinFunction
 
   (* Builtin Classes *)
-  | "Boolean" | "Integer" | "String" | "StateSelect" | "Connections" | "AssertionLevel" -> builtin CK_BuiltinClass
+  | "Boolean" | "Integer" | "String" | "Connections" -> builtin CK_BuiltinClass
+  | "StateSelect" -> builtin ~known_type:(FTEnum (StrSet.of_list ["never";"avoid";"default";"prefer";"always"])) CK_BuiltinClass
+  | "AssertionLevel" -> builtin ~known_type:(FTEnum (StrSet.of_list ["warning"; "error"])) CK_BuiltinClass
 
   | _ ->
     BatLog.logf "%s\nError searching for %s\n" (where_desc first.ident.loc) first.ident.txt ; raise (NoSuchClass first.ident)
