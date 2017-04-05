@@ -137,8 +137,8 @@ let letter = [%sedlex.regexp? 'a'..'z'|'A'..'Z']
 
 let white_space = [%sedlex.regexp? 
                                    0x09 | 0x0b | 0x0c | 0x20 | 0x85 | 0xa0 | 0x1680 |
-                                 0x2000 .. 0x200a | 0x2028 .. 0x2029 | 0x202f.. 0x202f | 0x205f.. 0x205f |
-                                 0x3000.. 0x3000 | 0xfeff]
+                                 0x2000 .. 0x200a | 0x2028 .. 0x2029 | 0x202f .. 0x202f | 0x205f .. 0x205f |
+                                 0x3000 .. 0x3000 | 0xfeff]
 
 let state_from_utf8_string src input = {
   buf = Utf8.from_string input ;
